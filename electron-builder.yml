@@ -1,0 +1,28 @@
+appId: com.densz.app
+productName: Densz
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist-electron/**
+  - dist-renderer/**
+  - package.json
+extraResources:
+  - .env
+win:
+  target: nsis
+  icon: build/icon.ico
+  # Sin certificado de firma de código: se desactiva el paso de edición de
+  # recursos del .exe (rcedit) para evitar que electron-builder intente
+  # descargar su herramienta vendorizada de firma (winCodeSign), que en
+  # Windows sin "Modo de desarrollador" falla al crear symlinks internos
+  # que ni siquiera se usan para un build sin firmar. El instalador NSIS
+  # igual queda con el ícono de Densz (lo aplica el propio NSIS).
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+asarUnpack:
+  - "**/*.node"

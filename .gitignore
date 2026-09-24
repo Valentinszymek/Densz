@@ -1,0 +1,30 @@
+node_modules/
+dist-electron/
+dist-renderer/
+dist/
+release/
+release-final/
+data/
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+
+# Bases de datos reales / backups — nunca en el repo (defensa en
+# profundidad además de data/ arriba: nunca debería haber un .db real
+# fuera de esa carpeta, pero si aparece uno suelto, esto lo bloquea).
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Instaladores/empaquetados de Electron — binarios grandes, se generan
+# con `npm run dist`, nunca se versionan.
+*.exe
+*.blockmap
+*.dmg
+*.AppImage
+win-unpacked/

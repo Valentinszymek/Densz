@@ -1,0 +1,35 @@
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--densz-cream);
+  color: var(--densz-carbon);
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--densz-gold);
+  outline-offset: 2px;
+}
+
+/* Oculta la scrollbar visualmente sin desactivar el scroll funcional —
+   usado puntualmente en la nav del Sidebar, no globalmente. */
+.scrollbar-invisible {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Edge/IE legacy */
+}
+.scrollbar-invisible::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
