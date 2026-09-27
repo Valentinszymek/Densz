@@ -1,6 +1,11 @@
 # Config de build para Railway (Nixpacks) — SOLO para el backend
 # (src/server), nunca afecta al build de Electron ni al de Vercel.
 #
+# Se especifica acá el build/start EXACTOS (en vez de depender de que se
+# configuren a mano en Settings de Railway): sin esto, Nixpacks corre por
+# defecto `npm run build` (el de Electron, que no existe como carpeta
+# `dist/`) y falla porque busca una carpeta que este proyecto no tiene.
+#
 # Puppeteer (src/server/pdf.ts) descarga su propio Chromium en `npm
 # install`, pero Chromium necesita estas librerías del sistema operativo
 # para poder arrancar — sin esto, la generación de PDFs (comprobantes,
@@ -46,3 +51,9 @@ aptPkgs = [
   "wget",
   "xdg-utils"
 ]
+
+[phases.build]
+cmds = ["npm run build:server"]
+
+[start]
+cmd = "npm run start:server"
