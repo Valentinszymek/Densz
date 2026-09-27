@@ -30,6 +30,7 @@ export default function Trabajos() {
   const [params] = useSearchParams();
   const odontologoId = params.get("odontologo") ? Number(params.get("odontologo")) : undefined;
   const clinicaId = params.get("clinica") ? Number(params.get("clinica")) : undefined;
+  const pacienteId = params.get("paciente") ? Number(params.get("paciente")) : undefined;
 
   const [busquedaCruda, setBusquedaCruda] = useState("");
   const busqueda = useDebouncedValue(busquedaCruda, 200);
@@ -38,6 +39,7 @@ export default function Trabajos() {
   const { data: ordenes, isLoading } = useOrdenes({
     odontologoId,
     clinicaId,
+    pacienteId,
     busqueda,
     estado: estado || undefined
   });

@@ -72,6 +72,21 @@ export default function CuentaDetalle() {
         </div>
       </div>
 
+      {odontologo?.clinicaId && (
+        <div className="mb-6 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3">
+          <p className="text-sm font-medium text-carbon">Facturación por clínica</p>
+          <p className="text-sm text-carbon/60 mt-0.5">
+            Este odontólogo factura a través de {odontologo.clinicaNombre}.
+          </p>
+          <Link
+            to={`/cuentas/clinica/${odontologo.clinicaId}`}
+            className="inline-flex items-center gap-1 text-sm text-gold-dim hover:underline mt-1.5"
+          >
+            Ver cuenta de la clínica →
+          </Link>
+        </div>
+      )}
+
       {(saldos ?? []).length === 0 && (
         <p className="text-sm text-carbon/40 mb-6">Sin movimientos todavía.</p>
       )}

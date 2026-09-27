@@ -172,7 +172,7 @@ export default function ClinicaCuentaDetalle() {
                         visualización para que el último facturado quede arriba. */}
                     {[...b.trabajos].reverse().map((t) => (
                       <Tr
-                        key={t.ordenId}
+                        key={`${t.ordenId}-${t.comprobanteNumero}`}
                         className={`cursor-pointer ${t.anulado ? "opacity-40" : ""}`}
                         onClick={() => navigate(`/trabajos/${t.ordenId}`)}
                       >

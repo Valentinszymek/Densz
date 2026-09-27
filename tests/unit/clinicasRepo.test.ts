@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTestDbConUsuario, idListaGeneral, type TestDb } from "../helpers/testDb";
-import { crearOdontologo } from "../../src/main/db/repositories/odontologosRepo";
+import { crearOdontologo, obtenerOdontologo } from "../../src/main/db/repositories/odontologosRepo";
 import { crearCategoria, crearPrestacion } from "../../src/main/db/repositories/preciosRepo";
 import { cambiarPrecioEnLista } from "../../src/main/db/repositories/listasPrecioRepo";
 import { crearOrdenConPrestaciones } from "../../src/main/services/ordenService";
 import {
   crearClinica,
   obtenerClinica,
+  listarClinicas,
+  actualizarClinica,
+  setActivaClinica,
   contarUsoClinica,
   eliminarClinica
 } from "../../src/main/db/repositories/clinicasRepo";
@@ -105,5 +108,74 @@ describe("clinicasRepo — eliminación segura", () => {
     const uso = await contarUsoClinica(db, clinicaId);
     expect(uso.cantidadPagos).toBe(1);
     await expect(eliminarClinica(db, clinicaId)).rejects.toThrow(/información histórica asociada/);
+  });
+});
+
+// Cobertura de las escrituras conectadas al backend web en la Fase 5B
+// (ver src/server/routes/clinicas.route.ts): actualizarClinica y
+// setActivaClinica no tenían test todavía — crearClinica y eliminarClinica
+// ya estaban cubiertas arriba.
+describe("clinicasRepo — actualizar y activar/desactivar", () => {
+  let ctx: TestDb & { usuarioId: number };
+  let listaId: number;
+
+  beforeEach(async () => {
+    ctx = await createTestDbConUsuario();
+    listaId = await idListaGeneral(ctx.db);
+  });
+
+  afterEach(async () => {
+    await ctx.finalizar();
+  });
+
+  it("actualiza nombre, teléfono y dirección de una clínica", async () => {
+    const { db } = ctx;
+    const id = await crearClinica(db, { nombre: "Vieja", telefono: "111", direccion: "Calle Vieja" });
+
+    await actualizarClinica(db, id, { nombre: "Nueva", telefono: "222", direccion: "Calle Nueva" });
+
+    const c = await obtenerClinica(db, id);
+    expect(c?.nombre).toBe("Nueva");
+    expect(c?.telefono).toBe("222");
+    expect(c?.direccion).toBe("Calle Nueva");
+  });
+
+  it("activa y desactiva una clínica sin tocar sus profesionales asociados", async () => {
+    const { db } = ctx;
+    const clinicaId = await crearClinica(db, { nombre: "Con profesional" });
+    const odontologoId = await crearOdontologo(db, {
+      nombre: "Dr. De la clínica",
+      listaPrecioId: listaId,
+      clinicaId
+    });
+
+    await setActivaClinica(db, clinicaId, false);
+    let c = await obtenerClinica(db, clinicaId);
+    expect(c?.activo).toBe(false);
+
+    // La relación con el odontólogo no se mueve ni se rompe al desactivar la clínica.
+    let o = await obtenerOdontologo(db, odontologoId);
+    expect(o?.clinicaId).toBe(clinicaId);
+    expect(o?.activo).toBe(true);
+
+    await setActivaClinica(db, clinicaId, true);
+    c = await obtenerClinica(db, clinicaId);
+    expect(c?.activo).toBe(true);
+
+    o = await obtenerOdontologo(db, odontologoId);
+    expect(o?.clinicaId).toBe(clinicaId);
+  });
+
+  it("listarClinicas respeta soloActivas después de desactivar", async () => {
+    const { db } = ctx;
+    const id1 = await crearClinica(db, { nombre: "Activa Uno" });
+    const id2 = await crearClinica(db, { nombre: "Activa Dos" });
+    await setActivaClinica(db, id2, false);
+
+    const activas = await listarClinicas(db, { soloActivas: true });
+    expect(activas.map((c) => c.id)).toEqual([id1]);
+
+    const todas = await listarClinicas(db, {});
+    expect(todas.map((c) => c.id).sort()).toEqual([id1, id2].sort());
   });
 });

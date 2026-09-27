@@ -41,11 +41,20 @@ export function useImprimirComprobante() {
   return useMutation({
     mutationFn: (comprobanteId: number) => window.densz.comprobantesImprimir(comprobanteId),
     onSuccess: () => toast({ titulo: "Enviado a la impresora", tono: "exito" }),
-    onError: (e: unknown) =>
-      toast({
-        titulo: "No se pudo imprimir",
-        descripcion: String(e),
-        tono: "error"
-      })
+    onError: (e: unknown) => {
+      // En Web, comprobantesImprimir todavía no tiene equivalente (es
+      // impresión silenciosa, exclusiva de Electron) — en vez del error
+      // técnico crudo, se explica en criollo. En Desktop esta función
+      // funciona de verdad y nunca cae en esta rama.
+      if (String(e).includes("no está conectado en la versión web")) {
+        toast({
+          titulo: "La impresión directa está disponible únicamente en Densz Desktop.",
+          descripcion: "Desde la Web podés abrir o descargar el PDF e imprimirlo desde el navegador.",
+          tono: "info"
+        });
+        return;
+      }
+      toast({ titulo: "No se pudo imprimir", descripcion: String(e), tono: "error" });
+    }
   });
 }

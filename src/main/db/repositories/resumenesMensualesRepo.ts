@@ -96,6 +96,22 @@ export async function listarResumenesMensuales(db: Queryable, titular: TitularCu
   return rows.map(mapear);
 }
 
+/** Actualiza el `pdf_path` de un resumen ya creado — usado por la capa web
+ * (cuentasWeb.ts) después de subir el PDF a Storage, igual que
+ * `comprobantesRepo.setPdfPath` hace para comprobantes. */
+export async function actualizarPdfPathResumen(db: Queryable, id: number, pdfPath: string): Promise<void> {
+  await db.query("UPDATE resumenes_mensuales SET pdf_path = $1 WHERE id = $2", [pdfPath, id]);
+}
+
+/** Borra un resumen ya creado — usado exclusivamente por la capa web
+ * (cuentasWeb.ts) para revertir una generación cuando la subida del PDF a
+ * Storage (o la actualización de `pdf_path`) falla: nunca debe quedar un
+ * resumen generado por la web apuntando a un archivo local o inexistente
+ * (§ corrección Fase 8D). No lo usa Desktop ni ningún otro flujo. */
+export async function eliminarResumenMensual(db: Queryable, id: number): Promise<void> {
+  await db.query("DELETE FROM resumenes_mensuales WHERE id = $1", [id]);
+}
+
 export async function obtenerResumenMensual(db: Queryable, id: number): Promise<ResumenMensual | null> {
   const { rows } = await db.query<FilaResumen>(`${SELECT_BASE} WHERE r.id = $1`, [id]);
   return rows[0] ? mapear(rows[0]) : null;

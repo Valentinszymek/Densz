@@ -54,7 +54,17 @@ export default function PacienteDetalle() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-display">{cantidadTrabajos ?? "—"}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-2xl font-display">{cantidadTrabajos ?? "—"}</p>
+              {cantidadTrabajos !== undefined &&
+                (cantidadTrabajos > 0 ? (
+                  <Link to={`/trabajos?paciente=${paciente.id}`} className="text-sm text-gold-dim hover:underline shrink-0">
+                    Ver trabajos →
+                  </Link>
+                ) : (
+                  <span className="text-sm text-carbon/40 shrink-0">Sin trabajos</span>
+                ))}
+            </div>
           </CardContent>
         </Card>
       </div>

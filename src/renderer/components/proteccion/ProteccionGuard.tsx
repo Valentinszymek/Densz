@@ -1,64 +1,46 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Outlet } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { Button } from "../ui/Button";
 import { FormField, Input } from "../ui/Input";
 import { useEstadoProteccion, useDesbloquear, useBloquearProteccion } from "../../features/proteccion/hooks";
 import { RecuperarAccesoModal } from "./RecuperarAccesoModal";
 
-/** A qué sección protegida pertenece una ruta, o `null` si no es
- * ninguna — usa prefijo para cubrir también las sub-rutas de cada una
- * (ej. `/cuentas/5`, `/cuentas/clinica/3`) sin considerarlas una salida. */
-function seccionProtegidaDe(pathname: string): "cuentas" | "estadisticas" | null {
-  if (pathname.startsWith("/cuentas")) return "cuentas";
-  if (pathname.startsWith("/estadisticas")) return "estadisticas";
-  return null;
-}
-
 /**
- * Envuelve las rutas de Estadísticas y Cuentas (§3, §4). Regla
- * fundamental (corrección posterior a la versión original): la
- * autorización NUNCA persiste más allá de la visita actual — nada de
+ * Envuelve las rutas de Estadísticas y Cuentas (§3, §4) — comparten UNA
+ * sola contraseña y por eso comparten UN solo guard (ver comentario en
+ * router.tsx): desbloquear cualquiera de las dos desbloquea la otra
+ * también, porque para el usuario es una sola "zona protegida", no dos.
+ * La autorización NUNCA persiste más allá de la visita actual — nada de
  * sesión, nada de timeout, nada cacheado. El desbloqueo vive como estado
  * local de ESTE componente (`useState`, nunca en una consulta que
  * sobreviva a un remount) y se resetea a "bloqueado":
  *
- * - Cada vez que este componente se monta de cero (primera entrada,
- *   volver desde otra parte de la app, o recargar la página completa).
- * - Cada vez que se cambia de sección protegida sin desmontar (Cuentas
- *   ↔ Estadísticas comparten esta misma ruta padre, así que React Router
- *   no las desmonta entre sí — se detecta el cambio por `pathname`).
+ * - Cada vez que este componente se monta de cero (primera entrada a
+ *   Cuentas o Estadísticas, volver desde otra parte de la app, o recargar
+ *   la página completa).
  * - Al desmontarse del todo (se sale hacia cualquier otra parte de Densz,
- *   incluido el botón "Atrás").
+ *   incluido el botón "Atrás", o se cierra sesión).
  *
- * En los tres casos también se llama al backend (`bloquearProteccion`)
- * para que la protección sea real y no solo visual (§10): ningún canal
- * de Estadísticas/Cuentas sigue aceptando llamadas después de esto,
- * aunque alguien intentara invocarlas directamente desde DevTools.
+ * En ambos casos también se llama al backend (`bloquearProteccion`) para
+ * que la protección sea real y no solo visual (§10): ningún canal de
+ * Estadísticas/Cuentas sigue aceptando llamadas después de esto, aunque
+ * alguien intentara invocarlas directamente desde DevTools.
  */
 export function ProteccionGuard() {
-  const location = useLocation();
   const { data: estado, isLoading: cargandoEstado } = useEstadoProteccion();
   const [desbloqueada, setDesbloqueada] = useState(false);
   const bloquear = useBloquearProteccion();
-  const seccionAnteriorRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const seccion = seccionProtegidaDe(location.pathname);
-    const primeraVez = seccionAnteriorRef.current === null;
-    const cambioDeSeccion = !primeraVez && seccionAnteriorRef.current !== seccion;
-    if (primeraVez || cambioDeSeccion) {
-      setDesbloqueada(false);
-      bloquear.mutate();
-    }
-    seccionAnteriorRef.current = seccion;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
-
-  useEffect(() => {
+    // Primera entrada a la zona protegida (Cuentas o Estadísticas,
+    // cualquiera de las dos) — nunca vuelve a correr al navegar entre
+    // ambas, porque comparten esta misma instancia del guard.
+    setDesbloqueada(false);
+    bloquear.mutate();
     return () => {
       // Se desmonta el guard entero: se salió hacia afuera de Cuentas y
-      // Estadísticas (a cualquier otra sección de Densz).
+      // Estadísticas (a cualquier otra sección de Densz, o logout).
       bloquear.mutate();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

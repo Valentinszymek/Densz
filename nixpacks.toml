@@ -1,0 +1,48 @@
+# Config de build para Railway (Nixpacks) — SOLO para el backend
+# (src/server), nunca afecta al build de Electron ni al de Vercel.
+#
+# Puppeteer (src/server/pdf.ts) descarga su propio Chromium en `npm
+# install`, pero Chromium necesita estas librerías del sistema operativo
+# para poder arrancar — sin esto, la generación de PDFs (comprobantes,
+# estados de cuenta, listas de precio) falla en producción con un error de
+# "no se pudo lanzar el navegador", aunque todo el resto de la app funcione
+# bien. Es la lista estándar que recomienda la propia documentación de
+# Puppeteer para sistemas basados en Debian/Ubuntu (la base que usa
+# Nixpacks) — no agrega nada específico de este proyecto.
+[phases.setup]
+aptPkgs = [
+  "ca-certificates",
+  "fonts-liberation",
+  "libasound2",
+  "libatk-bridge2.0-0",
+  "libatk1.0-0",
+  "libc6",
+  "libcairo2",
+  "libcups2",
+  "libdbus-1-3",
+  "libexpat1",
+  "libfontconfig1",
+  "libgbm1",
+  "libglib2.0-0",
+  "libgtk-3-0",
+  "libnspr4",
+  "libnss3",
+  "libpango-1.0-0",
+  "libpangocairo-1.0-0",
+  "libstdc++6",
+  "libx11-6",
+  "libx11-xcb1",
+  "libxcb1",
+  "libxcomposite1",
+  "libxcursor1",
+  "libxdamage1",
+  "libxext6",
+  "libxfixes3",
+  "libxi6",
+  "libxrandr2",
+  "libxrender1",
+  "libxss1",
+  "libxtst6",
+  "wget",
+  "xdg-utils"
+]

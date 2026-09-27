@@ -28,7 +28,7 @@ export function IngresoPassword({
     try {
       await login.mutateAsync({ nombreUsuario: usuario.nombreUsuario, password });
     } catch (err) {
-      setError(String(err));
+      setError(err instanceof Error ? err.message : "No se pudo iniciar sesión.");
     }
   }
 

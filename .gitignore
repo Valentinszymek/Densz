@@ -1,6 +1,9 @@
 node_modules/
+.claude/
 dist-electron/
 dist-renderer/
+dist-renderer-web/
+dist-server/
 dist/
 release/
 release-final/

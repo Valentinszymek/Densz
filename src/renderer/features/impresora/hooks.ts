@@ -4,7 +4,10 @@ import { toast } from "../../store/toastStore";
 const CLAVE = "impresora";
 
 export function useImpresorasDisponibles() {
-  return useQuery({ queryKey: [CLAVE, "disponibles"], queryFn: () => window.densz.impresoraListar() });
+  // retry: false — en Web esta función no existe (es exclusiva de Electron/Windows)
+  // y siempre va a fallar de la misma forma, así que reintentar no sirve de nada
+  // y solo demora que se muestre el aviso de "no disponible en Web".
+  return useQuery({ queryKey: [CLAVE, "disponibles"], queryFn: () => window.densz.impresoraListar(), retry: false });
 }
 
 export function useImpresoraSeleccionada() {

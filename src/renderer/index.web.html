@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Sin la CSP restrictiva de index.html (pensada para el empaquetado
+         de escritorio, servido desde file://): la versión web necesita
+         poder hacer fetch() al backend HTTP, en otro origen. La política
+         real de red la aplica el backend (CORS con WEB_ORIGIN) y el
+         hosting cuando se despliegue — no este archivo de desarrollo. -->
+    <title>Densz</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.web.tsx"></script>
+  </body>
+</html>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Printer, RefreshCw, Check } from "lucide-react";
+import { Printer, RefreshCw, Check, MonitorX } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { cn } from "../../lib/cn";
@@ -14,13 +14,30 @@ export function ImpresoraSelectorModal({
   onOpenChange: (o: boolean) => void;
   seleccionActual: string | undefined;
 }) {
-  const { data: impresoras, isLoading, refetch, isFetching } = useImpresorasDisponibles();
+  const { data: impresoras, isLoading, isError, refetch, isFetching } = useImpresorasDisponibles();
   const seleccionar = useSeleccionarImpresora();
   const [elegida, setElegida] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) setElegida(seleccionActual ?? null);
   }, [open, seleccionActual]);
+
+  if (isError) {
+    return (
+      <Modal open={open} onOpenChange={onOpenChange} title="Elegir impresora predeterminada" size="sm">
+        <div className="flex flex-col items-center gap-3 py-4 text-center">
+          <MonitorX size={28} className="text-carbon/30" />
+          <p className="text-sm text-carbon">Esta función solo está disponible en la aplicación de escritorio de Densz.</p>
+          <p className="text-xs text-carbon/45">
+            Para imprimir desde Densz Web, generá el PDF y utilizá el diálogo de impresión del navegador.
+          </p>
+          <Button variant="secondary" size="sm" onClick={() => onOpenChange(false)}>
+            Entendido
+          </Button>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Elegir impresora predeterminada" size="sm">

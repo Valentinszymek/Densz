@@ -47,12 +47,18 @@ export async function escribirXlsx(
   await workbook.xlsx.writeFile(destino);
 }
 
+type GenerarPdf = (html: string, outputPath: string) => Promise<void>;
+
 export async function escribirPdfTabla(
   titulo: string,
   subtitulo: string,
   filas: Record<string, unknown>[],
   columnas: ColumnaExport[],
-  destino: string
+  destino: string,
+  // Inyectable para el servidor web (ver src/server/pdf.ts) — mismo
+  // criterio que comprobanteService.ts/cuentaService.ts, sin tocar el
+  // comportamiento de Desktop (sigue usando generarPdfDesdeHtml por defecto).
+  generarPdf: GenerarPdf = generarPdfDesdeHtml
 ): Promise<void> {
   const encabezados = columnas.map((c) => `<th>${c.titulo}</th>`).join("");
   const cuerpo = filas
@@ -75,5 +81,5 @@ export async function escribirPdfTabla(
   <table><thead><tr>${encabezados}</tr></thead><tbody>${cuerpo}</tbody></table>
 </body></html>`;
 
-  await generarPdfDesdeHtml(html, destino);
+  await generarPdf(html, destino);
 }

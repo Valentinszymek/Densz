@@ -240,12 +240,18 @@ async function prepararDatos(db: Queryable, tipo: TipoExport, opciones: Opciones
   }
 }
 
+type GenerarPdf = (html: string, outputPath: string) => Promise<void>;
+
 export async function exportarDatos(
   db: Queryable,
   tipo: TipoExport,
   formato: FormatoExport,
   destino: string,
-  opciones: OpcionesExport = {}
+  opciones: OpcionesExport = {},
+  // Inyectable para el servidor web — mismo criterio que
+  // comprobanteService.ts/cuentaService.ts, sin tocar el comportamiento de
+  // Desktop (sigue usando generarPdfDesdeHtml por defecto vía escribirPdfTabla).
+  generarPdf?: GenerarPdf
 ): Promise<void> {
   const datos = await prepararDatos(db, tipo, opciones);
 
@@ -253,6 +259,8 @@ export async function exportarDatos(
     escribirCsv(datos.filas, datos.columnas, destino);
   } else if (formato === "xlsx") {
     await escribirXlsx(datos.filas, datos.columnas, destino, datos.titulo.slice(0, 30));
+  } else if (generarPdf) {
+    await escribirPdfTabla(datos.titulo, datos.subtitulo, datos.filas, datos.columnas, destino, generarPdf);
   } else {
     await escribirPdfTabla(datos.titulo, datos.subtitulo, datos.filas, datos.columnas, destino);
   }

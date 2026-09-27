@@ -7,6 +7,33 @@ files:
   - dist-electron/**
   - dist-renderer/**
   - package.json
+  # Dependencias exclusivas del backend web (src/server/**) — nunca las usa
+  # el escritorio, no tienen que viajar en el instalador de Electron. El
+  # binario pesado de Chromium de Puppeteer (~580MB) vive fuera del
+  # proyecto (caché del usuario, ~/.cache/puppeteer) y nunca se empaqueta;
+  # esto excluye el paquete npm en sí y el resto de los paquetes solo-web.
+  - "!node_modules/puppeteer/**"
+  - "!node_modules/puppeteer-core/**"
+  - "!node_modules/@puppeteer/**"
+  - "!node_modules/express/**"
+  - "!node_modules/cookie-parser/**"
+  - "!node_modules/@supabase/**"
+  # Dependencias transitivas de puppeteer-core (protocolo BiDi/WebSocket y
+  # soporte de proxy para conectarse a Chromium) — confirmadas sin ningún
+  # otro uso en el proyecto tras una extracción real del .asar empaquetado.
+  - "!node_modules/chromium-bidi/**"
+  - "!node_modules/devtools-protocol/**"
+  - "!node_modules/@tootallnate/**"
+  - "!node_modules/ws/**"
+  - "!node_modules/bare-events/**"
+  - "!node_modules/bare-fs/**"
+  - "!node_modules/bare-path/**"
+  - "!node_modules/bare-stream/**"
+  - "!node_modules/bare-url/**"
+  - "!node_modules/proxy-agent/**"
+  - "!node_modules/http-proxy-agent/**"
+  - "!node_modules/https-proxy-agent/**"
+  - "!node_modules/pac-proxy-agent/**"
 extraResources:
   - .env
 win:

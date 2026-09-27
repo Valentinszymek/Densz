@@ -24,7 +24,7 @@ export function SystemStatusBadge() {
         )}
       >
         <Icono size={13} />
-        <span>{ok ? "Base de datos OK" : "Verificando…"}</span>
+        <span className="hidden lg:inline">{ok ? "Base de datos OK" : "Verificando…"}</span>
       </div>
     </Tooltip>
   );
