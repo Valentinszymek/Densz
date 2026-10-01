@@ -1,7 +1,17 @@
 import express from "express";
+// Parchea Router para que un handler `async` que rechaza (throw dentro de
+// una función async, incluyendo `.parse()` de Zod) llegue SIEMPRE al
+// error-handler global de más abajo, en vez de quedar como una promesa
+// rechazada sin manejar (Express 4 no hace esto por sí solo — recién lo
+// incorpora Express 5). Debe importarse ANTES de crear cualquier router
+// (por eso va primero, incluso antes de cookie-parser). Corrección
+// post-auditoría (§23.7/§38.2): 5 rutas quedaban colgadas ante un query
+// param inválido porque nada capturaba ese rechazo.
+import "express-async-errors";
 import cookieParser from "cookie-parser";
 import { loadEnvFile, getDatabaseUrl } from "../main/utils/appPaths";
 import { openDatabase, checkConnection } from "../main/db/connection";
+import { errorHandler } from "./middleware/errorHandler";
 import { crearRouterAuth } from "./routes/auth.route";
 import { crearRouterOdontologos } from "./routes/odontologos.route";
 import { crearRouterClinicas } from "./routes/clinicas.route";
@@ -87,6 +97,11 @@ async function main(): Promise<void> {
   app.use("/comprobantes", crearRouterComprobantes(pool));
   app.use("/estadisticas", crearRouterEstadisticas(pool));
   app.use("/export", crearRouterExport(pool));
+
+  // Red de seguridad centralizada (corrección post-auditoría §23.7/§38.2):
+  // debe ir DESPUÉS de montar todos los routers (Express la reconoce como
+  // error-handler solo por tener 4 parámetros). Ver src/server/middleware/errorHandler.ts.
+  app.use(errorHandler);
 
   app.listen(PUERTO, () => {
     // eslint-disable-next-line no-console

@@ -32,8 +32,13 @@ export function crearRouterPrecios(db: Pool): Router {
   router.use(requireAuth);
 
   router.get("/categorias", async (req, res) => {
-    const soloActivas = zBooleanQuery.parse(req.query.soloActivas as string | undefined);
-    res.json(await repo.listarCategorias(db, soloActivas));
+    try {
+      const soloActivas = zBooleanQuery.parse(req.query.soloActivas as string | undefined);
+      res.json(await repo.listarCategorias(db, soloActivas));
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      res.status(400).json({ error: error.message });
+    }
   });
 
   router.get("/categorias/:id/uso", async (req, res) => {
@@ -138,7 +143,18 @@ export function crearRouterPrecios(db: Pool): Router {
     try {
       const id = esquemaId.parse(req.params.id);
       const direccion = z.enum(["arriba", "abajo"]).parse(req.body.direccion);
-      await repo.moverCategoria(db, id, direccion);
+      const resultado = await repo.moverCategoria(db, id, direccion);
+      // Solo audita si de verdad se movió algo (resultado === null cuando
+      // ya estaba en el extremo) — corrección post-auditoría (§26/§30-D).
+      if (resultado) {
+        await registrarAuditoria(db, {
+          usuarioId: (req as unknown as RequestConSesion).sesion.usuarioId,
+          accion: "modificar",
+          entidad: "categorias_precio",
+          entidadId: id,
+          detalle: { direccion, ...resultado }
+        });
+      }
       res.json({ ok: true });
     } catch (err) {
       const error = traducirErrorPostgres(err);

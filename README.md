@@ -83,10 +83,18 @@ apuntando a todo eso.
 ## Acceso / usuarios
 
 El primer arranque, si la base está completamente vacía de usuarios, crea
-automáticamente un usuario administrador (`admin` / `densz123`) — en una
-base real migrada esto nunca se dispara porque ya existen usuarios reales.
-Cambiar la contraseña por defecto cuanto antes desde **Usuarios** (menú
-lateral, solo visible para el rol ADMINISTRADOR).
+automáticamente un usuario administrador (`admin`) — en una base real
+migrada esto nunca se dispara porque ya existen usuarios reales. La
+contraseña de ese usuario de arranque **nunca es un valor fijo conocido de
+antemano**: se genera aleatoriamente en cada arranque y se imprime una
+única vez en el log de la consola (ej. `[densz] Usuario administrador de
+arranque creado (usuario: "admin", contraseña generada: "...")`) —
+guardala de ahí y cambiala cuanto antes desde **Usuarios** (menú lateral,
+solo visible para el rol ADMINISTRADOR). Si preferís elegir vos la
+contraseña inicial en vez de que se genere una al azar, definí
+`BOOTSTRAP_ADMIN_PASSWORD` en el `.env` antes del primer arranque (ver
+`.env.example`) — nunca hace falta configurarla en producción, porque ahí
+ya existen usuarios reales y este código no se ejecuta.
 
 ## Modelo de datos (resumen)
 

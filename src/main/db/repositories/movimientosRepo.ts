@@ -266,6 +266,8 @@ interface FilaTrabajoFacturado {
   estado: "pendiente_facturar" | "facturado" | "anulado";
   importe_centavos: number;
   moneda: Moneda;
+  /** Flag propio de ESTE movimiento (no de la orden) — ver `mapearTrabajoFacturado`. */
+  movimiento_anulado: number;
 }
 
 function mapearTrabajoFacturado(f: FilaTrabajoFacturado): TrabajoFacturadoMes {
@@ -287,7 +289,19 @@ function mapearTrabajoFacturado(f: FilaTrabajoFacturado): TrabajoFacturadoMes {
     prestacionesDetalle,
     profesionalNombre: f.profesional_nombre,
     estado: f.estado,
-    anulado: f.estado === "anulado",
+    // Corrección post-auditoría (§38.1): antes se derivaba de `orden.estado`,
+    // que solo distingue "la OT entera está anulada" — cuando se edita una OT
+    // YA facturada (editarOrdenConPrestaciones), el movimiento DEBE viejo se
+    // anula y se crea uno nuevo, pero la orden SIGUE en estado "facturado".
+    // Como esta consulta puede devolver más de un movimiento para la misma
+    // OT (el viejo anulado + el nuevo activo), usar `orden.estado` hacía que
+    // AMBAS filas se mostraran como activas y se sumaran dos veces en el mes
+    // de la edición. El flag propio del movimiento (`movimientos_cuenta.anulado`)
+    // es la fuente de verdad correcta: cada mutación que anula un movimiento
+    // (anular OT, o recalcular el DEBE al editar una OT facturada) ya lo
+    // mantiene al día. Se conserva el OR con `orden.estado` como defensa
+    // adicional, nunca como fuente primaria.
+    anulado: f.movimiento_anulado === 1 || f.estado === "anulado",
     importeCentavos: f.importe_centavos,
     moneda: f.moneda
   };
@@ -323,7 +337,7 @@ async function listarTrabajosFacturadosPorMes(
               ))
                FROM (SELECT id, prestacion_nombre, cantidad FROM orden_prestaciones WHERE orden_id = o.id ORDER BY orden_index) op
             ) AS prestaciones_detalle_json,
-            m.importe_centavos, m.moneda
+            m.importe_centavos, m.moneda, m.anulado AS movimiento_anulado
      FROM movimientos_cuenta m
      JOIN ordenes o ON o.id = m.orden_id
      JOIN pacientes p ON p.id = o.paciente_id

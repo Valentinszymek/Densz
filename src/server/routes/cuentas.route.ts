@@ -51,9 +51,14 @@ export function crearRouterCuentas(db: Pool): Router {
 
   // Sin permiso ni protección — igual que CUENTAS_TIENE_PAGOS hoy.
   router.get("/tiene-pagos", async (req, res) => {
-    const odontologoId = req.query.odontologoId !== undefined ? esquemaId.parse(req.query.odontologoId) : null;
-    const clinicaId = req.query.clinicaId !== undefined ? esquemaId.parse(req.query.clinicaId) : null;
-    res.json(await tienePagosRegistrados(db, { odontologoId, clinicaId }));
+    try {
+      const odontologoId = req.query.odontologoId !== undefined ? esquemaId.parse(req.query.odontologoId) : null;
+      const clinicaId = req.query.clinicaId !== undefined ? esquemaId.parse(req.query.clinicaId) : null;
+      res.json(await tienePagosRegistrados(db, { odontologoId, clinicaId }));
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      res.status(400).json({ error: error.message });
+    }
   });
 
   const requiereCuentas = [requirePermission(PERMISOS.CUENTAS_VER), requireProteccion(db)];

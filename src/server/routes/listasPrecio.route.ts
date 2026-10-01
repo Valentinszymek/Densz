@@ -26,8 +26,13 @@ export function crearRouterListasPrecio(db: Pool): Router {
   router.use(requireAuth);
 
   router.get("/", async (req, res) => {
-    const soloActivas = zBooleanQuery.parse(req.query.soloActivas as string | undefined);
-    res.json(await repo.listarListas(db, soloActivas));
+    try {
+      const soloActivas = zBooleanQuery.parse(req.query.soloActivas as string | undefined);
+      res.json(await repo.listarListas(db, soloActivas));
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      res.status(400).json({ error: error.message });
+    }
   });
 
   // Registradas ANTES de "/:id" a propósito: "/pdf" nunca debe matchear el

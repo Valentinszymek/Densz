@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Wallet, FileBarChart, Ban, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
@@ -19,6 +19,7 @@ import {
 import { formatearMoneda, formatearFecha, formatearFechaHora } from "../../lib/format";
 import { RegistrarPagoModal } from "./RegistrarPagoModal";
 import { AnularPagoModal } from "./AnularPagoModal";
+import type { TrabajoFacturadoMes } from "@shared/types/entities";
 
 const NOMBRES_MES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -27,6 +28,28 @@ const NOMBRES_MES = [
 
 const ESTADO_TRABAJO_TONO = { pendiente_facturar: "neutral", facturado: "exito", anulado: "error" } as const;
 const ESTADO_TRABAJO_LABEL = { pendiente_facturar: "Pendiente", facturado: "Facturado", anulado: "Anulado" } as const;
+
+/**
+ * Agrupación puramente visual (Bloque 1-C): el backend sigue devolviendo
+ * los trabajos ordenados por fecha ascendente (ese orden es el que usa
+ * también el PDF del resumen mensual — estadoCuentaHtmlTemplate.ts — y no
+ * se toca). Acá solo se reordena una copia para mostrar, más reciente
+ * primero, y se arman los grupos por fecha — cada OT sigue siendo su
+ * propia fila, nunca se suman entre sí.
+ */
+function agruparPorFecha(trabajos: TrabajoFacturadoMes[]): Array<{ fecha: string | null; trabajos: TrabajoFacturadoMes[] }> {
+  const ordenados = [...trabajos].sort((a, b) => (b.fechaFacturacion ?? "").localeCompare(a.fechaFacturacion ?? ""));
+  const grupos: Array<{ fecha: string | null; trabajos: TrabajoFacturadoMes[] }> = [];
+  for (const t of ordenados) {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.fecha === t.fechaFacturacion) {
+      ultimo.trabajos.push(t);
+    } else {
+      grupos.push({ fecha: t.fechaFacturacion, trabajos: [t] });
+    }
+  }
+  return grupos;
+}
 
 export default function CuentaDetalle() {
   const { id } = useParams();
@@ -180,21 +203,30 @@ export default function CuentaDetalle() {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {b.trabajos.map((t) => (
-                    <Tr
-                      key={t.ordenId}
-                      className={`cursor-pointer ${t.anulado ? "opacity-40" : ""}`}
-                      onClick={() => navigate(`/trabajos/${t.ordenId}`)}
-                    >
-                      <Td className="font-mono text-xs text-carbon/60">{t.ordenNumero}</Td>
-                      <Td className="text-carbon/60">{t.fechaFacturacion ? formatearFecha(t.fechaFacturacion) : "—"}</Td>
-                      <Td>{t.pacienteNombreCompleto}</Td>
-                      <Td className={`text-carbon/70 ${t.anulado ? "line-through" : ""}`}>{t.prestacionesResumen}</Td>
-                      <Td className={`font-medium ${t.anulado ? "line-through" : ""}`}>{formatearMoneda(t.importeCentavos, t.moneda)}</Td>
-                      <Td>
-                        <Badge tono={ESTADO_TRABAJO_TONO[t.estado]}>{ESTADO_TRABAJO_LABEL[t.estado]}</Badge>
-                      </Td>
-                    </Tr>
+                  {agruparPorFecha(b.trabajos).map((grupo) => (
+                    <Fragment key={grupo.fecha ?? "sin-fecha"}>
+                      <Tr className="hover:bg-transparent cursor-default">
+                        <Td colSpan={6} className="bg-carbon/[0.03] py-1.5 text-[11px] font-semibold uppercase tracking-wide text-carbon/45">
+                          {grupo.fecha ? formatearFecha(grupo.fecha) : "Sin fecha"}
+                        </Td>
+                      </Tr>
+                      {grupo.trabajos.map((t) => (
+                        <Tr
+                          key={t.ordenId}
+                          className={`cursor-pointer ${t.anulado ? "opacity-40" : ""}`}
+                          onClick={() => navigate(`/trabajos/${t.ordenId}`)}
+                        >
+                          <Td className="font-mono text-xs text-carbon/60">{t.ordenNumero}</Td>
+                          <Td className="text-carbon/60">{t.fechaFacturacion ? formatearFecha(t.fechaFacturacion) : "—"}</Td>
+                          <Td>{t.pacienteNombreCompleto}</Td>
+                          <Td className={`text-carbon/70 ${t.anulado ? "line-through" : ""}`}>{t.prestacionesResumen}</Td>
+                          <Td className={`font-medium ${t.anulado ? "line-through" : ""}`}>{formatearMoneda(t.importeCentavos, t.moneda)}</Td>
+                          <Td>
+                            <Badge tono={ESTADO_TRABAJO_TONO[t.estado]}>{ESTADO_TRABAJO_LABEL[t.estado]}</Badge>
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Fragment>
                   ))}
                 </Tbody>
               </Table>

@@ -12,6 +12,9 @@ import { crearRouterTrabajos } from "../../src/server/routes/trabajos.route";
 import { crearRouterComprobantes } from "../../src/server/routes/comprobantes.route";
 import * as storageModule from "../../src/server/storage";
 import { crearSesionHttp, destruirSesionHttp, obtenerSesionHttp, COOKIE_SESION } from "../../src/server/session";
+import { avisarSiStorageCompartido } from "../helpers/testStorage";
+
+avisarSiStorageCompartido(); // corrección post-auditoría §25/§30-D — ver tests/helpers/testStorage.ts
 
 function construirApp(db: Pool): Express {
   const app = express();

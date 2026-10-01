@@ -92,9 +92,26 @@ describe("auditoriaRepo — filtros, paginación y período", () => {
 
     expect((await listarAuditoriaFiltrada(db, { busqueda: "eliminar" })).total).toBe(1);
     expect((await listarAuditoriaFiltrada(db, { busqueda: "usuarios" })).total).toBe(1);
-    expect((await listarAuditoriaFiltrada(db, { busqueda: "42" })).total).toBe(1);
     expect((await listarAuditoriaFiltrada(db, { busqueda: "nicolas" })).total).toBe(1);
     expect((await listarAuditoriaFiltrada(db, { busqueda: "no-existe-nada" })).total).toBe(0);
+
+    // Corrección de un test frágil detectado durante el bloque de
+    // corrección post-auditoría (docs/AUDITORIA_MAESTRA_DENSZ.md §25):
+    // la búsqueda por texto también matchea contra `a.id` (el id INTERNO
+    // de cada fila de auditoría, a propósito — armarWhere() en
+    // auditoriaRepo.ts, "CAST(a.id AS TEXT) LIKE"), no solo contra
+    // `entidad_id`. `a.id` es una secuencia de Postgres GLOBAL a toda la
+    // corrida de tests (nunca se resetea con el ROLLBACK de cada test),
+    // así que no hay forma de garantizar que NINGUNA otra fila de este
+    // mismo test tenga, por pura coincidencia, un `a.id` que contenga la
+    // subcadena "42" — antes esto asumía `total === 1`, lo cual es frágil
+    // (dependía de cuántas auditorías se hubieran registrado ya en el
+    // resto de la suite). Se verifica CONTENIDO (aparece la fila
+    // correcta) en vez de un total exacto.
+    const resultadoPorEntidadId = await listarAuditoriaFiltrada(db, { busqueda: "42" });
+    expect(resultadoPorEntidadId.items.some((i) => i.entidadId === 42 && i.accion === "eliminar" && i.entidad === "usuarios")).toBe(
+      true
+    );
   });
 
   it("combina todos los filtros a la vez (AND)", async () => {

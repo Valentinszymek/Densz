@@ -10,6 +10,9 @@ import { cambiarPrecioEnLista } from "../../src/main/db/repositories/listasPreci
 import { crearRouterListasPrecio } from "../../src/server/routes/listasPrecio.route";
 import * as storageModule from "../../src/server/storage";
 import { crearSesionHttp, destruirSesionHttp, COOKIE_SESION } from "../../src/server/session";
+import { avisarSiStorageCompartido } from "../helpers/testStorage";
+
+avisarSiStorageCompartido(); // corrección post-auditoría §25/§30-D — ver tests/helpers/testStorage.ts
 
 function construirApp(db: Pool): Express {
   const app = express();

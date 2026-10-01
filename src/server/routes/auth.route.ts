@@ -5,6 +5,12 @@ import { login, logout } from "../../main/services/authService";
 import { listarUsuariosActivosParaSeleccion } from "../../main/db/repositories/usuariosRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { crearSesionHttp, obtenerSesionHttp, destruirSesionHttp, COOKIE_SESION } from "../session";
+import {
+  estaBloqueadoPorIntentos,
+  registrarIntentoFallido,
+  limpiarIntentos,
+  MENSAJE_BLOQUEADO_POR_INTENTOS
+} from "../loginRateLimit";
 
 const esquemaLogin = z.object({
   nombreUsuario: z.string().trim().min(1, "Ingresá tu usuario."),
@@ -35,10 +41,25 @@ export function crearRouterAuth(db: Pool): Router {
   router.post("/login", async (req, res) => {
     try {
       const datos = esquemaLogin.parse(req.body);
-      const sesion = await login(db, datos.nombreUsuario, datos.password);
-      const idSesion = crearSesionHttp(sesion);
-      res.cookie(COOKIE_SESION, idSesion, opcionesCookie);
-      res.json(sesion);
+
+      // Corrección post-auditoría (§23.5/§30-D): límite de intentos por
+      // usuario, ANTES de tocar la base — mismo mensaje genérico que
+      // cualquier otro fallo de login, nunca revela si el usuario existe.
+      if (estaBloqueadoPorIntentos(datos.nombreUsuario)) {
+        res.status(429).json({ error: MENSAJE_BLOQUEADO_POR_INTENTOS });
+        return;
+      }
+
+      try {
+        const sesion = await login(db, datos.nombreUsuario, datos.password);
+        limpiarIntentos(datos.nombreUsuario); // login correcto: nunca queda penalizado por errores previos
+        const idSesion = crearSesionHttp(sesion);
+        res.cookie(COOKIE_SESION, idSesion, opcionesCookie);
+        res.json(sesion);
+      } catch (errLogin) {
+        registrarIntentoFallido(datos.nombreUsuario);
+        throw errLogin;
+      }
     } catch (err) {
       const error = traducirErrorPostgres(err);
       res.status(401).json({ error: error.message });

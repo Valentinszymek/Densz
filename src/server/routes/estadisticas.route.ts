@@ -137,8 +137,13 @@ export function crearRouterEstadisticas(db: Pool): Router {
   });
 
   router.get("/saldos-pendientes-top", ...requiereEstadisticas, async (req, res) => {
-    const limite = req.query.limite !== undefined ? z.coerce.number().int().positive().parse(req.query.limite) : 20;
-    res.json(await saldosPendientesTop(db, limite));
+    try {
+      const limite = req.query.limite !== undefined ? z.coerce.number().int().positive().parse(req.query.limite) : 20;
+      res.json(await saldosPendientesTop(db, limite));
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      res.status(400).json({ error: error.message });
+    }
   });
 
   return router;

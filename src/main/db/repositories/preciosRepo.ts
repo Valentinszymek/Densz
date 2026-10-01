@@ -41,11 +41,29 @@ export async function setActivaCategoria(db: Queryable, id: number, activo: bool
   await db.query("UPDATE categorias_precio SET activo = $1 WHERE id = $2", [activo ? 1 : 0, id]);
 }
 
-export async function moverCategoria(pool: Queryable, id: number, direccion: "arriba" | "abajo"): Promise<void> {
+export interface ResultadoMoverCategoria {
+  movida: { id: number; ordenAnterior: number; ordenNuevo: number };
+  vecino: { id: number; ordenAnterior: number; ordenNuevo: number };
+}
+
+/**
+ * Intercambia el `orden` de una categoría con su vecina (arriba/abajo).
+ * Devuelve el detalle del intercambio (posición anterior/nueva de ambas)
+ * para que quien llama pueda auditar el movimiento — corrección
+ * post-auditoría (§26/§30-D de docs/AUDITORIA_MAESTRA_DENSZ.md): este era
+ * el único canal de escritura de Precios que no quedaba registrado en
+ * Auditoría. `null` cuando no hay nada que mover (ya está en el extremo) —
+ * en ese caso no cambió nada, así que no corresponde auditar nada.
+ */
+export async function moverCategoria(
+  pool: Queryable,
+  id: number,
+  direccion: "arriba" | "abajo"
+): Promise<ResultadoMoverCategoria | null> {
   const categorias = await listarCategorias(pool);
   const idx = categorias.findIndex((c) => c.id === id);
   const idxVecino = direccion === "arriba" ? idx - 1 : idx + 1;
-  if (idx < 0 || idxVecino < 0 || idxVecino >= categorias.length) return;
+  if (idx < 0 || idxVecino < 0 || idxVecino >= categorias.length) return null;
 
   const actual = categorias[idx];
   const vecino = categorias[idxVecino];
@@ -53,6 +71,10 @@ export async function moverCategoria(pool: Queryable, id: number, direccion: "ar
     await client.query("UPDATE categorias_precio SET orden = $1 WHERE id = $2", [vecino.orden, actual.id]);
     await client.query("UPDATE categorias_precio SET orden = $1 WHERE id = $2", [actual.orden, vecino.id]);
   });
+  return {
+    movida: { id: actual.id, ordenAnterior: actual.orden, ordenNuevo: vecino.orden },
+    vecino: { id: vecino.id, ordenAnterior: vecino.orden, ordenNuevo: actual.orden }
+  };
 }
 
 export interface UsoCategoria {

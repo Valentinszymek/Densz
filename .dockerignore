@@ -1,0 +1,15 @@
+node_modules
+dist-electron
+dist-renderer
+dist-renderer-web
+dist-server
+release
+release-final
+data
+comprobantes
+.git
+.claude
+*.log
+.env
+.env.*
+!.env.example

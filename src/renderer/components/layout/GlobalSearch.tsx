@@ -24,7 +24,16 @@ const ETIQUETA_POR_TIPO: Record<TipoResultadoBusqueda, string> = {
 };
 
 /** A dónde navega cada tipo de resultado: los que tienen ficha propia van
- * directo al registro (con su refId); el resto va al listado general. */
+ * directo al registro (con su refId); el resto va al listado general.
+ *
+ * Corrección post-auditoría (§30-D/§38.2 de docs/AUDITORIA_MAESTRA_DENSZ.md):
+ * "paciente" SÍ tiene una ficha propia (`/pacientes/:id`, PacienteDetalle.tsx)
+ * y antes no se usaba — corregido. "comprobante" sigue yendo al listado
+ * general a propósito: no existe ninguna ruta de detalle por comprobante
+ * en la app (solo "Ver PDF" desde Trabajos/Comprobantes) — inventar una acá
+ * habría sido agregar una pantalla nueva, fuera del alcance de esta
+ * corrección. Documentado como pendiente en §30-D del informe.
+ */
 function rutaDeResultado(r: ResultadoBusqueda): string {
   switch (r.tipo) {
     case "odontologo":
@@ -34,7 +43,7 @@ function rutaDeResultado(r: ResultadoBusqueda): string {
     case "orden":
       return `/trabajos/${r.refId}`;
     case "paciente":
-      return "/pacientes";
+      return `/pacientes/${r.refId}`;
     case "comprobante":
       return "/comprobantes";
   }

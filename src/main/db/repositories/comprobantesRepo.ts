@@ -34,7 +34,7 @@ export async function insertarComprobante(
   return rows[0].id;
 }
 
-export async function setPdfPath(db: Queryable, id: number, pdfPath: string): Promise<void> {
+export async function setPdfPath(db: Queryable, id: number, pdfPath: string | null): Promise<void> {
   await db.query("UPDATE comprobantes SET pdf_path = $1 WHERE id = $2", [pdfPath, id]);
 }
 

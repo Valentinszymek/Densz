@@ -5,6 +5,7 @@ import { siguienteNumero } from "../utils/numbering";
 import { obtenerOrden, marcarFacturada } from "../db/repositories/ordenesRepo";
 import { getConfig } from "../db/repositories/configRepo";
 import { obtenerOdontologo } from "../db/repositories/odontologosRepo";
+import { logger } from "../utils/logger";
 import { obtenerClinica } from "../db/repositories/clinicasRepo";
 import {
   insertarComprobante,
@@ -110,6 +111,23 @@ export async function regenerarPdfComprobante(
  * pasa la orden a facturado, registra el movimiento "debe" en la cuenta
  * corriente (en la moneda de la orden) y genera el PDF real con TODAS las
  * prestaciones de la orden. Todo en una única operación coherente.
+ *
+ * Corrección (docs/REPORTE_BLOQUE_ABC_DEF_DENSZ.md, Bloque 1-A): la parte
+ * contable (numeración, `marcarFacturada`, movimiento DEBE) y la
+ * generación del archivo PDF son dos pasos distintos, con una diferencia
+ * importante — la contable ya hizo COMMIT cuando se intenta el PDF, así
+ * que un fallo del PDF (ej. el generador no pudo arrancar) NUNCA debe
+ * hacer parecer que la operación entera falló: el comprobante ya existe,
+ * numerado y facturado, de verdad. Por eso un error en este paso
+ * puntual no se vuelve a lanzar — se devuelve igual el comprobante ya
+ * creado (con `pdfPath` en `null`, el estado real), y se loguea el error
+ * para quien revise el servidor. Quien llama puede distinguir ambos casos
+ * mirando `comprobante.pdfPath`. Reintentar más tarde (ej. "Ver PDF") es
+ * seguro: `regenerarPdfComprobante` solo regenera el archivo de un
+ * comprobante que ya existe, nunca crea uno nuevo ni vuelve a facturar —
+ * y esta misma función ya rechaza arriba una orden que ya está
+ * "facturado", así que no hay forma de duplicar el comprobante ni el
+ * movimiento DEBE reintentando.
  */
 export async function generarComprobante(
   pool: Queryable,
@@ -155,7 +173,14 @@ export async function generarComprobante(
     return id;
   });
 
-  await regenerarPdfComprobante(pool, comprobanteId, generarPdf);
+  try {
+    await regenerarPdfComprobante(pool, comprobanteId, generarPdf);
+  } catch (errorPdf) {
+    logger.error(
+      `No se pudo generar el PDF del comprobante ${comprobanteId} (orden ${ordenId}) — el comprobante ya quedó guardado y facturado igual, se puede reintentar el PDF desde "Ver PDF".`,
+      errorPdf
+    );
+  }
   return (await obtenerComprobante(pool, comprobanteId))!;
 }
 

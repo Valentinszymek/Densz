@@ -1,16 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus } from "lucide-react";
+import { Search } from "lucide-react";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { Table, Thead, Tbody, Tr, Th, Td } from "../../components/ui/Table";
 import { Input } from "../../components/ui/Input";
-import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ExportMenu } from "../../components/ui/ExportMenu";
 import { usePacientes } from "../../features/pacientes/hooks";
 import { useDebouncedValue } from "../../lib/useDebouncedValue";
-import { PacienteForm } from "./PacienteForm";
 import type { FiltroPacientesDto } from "@shared/types/ipc-contracts";
 
 type OrdenPacientes = NonNullable<FiltroPacientesDto["orden"]>;
@@ -22,8 +20,11 @@ const OPCIONES_ORDEN: Array<{ valor: OrdenPacientes; etiqueta: string }> = [
   { valor: "antiguo", etiqueta: "Más antiguos" }
 ];
 
-// Pacientes es el ÚNICO lugar donde se crean pacientes: Nuevo Trabajo solo
-// los selecciona (nunca los crea) — el flujo definitivo pedido.
+// Sección de SOLO CONSULTA (Bloque 1-B): los pacientes se crean
+// automáticamente desde Nuevo Trabajo al registrar una OT (ver
+// ordenService.crearOrdenConPrestaciones, que llama a crearPaciente()
+// directo del repositorio) — acá nunca se crea, edita ni elimina un
+// paciente a mano, a propósito.
 export default function Pacientes() {
   const navigate = useNavigate();
   const [busquedaCruda, setBusquedaCruda] = useState("");
@@ -31,7 +32,6 @@ export default function Pacientes() {
   const [soloActivos, setSoloActivos] = useState(true);
   // Orden por defecto al entrar: Nombre A → Z, como ya era el comportamiento.
   const [orden, setOrden] = useState<OrdenPacientes>("nombre_asc");
-  const [formAbierto, setFormAbierto] = useState(false);
 
   const { data: pacientes, isLoading } = usePacientes({ busqueda, soloActivos, orden });
 
@@ -39,15 +39,8 @@ export default function Pacientes() {
     <div>
       <PageHeader
         title="Pacientes"
-        description="Pacientes asociados a cada odontólogo."
-        actions={
-          <div className="flex gap-2">
-            <ExportMenu tipo="pacientes" nombreSugerido="pacientes" />
-            <Button onClick={() => setFormAbierto(true)}>
-              <Plus size={16} /> Nuevo paciente
-            </Button>
-          </div>
-        }
+        description="Consulta de pacientes — se crean automáticamente al registrar un trabajo nuevo."
+        actions={<ExportMenu tipo="pacientes" nombreSugerido="pacientes" />}
       />
 
       <div className="flex items-center gap-3 mb-4 flex-wrap">
@@ -90,12 +83,7 @@ export default function Pacientes() {
       {!isLoading && pacientes?.length === 0 && (
         <EmptyState
           title="Todavía no hay pacientes"
-          description="Creá el primero para empezar a registrar trabajos."
-          action={
-            <Button onClick={() => setFormAbierto(true)}>
-              <Plus size={16} /> Nuevo paciente
-            </Button>
-          }
+          description="Los pacientes aparecen acá automáticamente al registrar un trabajo nuevo en Trabajos."
         />
       )}
 
@@ -121,8 +109,6 @@ export default function Pacientes() {
           </Tbody>
         </Table>
       )}
-
-      <PacienteForm open={formAbierto} onOpenChange={setFormAbierto} />
     </div>
   );
 }

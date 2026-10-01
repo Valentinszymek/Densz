@@ -32,7 +32,15 @@ import WebSocket from "ws";
  *   el más restrictivo posible para este bucket.
  */
 
-const NOMBRE_BUCKET = "documentos";
+/**
+ * Corrección post-auditoría (§25/§30-D de docs/AUDITORIA_MAESTRA_DENSZ.md):
+ * el bucket ya NO es un literal fijo — en producción sigue siendo
+ * "documentos" (nada cambia ahí), pero los tests pueden apuntar a un
+ * bucket separado con `TEST_STORAGE_BUCKET`, para nunca tocar los objetos
+ * reales del laboratorio. Ver `tests/helpers/testStorage.ts` para el
+ * detalle de qué falta configurar para que la separación sea completa.
+ */
+const NOMBRE_BUCKET = process.env.TEST_STORAGE_BUCKET || "documentos";
 
 let clienteAdmin: SupabaseClient | null = null;
 

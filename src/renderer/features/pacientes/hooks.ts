@@ -1,6 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DatosPacienteDto, FiltroPacientesDto } from "@shared/types/ipc-contracts";
-import { toast } from "../../store/toastStore";
+import { useQuery } from "@tanstack/react-query";
+import type { FiltroPacientesDto } from "@shared/types/ipc-contracts";
 
 const CLAVE = "pacientes";
 
@@ -19,71 +18,20 @@ export function usePaciente(id: number | undefined) {
   });
 }
 
-function invalidar(qc: ReturnType<typeof useQueryClient>) {
-  qc.invalidateQueries({ queryKey: [CLAVE] });
-}
-
-export function useCrearPaciente() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: DatosPacienteDto) => window.densz.pacientesCrear(data),
-    onSuccess: () => {
-      invalidar(qc);
-      toast({ titulo: "Paciente creado", tono: "exito" });
-    },
-    onError: (err: unknown) => toast({ titulo: "No se pudo crear", descripcion: String(err), tono: "error" })
-  });
-}
-
-export function useActualizarPaciente() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: DatosPacienteDto }) =>
-      window.densz.pacientesActualizar(id, data),
-    onSuccess: () => {
-      invalidar(qc);
-      toast({ titulo: "Paciente actualizado", tono: "exito" });
-    },
-    onError: (err: unknown) => toast({ titulo: "No se pudo actualizar", descripcion: String(err), tono: "error" })
-  });
-}
-
-export function useSetActivoPaciente() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, activo }: { id: number; activo: boolean }) => window.densz.pacientesSetActivo(id, activo),
-    onSuccess: (_d, vars) => {
-      invalidar(qc);
-      toast({ titulo: vars.activo ? "Paciente activado" : "Paciente desactivado", tono: "exito" });
-    },
-    onError: (err: unknown) => toast({ titulo: "No se pudo actualizar", descripcion: String(err), tono: "error" })
-  });
-}
+// Nota (Bloque 1-B): esta sección es de solo consulta — crear, editar,
+// activar/desactivar y eliminar pacientes desde acá se eliminó a
+// propósito (esos hooks de mutación ya no tienen ninguna UI que los use).
+// Los pacientes se crean automáticamente desde Nuevo Trabajo (ver
+// ordenService.ts, que llama a crearPaciente() del repositorio directo,
+// nunca pasa por el endpoint pacientesCrear). Los endpoints
+// pacientesCrear/Actualizar/SetActivo/Eliminar siguen existiendo en el
+// backend (no se tocaron) y en window.densz (webApi.ts) — no son parte
+// del alcance de este cambio, solo dejaron de tener hook/UI en Pacientes.
 
 export function useCantidadTrabajosPaciente(id: number | undefined) {
   return useQuery({
     queryKey: [CLAVE, "cantidad-trabajos", id],
     queryFn: () => window.densz.pacientesCantidadTrabajos(id!),
     enabled: id !== undefined
-  });
-}
-
-export function useEliminarPaciente() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) => window.densz.pacientesEliminar(id),
-    onSuccess: (resultado) => {
-      invalidar(qc);
-      if (resultado.eliminadoFisicamente) {
-        toast({ titulo: "Paciente eliminado", tono: "exito" });
-      } else {
-        toast({
-          titulo: "Paciente marcado como inactivo",
-          descripcion: `Tenía ${resultado.cantidadTrabajos} trabajo(s) histórico(s) asociado(s), así que no se pudo eliminar sin perder esos registros.`,
-          tono: "exito"
-        });
-      }
-    },
-    onError: (err: unknown) => toast({ titulo: "No se pudo eliminar", descripcion: String(err), tono: "error" })
   });
 }

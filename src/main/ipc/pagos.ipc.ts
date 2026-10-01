@@ -31,17 +31,9 @@ export function registrarHandlersPagos(db: Pool): void {
     try {
       const validado = esquemaPago.parse(data);
       const usuarioId = getUsuarioActualId();
-      const resultado = await registrarPago(db, validado, usuarioId, confirmarDuplicado ?? false);
-      if (resultado.creado) {
-        await registrarAuditoria(db, {
-          usuarioId,
-          accion: "crear",
-          entidad: "pagos",
-          entidadId: resultado.pago.id,
-          detalle: { importeCentavos: resultado.pago.importeCentavos }
-        });
-      }
-      return resultado;
+      // registrarPago ya audita "crear" adentro de su propia transacción
+      // (corrección post-auditoría §26/§30-D) — no duplicar acá.
+      return await registrarPago(db, validado, usuarioId, confirmarDuplicado ?? false);
     } catch (err) {
       throw traducirErrorPostgres(err);
     }
@@ -51,8 +43,9 @@ export function registrarHandlersPagos(db: Pool): void {
     try {
       const motivoValidado = z.string().trim().min(3, "Ingresá un motivo de al menos 3 caracteres.").parse(motivo);
       const usuarioId = getUsuarioActualId();
+      // anularPago ya audita "anular" adentro de su propia transacción
+      // (corrección post-auditoría §26/§30-D) — no duplicar acá.
       await anularPago(db, id, motivoValidado, usuarioId);
-      await registrarAuditoria(db, { usuarioId, accion: "anular", entidad: "pagos", entidadId: id, detalle: { motivo: motivoValidado } });
     } catch (err) {
       throw traducirErrorPostgres(err);
     }

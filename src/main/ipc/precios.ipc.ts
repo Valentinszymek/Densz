@@ -64,7 +64,18 @@ export function registrarHandlersPrecios(db: Pool): void {
 
   ipcMain.handle(IPC_CHANNELS.CATEGORIAS_MOVER, async (_e, id: number, direccion: "arriba" | "abajo") => {
     requerirPermiso(PERMISOS.PRECIOS_EDITAR);
-    await repo.moverCategoria(db, id, direccion);
+    const resultado = await repo.moverCategoria(db, id, direccion);
+    // Solo audita si de verdad se movió algo (resultado === null cuando ya
+    // estaba en el extremo) — corrección post-auditoría (§26/§30-D).
+    if (resultado) {
+      await registrarAuditoria(db, {
+        usuarioId: getUsuarioActualId(),
+        accion: "modificar",
+        entidad: "categorias_precio",
+        entidadId: id,
+        detalle: { direccion, ...resultado }
+      });
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.CATEGORIAS_USO, (_e, id: number) => repo.contarUsoCategoria(db, id));

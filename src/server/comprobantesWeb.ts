@@ -25,6 +25,34 @@ function nombreArchivoStorage(numero: string): string {
   return `${numero}.pdf`;
 }
 
+/** Prefijo real de cualquier `pdf_path` que ya sea una ruta de OBJETO EN
+ * STORAGE (nunca una ruta de disco) — ver `limpiarPdfPathSiEsDeStorage`. */
+const PREFIJO_STORAGE = "comprobantes/";
+
+/**
+ * Corrección (docs/REPORTE_BLOQUE_ABC_DEF_DENSZ.md, Bloque 1-A — bug
+ * encontrado al revisar el flujo completo de "Ver PDF", no reportado
+ * originalmente): `comprobanteService.regenerarPdfComprobante`
+ * (compartido con Desktop) reutiliza `comprobante.pdfPath` TAL CUAL como
+ * ruta de SALIDA en disco si ya tiene un valor — correcto en Desktop,
+ * donde `pdf_path` siempre es una ruta real de Windows, pero roto acá: en
+ * cuanto un comprobante ya subió su PDF a Storage, `pdf_path` pasa a ser
+ * la ruta del OBJETO ("comprobantes/CB-...pdf", relativa, nunca una ruta
+ * de disco real) — reusarla como ruta de disco escribiría el archivo en
+ * un lugar equivocado del filesystem del servidor en vez de la carpeta
+ * local esperada. Antes de pedirle a la capa compartida que regenere, si
+ * el `pdf_path` actual ya es una ruta de Storage, se limpia a `null` para
+ * que esa capa vuelva a calcular una ruta local real por su cuenta — sin
+ * tocar `comprobanteService.ts` para esto, el arreglo queda enteramente
+ * del lado Web.
+ */
+async function limpiarPdfPathSiEsDeStorage(db: Pool | PoolClient, comprobanteId: number): Promise<void> {
+  const actual = await obtenerComprobante(db, comprobanteId);
+  if (actual?.pdfPath?.startsWith(PREFIJO_STORAGE)) {
+    await setPdfPath(db, comprobanteId, null);
+  }
+}
+
 /**
  * Si el `UPDATE` de `pdf_path` falla DESPUÉS de que el archivo ya se subió
  * a Storage con éxito, ese objeto quedaría huérfano (subido, pero sin
@@ -83,6 +111,7 @@ export async function generarComprobanteWeb(db: Pool | PoolClient, ordenId: numb
  * nuevo, solo repite la generación/subida del PDF de uno ya existente.
  */
 export async function regenerarComprobanteWeb(db: Pool | PoolClient, comprobanteId: number): Promise<string> {
+  await limpiarPdfPathSiEsDeStorage(db, comprobanteId);
   await regenerarPdfComprobante(db, comprobanteId, generarPdfDesdeHtmlWeb);
   const comprobante = (await obtenerComprobante(db, comprobanteId))!;
   const actualizado = await subirPdfLocalAStorage(db, comprobante);

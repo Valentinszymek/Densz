@@ -1,22 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { loadEnvFile } from "../../src/main/utils/appPaths";
+import { STORAGE_CONFIGURADO, avisarSiStorageCompartido } from "../helpers/testStorage";
 
 loadEnvFile();
-
-const CONFIGURADO = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+avisarSiStorageCompartido();
 
 /**
- * Prueba real contra el bucket "documentos" de Supabase Storage — pero
- * SOLO si SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY están configurados en el
- * entorno (nunca hardcodeados ni pedidos por chat, ver README). Si no
- * están, el test se salta explícitamente en vez de fallar — Storage sigue
- * siendo opcional para todo lo demás.
+ * Prueba real contra Supabase Storage — pero SOLO si
+ * SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY están configurados en el entorno
+ * (nunca hardcodeados ni pedidos por chat, ver README). Si no están, el
+ * test se salta explícitamente en vez de fallar — Storage sigue siendo
+ * opcional para todo lo demás. El bucket es "documentos" salvo que
+ * TEST_STORAGE_BUCKET diga lo contrario (ver tests/helpers/testStorage.ts,
+ * corrección post-auditoría §25/§30-D).
  *
  * El archivo que sube es un .txt sintético, claramente de prueba, sin
  * relación con ningún comprobante/cuenta/orden real — se borra al final
  * del mismo test, nunca queda como dato real en Storage.
  */
-describe.skipIf(!CONFIGURADO)("server/storage (Supabase Storage real)", () => {
+describe.skipIf(!STORAGE_CONFIGURADO)("server/storage (Supabase Storage real)", () => {
   it("sube, descarga y borra un documento de prueba en la carpeta 'comprobantes/'", async () => {
     const { subirDocumento, descargarDocumento, eliminarDocumento } = await import("../../src/server/storage");
 

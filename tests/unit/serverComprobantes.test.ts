@@ -16,6 +16,9 @@ import { generarComprobanteWeb, regenerarComprobanteWeb } from "../../src/server
 import * as storageModule from "../../src/server/storage";
 import * as comprobantesRepoModule from "../../src/main/db/repositories/comprobantesRepo";
 import { crearSesionHttp, destruirSesionHttp, COOKIE_SESION } from "../../src/server/session";
+import { avisarSiStorageCompartido } from "../helpers/testStorage";
+
+avisarSiStorageCompartido(); // corrección post-auditoría §25/§30-D — ver tests/helpers/testStorage.ts
 
 const PUNTOS_POR_MM = 72 / 25.4;
 function leerMediaBoxPdfMm(buffer: Buffer): { anchoMm: number; altoMm: number } {
@@ -329,14 +332,20 @@ describe("HTTP /comprobantes", () => {
     it("si el UPDATE de pdf_path falla después de subir el PDF, el objeto recién subido se borra solo (nunca otro)", async () => {
       const espiaEliminar = vi.spyOn(storageModule, "eliminarDocumento"); // sin mock: deja pasar la llamada real
 
-      // regenerarPdfComprobante() (reutilizada, sin tocar) llama a
-      // setPdfPath() UNA VEZ primero, para grabar la ruta LOCAL — esa
-      // llamada tiene que comportarse real. Recién la SEGUNDA llamada
-      // (la de esta capa web, para grabar la ruta de Storage) es la que
-      // se simula fallando.
+      // regenerarComprobanteWeb() hace, en orden, TRES llamadas reales a
+      // setPdfPath(): (1) limpiarPdfPathSiEsDeStorage() lo pone en null,
+      // porque en este punto el comprobante ya apunta a Storage —viene de
+      // generarComprobanteWeb() en el test anterior— (corrección del bug
+      // de "Ver PDF" reutilizando una ruta de Storage como ruta de disco,
+      // ver comprobantesWeb.ts); (2) regenerarPdfComprobante() (reutilizada
+      // de comprobanteService.ts, sin tocar) lo graba apuntando a la ruta
+      // LOCAL recién generada; esas dos tienen que comportarse reales.
+      // Recién la TERCERA llamada (la de esta capa web, para grabar la
+      // ruta de Storage después de subir) es la que se simula fallando.
       const implementacionReal = comprobantesRepoModule.setPdfPath;
       const espiaSetPdfPath = vi
         .spyOn(comprobantesRepoModule, "setPdfPath")
+        .mockImplementationOnce(implementacionReal)
         .mockImplementationOnce(implementacionReal)
         .mockRejectedValueOnce(new Error("Simulado: falla el UPDATE de pdf_path"));
 

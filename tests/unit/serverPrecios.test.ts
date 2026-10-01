@@ -6,6 +6,8 @@ import type { Pool } from "pg";
 import { createTestDbConUsuario, createTestDb, type TestDb } from "../helpers/testDb";
 import { crearRouterPrecios } from "../../src/server/routes/precios.route";
 import { crearSesionHttp, destruirSesionHttp, COOKIE_SESION } from "../../src/server/session";
+import { crearCategoria } from "../../src/main/db/repositories/preciosRepo";
+import { listarAuditoriaFiltradaCompleta } from "../../src/main/db/repositories/auditoriaRepo";
 
 function construirApp(db: Pool): Express {
   const app = express();
@@ -172,6 +174,40 @@ describe("HTTP /precios", () => {
   it("categoriasMover cambia el orden (200) sin romper nada", async () => {
     const res = await request(app).patch(`/precios/categorias/${categoriaId}/mover`).set("Cookie", cookieAdmin).send({ direccion: "arriba" });
     expect(res.status).toBe(200);
+  });
+
+  it("corrección post-auditoría §26/§30-D: mover una categoría SÍ queda registrado en Auditoría, con la posición anterior y nueva", async () => {
+    const { db } = ctx;
+    // Categorías propias de este test, en orden conocido, para no depender
+    // de movimientos previos de otros tests que comparten la misma conexión.
+    const idArriba = await crearCategoria(db, "Auditoria Mover A");
+    const idAbajo = await crearCategoria(db, "Auditoria Mover B");
+
+    const res = await request(app).patch(`/precios/categorias/${idAbajo}/mover`).set("Cookie", cookieAdmin).send({ direccion: "arriba" });
+    expect(res.status).toBe(200);
+
+    const registros = await listarAuditoriaFiltradaCompleta(db, { entidad: "categorias_precio" });
+    const deEsteMovimiento = registros.filter((r) => r.entidadId === idAbajo && r.accion === "modificar");
+    expect(deEsteMovimiento).toHaveLength(1);
+    expect(deEsteMovimiento[0].detalle).toMatchObject({
+      direccion: "arriba",
+      movida: { id: idAbajo },
+      vecino: { id: idArriba }
+    });
+  });
+
+  it("mover una categoría que ya está en el extremo no genera ninguna entrada de auditoría (no cambió nada)", async () => {
+    const { db } = ctx;
+    // Recién creada: crearCategoria siempre agrega al final (orden = MAX+1),
+    // así que necesariamente es la ÚLTIMA — moverla "abajo" es un no-op
+    // real, sin importar qué otras categorías existan de tests anteriores.
+    const idUltima = await crearCategoria(db, "Auditoria Mover Ultima");
+
+    const res = await request(app).patch(`/precios/categorias/${idUltima}/mover`).set("Cookie", cookieAdmin).send({ direccion: "abajo" });
+    expect(res.status).toBe(200);
+
+    const registros = await listarAuditoriaFiltradaCompleta(db, { entidad: "categorias_precio" });
+    expect(registros.filter((r) => r.entidadId === idUltima && r.accion === "modificar")).toHaveLength(0);
   });
 
   it("rechaza payload inválido al crear (400) sin crear nada", async () => {

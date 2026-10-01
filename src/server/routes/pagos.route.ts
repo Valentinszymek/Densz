@@ -73,8 +73,13 @@ export function crearRouterPagos(db: Pool): Router {
   });
 
   router.get("/ultimos", async (req, res) => {
-    const limite = req.query.limite !== undefined ? z.coerce.number().int().positive().parse(req.query.limite) : 5;
-    res.json(await listarUltimosPagos(db, limite));
+    try {
+      const limite = req.query.limite !== undefined ? z.coerce.number().int().positive().parse(req.query.limite) : 5;
+      res.json(await listarUltimosPagos(db, limite));
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      res.status(400).json({ error: error.message });
+    }
   });
 
   router.post("/", async (req, res) => {
@@ -82,15 +87,10 @@ export function crearRouterPagos(db: Pool): Router {
       const validado = esquemaPago.parse(req.body);
       const confirmarDuplicado = req.body.confirmarDuplicado === true;
       const usuarioId = (req as unknown as RequestConSesion).sesion.usuarioId;
+      // registrarPago ya audita "crear" adentro de su propia transacción
+      // (corrección post-auditoría §26/§30-D) — no duplicar acá.
       const resultado = await registrarPago(db, validado, usuarioId, confirmarDuplicado);
       if (resultado.creado) {
-        await registrarAuditoria(db, {
-          usuarioId,
-          accion: "crear",
-          entidad: "pagos",
-          entidadId: resultado.pago.id,
-          detalle: { importeCentavos: resultado.pago.importeCentavos }
-        });
         res.status(201).json(resultado);
       } else {
         // Mismo criterio que el escritorio: no es un error, es una
@@ -109,8 +109,9 @@ export function crearRouterPagos(db: Pool): Router {
       const id = esquemaId.parse(req.params.id);
       const motivo = esquemaMotivo.parse(req.body.motivo);
       const usuarioId = (req as unknown as RequestConSesion).sesion.usuarioId;
+      // anularPago ya audita "anular" adentro de su propia transacción
+      // (corrección post-auditoría §26/§30-D) — no duplicar acá.
       await anularPago(db, id, motivo, usuarioId);
-      await registrarAuditoria(db, { usuarioId, accion: "anular", entidad: "pagos", entidadId: id, detalle: { motivo } });
       res.json({ ok: true });
     } catch (err) {
       const error = traducirErrorPostgres(err);

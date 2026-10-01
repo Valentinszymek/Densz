@@ -8,6 +8,7 @@ import {
   type DatosNuevoPago
 } from "../db/repositories/pagosRepo";
 import { registrarMovimientoHaber, anularMovimientoDePago } from "../db/repositories/movimientosRepo";
+import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
 import { DenszError } from "../utils/errors";
 import type { Pago } from "../../shared/types/entities";
 
@@ -18,6 +19,15 @@ export type ResultadoRegistrarPago = { creado: true; pago: Pago } | { creado: fa
  * existe un pago idéntico (mismo odontólogo, importe, moneda, fecha y
  * medio) sin anular, no lo bloquea silenciosamente ni lo inserta a ciegas:
  * devuelve una advertencia clara para que el usuario confirme explícitamente.
+ *
+ * Corrección post-auditoría (§26/§30-D de docs/AUDITORIA_MAESTRA_DENSZ.md):
+ * este servicio no auditaba nada — tanto `pagos.ipc.ts` (Desktop) como
+ * `pagos.route.ts` (Web) ya llamaban a `registrarAuditoria` por su cuenta,
+ * DESPUÉS de que esta función terminaba (fuera de la transacción: un fallo
+ * entre el commit y esa llamada externa dejaba un pago real sin rastro en
+ * Auditoría). Se centraliza acá, dentro de la MISMA transacción — igual
+ * que ordenService/authService/proteccionService — y se sacan las llamadas
+ * ahora redundantes de ambas capas para no auditar dos veces el mismo pago.
  */
 export async function registrarPago(
   pool: Queryable,
@@ -46,6 +56,20 @@ export async function registrarPago(
       fecha: data.fecha,
       descripcion: "Pago recibido"
     });
+    await registrarAuditoria(db, {
+      usuarioId,
+      accion: "crear",
+      entidad: "pagos",
+      entidadId: id,
+      detalle: {
+        odontologoId: data.odontologoId,
+        clinicaId: data.clinicaId,
+        importeCentavos: data.importeCentavos,
+        moneda: data.moneda,
+        medioPagoId: data.medioPagoId,
+        fecha: data.fecha
+      }
+    });
     return id;
   });
 
@@ -60,5 +84,19 @@ export async function anularPago(pool: Queryable, id: number, motivo: string, us
   await withTransaction(pool, async (db) => {
     await anularPagoDb(db, id, motivo, usuarioId);
     await anularMovimientoDePago(db, id);
+    await registrarAuditoria(db, {
+      usuarioId,
+      accion: "anular",
+      entidad: "pagos",
+      entidadId: id,
+      detalle: {
+        motivo,
+        odontologoId: pago.odontologoId,
+        clinicaId: pago.clinicaId,
+        importeCentavos: pago.importeCentavos,
+        moneda: pago.moneda,
+        medioPagoId: pago.medioPagoId
+      }
+    });
   });
 }
