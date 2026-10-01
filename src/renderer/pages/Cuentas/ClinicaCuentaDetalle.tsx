@@ -29,6 +29,16 @@ const NOMBRES_MES = [
 const ESTADO_TRABAJO_TONO = { pendiente_facturar: "neutral", facturado: "exito", anulado: "error" } as const;
 const ESTADO_TRABAJO_LABEL = { pendiente_facturar: "Pendiente", facturado: "Facturado", anulado: "Anulado" } as const;
 
+/** `fechaFacturacion` es `comprobantes.fecha_emision`, que incluye hora
+ * ("2026-10-01 21:41:01", no solo la fecha) — dos OTs facturadas el mismo
+ * día pero en momentos distintos nunca coinciden como string exacto.
+ * Agrupar por el día solo (los primeros 10 caracteres, "YYYY-MM-DD") es
+ * lo correcto acá: nunca cambia qué se muestra (formatearFecha ya
+ * ignoraba la hora), solo corrige qué cuenta como "la misma fecha". */
+function soloFecha(fecha: string | null): string | null {
+  return fecha ? fecha.slice(0, 10) : null;
+}
+
 /**
  * Agrupación puramente visual (Bloque 1-C) — mismo criterio que
  * CuentaDetalle.tsx: el backend sigue devolviendo los trabajos ordenados
@@ -38,14 +48,14 @@ const ESTADO_TRABAJO_LABEL = { pendiente_facturar: "Pendiente", facturado: "Fact
  * fecha, más reciente primero — cada OT sigue siendo su propia fila.
  */
 function agruparPorFecha(trabajos: TrabajoFacturadoMes[]): Array<{ fecha: string | null; trabajos: TrabajoFacturadoMes[] }> {
-  const ordenados = [...trabajos].sort((a, b) => (b.fechaFacturacion ?? "").localeCompare(a.fechaFacturacion ?? ""));
+  const ordenados = [...trabajos].sort((a, b) => (soloFecha(b.fechaFacturacion) ?? "").localeCompare(soloFecha(a.fechaFacturacion) ?? ""));
   const grupos: Array<{ fecha: string | null; trabajos: TrabajoFacturadoMes[] }> = [];
   for (const t of ordenados) {
     const ultimo = grupos[grupos.length - 1];
-    if (ultimo && ultimo.fecha === t.fechaFacturacion) {
+    if (ultimo && ultimo.fecha === soloFecha(t.fechaFacturacion)) {
       ultimo.trabajos.push(t);
     } else {
-      grupos.push({ fecha: t.fechaFacturacion, trabajos: [t] });
+      grupos.push({ fecha: soloFecha(t.fechaFacturacion), trabajos: [t] });
     }
   }
   return grupos;
