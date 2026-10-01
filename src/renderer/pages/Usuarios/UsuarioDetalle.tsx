@@ -7,7 +7,7 @@ import { FormField } from "../../components/ui/Input";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { useRoles, useActualizarUsuario, useSetActivoUsuario, useEliminarUsuario } from "../../features/usuarios/hooks";
 import { useAuthStore } from "../../store/authStore";
-import { formatearFechaHora } from "../../lib/format";
+import { formatearFechaHora, formatearRol } from "../../lib/format";
 import { CambiarPasswordModal } from "./CambiarPasswordModal";
 import type { Usuario } from "@shared/types/entities";
 
@@ -78,7 +78,7 @@ export function UsuarioDetalle({
             >
               {roles?.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.nombre}
+                  {formatearRol(r.nombre)}
                 </option>
               ))}
             </select>

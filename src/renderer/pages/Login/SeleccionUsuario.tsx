@@ -1,5 +1,6 @@
 import { useUsuariosDisponibles } from "../../features/auth/hooks";
 import { DenszLogo } from "../../components/brand/DenszLogo";
+import { formatearRol } from "../../lib/format";
 import type { UsuarioParaSeleccion } from "@shared/types/entities";
 
 function TarjetaUsuario({ usuario, onClick }: { usuario: UsuarioParaSeleccion; onClick: () => void }) {
@@ -16,7 +17,7 @@ function TarjetaUsuario({ usuario, onClick }: { usuario: UsuarioParaSeleccion; o
       <div className="text-center min-w-0 w-full">
         <p className="text-sm font-medium text-cream truncate">{usuario.nombreCompleto}</p>
         <p className="text-xs text-cream/40 font-mono truncate">@{usuario.nombreUsuario}</p>
-        <p className="text-[10px] uppercase tracking-wide text-gold-dim mt-1.5">{usuario.rolNombre}</p>
+        <p className="text-[10px] uppercase tracking-wide text-gold-dim mt-1.5">{formatearRol(usuario.rolNombre)}</p>
       </div>
     </button>
   );

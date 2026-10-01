@@ -4,6 +4,7 @@ import { useUiStore } from "../../store/uiStore";
 import { useAuthStore } from "../../store/authStore";
 import { useLogout } from "../../features/auth/hooks";
 import { SystemStatusBadge } from "./SystemStatusBadge";
+import { formatearRol } from "../../lib/format";
 
 export function Topbar() {
   const setBusquedaAbierta = useUiStore((s) => s.setBusquedaAbierta);
@@ -41,7 +42,7 @@ export function Topbar() {
             className="z-50 min-w-[180px] rounded-lg bg-cream-card border border-carbon/10 shadow-lg py-1"
           >
             <div className="px-3 py-2 text-xs text-carbon/40 border-b border-carbon/10">
-              {sesion?.rolNombre === "ADMINISTRADOR" ? "Administrador" : "Recepción"}
+              {sesion?.rolNombre ? formatearRol(sesion.rolNombre) : ""}
             </div>
             <DropdownMenu.Item
               onSelect={() => logout.mutate()}

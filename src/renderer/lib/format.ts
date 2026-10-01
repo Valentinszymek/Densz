@@ -1,5 +1,19 @@
 import type { Moneda } from "@shared/types/entities";
 
+// Nombre técnico real en la tabla `roles` (nunca cambia — de eso dependen
+// los chequeos de permisos, ej. RutaSoloAdmin.tsx) -> etiqueta que ve la
+// persona. Puramente de presentación: `rolNombre`/`r.nombre` siguen
+// siendo "ADMINISTRADOR"/"RECEPCION" en todos lados, esto solo cambia
+// cómo se muestran.
+const ETIQUETAS_ROL: Record<string, string> = {
+  ADMINISTRADOR: "Admin",
+  RECEPCION: "Operador"
+};
+
+export function formatearRol(nombreRol: string): string {
+  return ETIQUETAS_ROL[nombreRol] ?? nombreRol;
+}
+
 const formatoARS = new Intl.NumberFormat("es-AR", {
   style: "currency",
   currency: "ARS",

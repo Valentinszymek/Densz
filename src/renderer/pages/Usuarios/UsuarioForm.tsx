@@ -3,6 +3,7 @@ import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { FormField, Input } from "../../components/ui/Input";
 import { useRoles, useCrearUsuario } from "../../features/usuarios/hooks";
+import { formatearRol } from "../../lib/format";
 
 const REGEX_USUARIO = /^[a-z0-9._-]+$/i;
 
@@ -72,7 +73,7 @@ export function UsuarioForm({ open, onOpenChange }: { open: boolean; onOpenChang
           >
             {roles?.map((r) => (
               <option key={r.id} value={r.id}>
-                {r.nombre}
+                {formatearRol(r.nombre)}
               </option>
             ))}
           </select>

@@ -5,7 +5,7 @@ import { Table, Thead, Tbody, Tr, Th, Td } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { useUsuarios } from "../../features/usuarios/hooks";
-import { formatearFechaHora } from "../../lib/format";
+import { formatearFechaHora, formatearRol } from "../../lib/format";
 import { UsuarioForm } from "./UsuarioForm";
 import { UsuarioDetalle } from "./UsuarioDetalle";
 
@@ -61,7 +61,7 @@ export default function Usuarios() {
                   </div>
                 </Td>
                 <Td>
-                  <Badge tono="gold">{u.rolNombre}</Badge>
+                  <Badge tono="gold">{u.rolNombre ? formatearRol(u.rolNombre) : "—"}</Badge>
                 </Td>
                 <Td className="text-carbon/50 text-xs">{u.ultimoAcceso ? formatearFechaHora(u.ultimoAcceso) : "Nunca"}</Td>
                 <Td>
