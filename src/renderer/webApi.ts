@@ -151,7 +151,7 @@ async function getBlob(path: string): Promise<Blob> {
  * fallar en silencio; recién después pedir el PDF y, cuando llega,
  * redirigir esa pestaña ya abierta al blob — nunca se abre una pestaña
  * vacía si la descarga falla (se cierra la que se había abierto). */
-async function abrirPdfEnNuevaPestana(obtenerBlob: () => Promise<Blob>, opciones: { imprimir?: boolean } = {}): Promise<void> {
+async function abrirPdfEnNuevaPestana(obtenerBlob: () => Promise<Blob>): Promise<void> {
   const ventana = window.open("", "_blank");
   if (!ventana) {
     toast({
@@ -176,18 +176,69 @@ async function abrirPdfEnNuevaPestana(obtenerBlob: () => Promise<Blob>, opciones
   }
 
   const url = URL.createObjectURL(blob);
-  // Web no tiene impresión silenciosa como Desktop (ninguna API de
-  // navegador lo permite) — lo más parecido es abrir el PDF y disparar el
-  // diálogo de impresión nativo del navegador apenas termina de cargar,
-  // para que la persona solo tenga que confirmar "Imprimir" en vez de
-  // tener que buscar el botón de impresión del visor de PDF a mano.
-  if (opciones.imprimir) {
-    ventana.addEventListener("load", () => ventana.print());
-  }
   ventana.location.href = url;
   // Se libera el Object URL una vez que la pestaña nueva ya lo cargó — antes
   // sería prematuro (la pestaña todavía lo necesita para mostrarlo).
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Dispara el diálogo de impresión nativo del navegador sobre un PDF, sin
+ * abrir ninguna pestaña visible — es la técnica que de verdad funciona de
+ * forma confiable: un iframe oculto cargando el PDF, llamando a
+ * `contentWindow.print()` recién cuando el visor interno de PDF del
+ * navegador ya terminó de renderizar (nunca apenas dispara el evento
+ * `load` del iframe: el visor de PDF de Chrome sigue dibujando un
+ * instante después de eso, y llamar a `print()` demasiado pronto no hace
+ * nada — por eso el pequeño `setTimeout` antes de imprimir). No existe
+ * ninguna forma de imprimir en silencio, sin diálogo, desde un navegador
+ * (ninguna web puede hacerlo, por diseño de seguridad) — esto es lo más
+ * cercano: un solo click, sin tener que ir a buscar el botón de imprimir
+ * dentro del visor. Si por lo que sea el navegador bloquea esto, se cae
+ * a abrir el PDF en una pestaña visible para que la persona lo imprima
+ * desde ahí con un click más. */
+async function imprimirPdf(obtenerBlob: () => Promise<Blob>): Promise<void> {
+  let blob: Blob;
+  try {
+    blob = await obtenerBlob();
+  } catch (err) {
+    toast({
+      titulo: "No se pudo imprimir",
+      descripcion: err instanceof Error ? err.message : "Error inesperado.",
+      tono: "error"
+    });
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const limpiar = () => {
+    iframe.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "none";
+  iframe.src = url;
+
+  iframe.onload = () => {
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch {
+        window.open(url, "_blank");
+      }
+      // Recién se libera después de darle tiempo real al diálogo de
+      // impresión (confirmarlo/cancelarlo) — nunca antes.
+      setTimeout(limpiar, 60_000);
+    }, 300);
+  };
+
+  document.body.appendChild(iframe);
 }
 
 /** Igual que `getBlob`, pero con `POST` + body JSON — usado por
@@ -383,10 +434,10 @@ export const webApi: DenszApi = {
   comprobantesVerPdf: (comprobanteId) => abrirPdfEnNuevaPestana(() => getBlob(`/comprobantes/${comprobanteId}/pdf`)),
   // Impresión física SILENCIOSA (sin diálogo, a una impresora elegida de
   // antemano) solo existe en Desktop — ninguna API de navegador lo
-  // permite. En Web, "Imprimir" abre el mismo PDF que "Ver PDF" pero
-  // dispara el diálogo de impresión nativo del navegador apenas carga.
-  comprobantesImprimir: (comprobanteId) =>
-    abrirPdfEnNuevaPestana(() => getBlob(`/comprobantes/${comprobanteId}/pdf`), { imprimir: true }),
+  // permite. En Web, "Imprimir" dispara el diálogo de impresión nativo
+  // del navegador directo sobre el PDF, sin abrir ninguna pestaña visible
+  // (ver imprimirPdf).
+  comprobantesImprimir: (comprobanteId) => imprimirPdf(() => getBlob(`/comprobantes/${comprobanteId}/pdf`)),
 
   // --- Cuentas: solo lectura conectada en esta etapa (Fase 8B) ---
   cuentasSaldos: (odontologoId) => get(`/cuentas/${odontologoId}/saldos`),
