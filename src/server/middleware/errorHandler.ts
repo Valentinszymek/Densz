@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { traducirErrorPostgres } from "../../main/utils/errors";
+import { logger } from "../../main/utils/logger";
 
 /**
  * Manejador de errores global de Express — corrección post-auditoría
@@ -17,11 +18,18 @@ import { traducirErrorPostgres } from "../../main/utils/errors";
  * DESPUÉS de montar todos los routers (Express solo lo reconoce como
  * error-handler por tener 4 parámetros).
  */
-export function errorHandler(err: unknown, _req: Request, res: Response, next: NextFunction): void {
+export function errorHandler(err: unknown, req: Request, res: Response, next: NextFunction): void {
   if (res.headersSent) {
     next(err);
     return;
   }
+  // Corrección (encontrada investigando el bug real de "Ver PDF" en
+  // producción, 2026-10-01): este handler nunca logueaba el error
+  // original — devolvía el mensaje genérico al cliente (a propósito,
+  // nunca expone detalles técnicos) pero no dejaba ningún rastro server-side,
+  // así que un fallo real (ej. Puppeteer) era invisible en los logs de
+  // Railway. Acá sí se loguea completo, nunca se envía al cliente.
+  logger.error(`Error no manejado en ${req.method} ${req.path}:`, err);
   const error = traducirErrorPostgres(err);
   res.status(400).json({ error: error.message });
 }

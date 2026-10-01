@@ -35,10 +35,20 @@ const FORMATOS_VALIDOS = new Set([
 let navegadorPromesa: Promise<Browser> | null = null;
 
 /** Una única instancia de Chromium reutilizada entre generaciones — mismo
- * criterio que pdfService.ts reutiliza una sola BrowserWindow oculta. */
+ * criterio que pdfService.ts reutiliza una sola BrowserWindow oculta.
+ *
+ * `--no-sandbox`/`--disable-setuid-sandbox`: el contenedor de Railway
+ * (Dockerfile, sin `USER` propio) corre como root — el sandbox de Chromium
+ * se niega a arrancar como root sin este flag ("No usable sandbox!"), y
+ * sin él `puppeteer.launch()` rechaza la promesa en cada intento. Es el
+ * motivo real por el que el PDF seguía fallando incluso después de
+ * agregar el Dockerfile con las librerías de sistema correctas — esas
+ * librerías eran necesarias pero no alcanzaban solas. Nunca afecta a un
+ * entorno de desarrollo local (Windows/Mac fuera de Docker): el flag se
+ * ignora sin problema ahí. */
 function getNavegador(): Promise<Browser> {
   if (!navegadorPromesa) {
-    navegadorPromesa = puppeteer.launch({ headless: true });
+    navegadorPromesa = puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
   }
   return navegadorPromesa;
 }

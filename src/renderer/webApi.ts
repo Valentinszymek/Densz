@@ -151,7 +151,7 @@ async function getBlob(path: string): Promise<Blob> {
  * fallar en silencio; recién después pedir el PDF y, cuando llega,
  * redirigir esa pestaña ya abierta al blob — nunca se abre una pestaña
  * vacía si la descarga falla (se cierra la que se había abierto). */
-async function abrirPdfEnNuevaPestana(obtenerBlob: () => Promise<Blob>): Promise<void> {
+async function abrirPdfEnNuevaPestana(obtenerBlob: () => Promise<Blob>, opciones: { imprimir?: boolean } = {}): Promise<void> {
   const ventana = window.open("", "_blank");
   if (!ventana) {
     toast({
@@ -176,6 +176,14 @@ async function abrirPdfEnNuevaPestana(obtenerBlob: () => Promise<Blob>): Promise
   }
 
   const url = URL.createObjectURL(blob);
+  // Web no tiene impresión silenciosa como Desktop (ninguna API de
+  // navegador lo permite) — lo más parecido es abrir el PDF y disparar el
+  // diálogo de impresión nativo del navegador apenas termina de cargar,
+  // para que la persona solo tenga que confirmar "Imprimir" en vez de
+  // tener que buscar el botón de impresión del visor de PDF a mano.
+  if (opciones.imprimir) {
+    ventana.addEventListener("load", () => ventana.print());
+  }
   ventana.location.href = url;
   // Se libera el Object URL una vez que la pestaña nueva ya lo cargó — antes
   // sería prematuro (la pestaña todavía lo necesita para mostrarlo).
@@ -373,9 +381,12 @@ export const webApi: DenszApi = {
   // vía GET /comprobantes/:id/pdf (nunca un path elegido por el cliente),
   // abierta en una pestaña nueva a partir de un blob local.
   comprobantesVerPdf: (comprobanteId) => abrirPdfEnNuevaPestana(() => getBlob(`/comprobantes/${comprobanteId}/pdf`)),
-  // Impresión física silenciosa: sin equivalente web, no existe ruta HTTP
-  // (fuera de alcance de Fase 12B — ver informe).
-  comprobantesImprimir: pendiente("comprobantesImprimir"),
+  // Impresión física SILENCIOSA (sin diálogo, a una impresora elegida de
+  // antemano) solo existe en Desktop — ninguna API de navegador lo
+  // permite. En Web, "Imprimir" abre el mismo PDF que "Ver PDF" pero
+  // dispara el diálogo de impresión nativo del navegador apenas carga.
+  comprobantesImprimir: (comprobanteId) =>
+    abrirPdfEnNuevaPestana(() => getBlob(`/comprobantes/${comprobanteId}/pdf`), { imprimir: true }),
 
   // --- Cuentas: solo lectura conectada en esta etapa (Fase 8B) ---
   cuentasSaldos: (odontologoId) => get(`/cuentas/${odontologoId}/saldos`),
