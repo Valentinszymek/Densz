@@ -41,7 +41,7 @@ describe("usuariosRepo — eliminación segura", () => {
     expect(await obtenerUsuarioPorId(db, id)).toBeNull();
   });
 
-  it("bloquea la eliminación si el usuario tiene eventos de Auditoría (ej: ya inició sesión alguna vez)", async () => {
+  it("permite eliminar un usuario que SOLO tiene eventos de Auditoría (ej: cuentas de prueba que ya iniciaron sesión) — se borran junto con el usuario", async () => {
     const { db } = ctx;
     const id = await crearUsuario(db, { nombreUsuario: "logueado", nombreCompleto: "logueado", rolId }, bcrypt.hashSync("clave123", 10));
     const sesion = await login(db, "logueado", "clave123");
@@ -49,9 +49,12 @@ describe("usuariosRepo — eliminación segura", () => {
 
     const uso = await contarUsoUsuario(db, id);
     expect(uso.cantidadEventosAuditoria).toBeGreaterThan(0);
-    await expect(eliminarUsuario(db, id)).rejects.toThrow(/actividad registrada/i);
-    // Nunca se borra: sigue existiendo.
-    expect(await obtenerUsuarioPorId(db, id)).not.toBeNull();
+
+    await eliminarUsuario(db, id);
+
+    expect(await obtenerUsuarioPorId(db, id)).toBeNull();
+    const { rows } = await db.query("SELECT COUNT(*) c FROM auditoria WHERE usuario_id = $1", [id]);
+    expect(Number(rows[0].c)).toBe(0);
   });
 
   it("bloquea la eliminación si el usuario creó una orden de trabajo (creado_por)", async () => {

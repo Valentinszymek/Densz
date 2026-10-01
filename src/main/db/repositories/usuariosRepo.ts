@@ -1,6 +1,7 @@
 import type { Queryable } from "../types";
 import type { Usuario, Rol, UsuarioParaSeleccion } from "../../../shared/types/entities";
 import { DenszError } from "../../utils/errors";
+import { withTransaction } from "../withTransaction";
 
 interface FilaUsuario {
   id: number;
@@ -159,22 +160,32 @@ export async function contarUsoUsuario(db: Queryable, id: number): Promise<UsoUs
 }
 
 /**
- * Elimina físicamente un usuario — solo si NO tiene absolutamente ningún
- * registro histórico asociado (ni órdenes, ni pagos, ni comprobantes, ni
- * resúmenes mensuales, ni eventos de auditoría a su nombre). Esto existe
- * únicamente para corregir un usuario cargado por error: si tiene
- * cualquier historial, se bloquea por completo (nunca se borra información
- * real) y la vía segura sigue siendo desactivarlo.
+ * Elimina físicamente un usuario — solo si NO tiene ningún registro de
+ * NEGOCIO asociado (ni órdenes, ni pagos, ni comprobantes, ni resúmenes
+ * mensuales, creados o anulados a su nombre). Esto existe únicamente para
+ * corregir un usuario cargado por error: si tiene cualquier historial de
+ * negocio, se bloquea por completo (nunca se borra información real) y la
+ * vía segura sigue siendo desactivarlo.
+ *
+ * Los eventos de auditoría (ej. intentos de login de una cuenta de
+ * prueba) NO bloquean la eliminación por sí solos — a diferencia de un
+ * trabajo o un comprobante, no representan ninguna operación de negocio
+ * real que se pierda. Se borran junto con el usuario, en la misma
+ * transacción (si el usuario no tiene ningún otro historial).
  */
 export async function eliminarUsuario(db: Queryable, id: number): Promise<void> {
   const uso = await contarUsoUsuario(db, id);
-  const tieneHistorial = Object.values(uso).some((cantidad) => cantidad > 0);
-  if (tieneHistorial) {
+  const { cantidadEventosAuditoria, ...usoDeNegocio } = uso;
+  const tieneHistorialDeNegocio = Object.values(usoDeNegocio).some((cantidad) => cantidad > 0);
+  if (tieneHistorialDeNegocio) {
     throw new DenszError(
-      "Este usuario tiene actividad registrada (trabajos, pagos, comprobantes o auditoría) y no puede eliminarse sin perder esa información. Desactivalo en su lugar."
+      "Este usuario tiene actividad registrada (trabajos, pagos, comprobantes o resúmenes mensuales) y no puede eliminarse sin perder esa información. Desactivalo en su lugar."
     );
   }
-  await db.query("DELETE FROM usuarios WHERE id = $1", [id]);
+  await withTransaction(db, async (tx) => {
+    await tx.query("DELETE FROM auditoria WHERE usuario_id = $1", [id]);
+    await tx.query("DELETE FROM usuarios WHERE id = $1", [id]);
+  });
 }
 
 export async function listarRoles(db: Queryable): Promise<Rol[]> {
