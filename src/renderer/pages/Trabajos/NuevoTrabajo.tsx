@@ -26,6 +26,12 @@ function hoyISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** "olivia rodriguez" → "Olivia Rodriguez": solo sube a mayúscula la primera
+ * letra de cada palabra, nunca baja las que el usuario ya escribió en mayúscula. */
+function capitalizarPalabras(texto: string): string {
+  return texto.replace(/(^|\s)(\S)/g, (_m, sep: string, letra: string) => sep + letra.toUpperCase());
+}
+
 let contadorRegistro = 0;
 function nuevoRegistro() {
   contadorRegistro += 1;
@@ -509,7 +515,7 @@ export default function NuevoTrabajo() {
                 texto={pacienteTexto}
                 pacienteId={pacienteId}
                 onCambiarTexto={(texto) => {
-                  setPacienteTexto(texto);
+                  setPacienteTexto(capitalizarPalabras(texto));
                   setPacienteId(null);
                 }}
                 onSeleccionar={(id, label) => {
