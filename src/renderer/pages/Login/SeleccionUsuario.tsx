@@ -19,7 +19,7 @@ function TarjetaUsuario({ usuario, onClick }: { usuario: UsuarioParaSeleccion; o
       </span>
       <div className="text-center min-w-0 w-full">
         <p className="text-sm font-medium text-cream truncate">{usuario.nombreCompleto}</p>
-        <p className="text-xs text-cream/40 font-mono truncate">@{usuario.nombreUsuario}</p>
+        <p className="text-xs text-cream/40 truncate">@{usuario.nombreUsuario}</p>
         <p className="text-[10px] uppercase tracking-wide text-gold-dim mt-1.5">{formatearRol(usuario.rolNombre)}</p>
       </div>
     </button>

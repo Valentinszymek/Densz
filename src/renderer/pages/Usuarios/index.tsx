@@ -60,7 +60,7 @@ export default function Usuarios() {
                 <Td>
                   <div className="flex items-center gap-3">
                     <Avatar nombre={u.nombreUsuario} />
-                    <p className="font-medium text-carbon font-mono truncate">@{u.nombreUsuario}</p>
+                    <p className="font-medium text-carbon truncate">@{u.nombreUsuario}</p>
                   </div>
                 </Td>
                 <Td>

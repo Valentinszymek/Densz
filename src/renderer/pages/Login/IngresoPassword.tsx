@@ -45,7 +45,7 @@ export function IngresoPassword({
               {inicial}
             </span>
             <p className="text-base font-medium text-carbon text-center">Hola, {usuario.nombreCompleto}</p>
-            <p className="text-xs text-carbon/40 font-mono">@{usuario.nombreUsuario}</p>
+            <p className="text-xs text-carbon/40">@{usuario.nombreUsuario}</p>
           </div>
 
           <form onSubmit={onSubmit} className="space-y-4">
