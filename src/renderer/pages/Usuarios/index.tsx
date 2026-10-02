@@ -12,7 +12,10 @@ import { UsuarioDetalle } from "./UsuarioDetalle";
 function Avatar({ nombre }: { nombre: string }) {
   const inicial = nombre.trim().charAt(0).toUpperCase() || "?";
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-carbon text-gold text-sm font-semibold">
+    <span
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-carbon text-gold text-sm"
+      style={{ fontFamily: '"Densz Avatar", "Inter", system-ui, sans-serif', fontWeight: 700, letterSpacing: "-0.02em" }}
+    >
       {inicial}
     </span>
   );

@@ -11,7 +11,10 @@ function TarjetaUsuario({ usuario, onClick }: { usuario: UsuarioParaSeleccion; o
       onClick={onClick}
       className="flex flex-col items-center gap-3 rounded-xl border border-cream/10 bg-cream/[0.03] hover:bg-cream/[0.06] hover:border-gold/40 transition-colors px-6 py-6 w-40 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
     >
-      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gold/15 text-gold text-2xl font-semibold">
+      <span
+        className="flex h-16 w-16 items-center justify-center rounded-full bg-gold/15 text-gold text-2xl"
+        style={{ fontFamily: '"Densz Avatar", "Inter", system-ui, sans-serif', fontWeight: 700, letterSpacing: "-0.02em" }}
+      >
         {inicial}
       </span>
       <div className="text-center min-w-0 w-full">

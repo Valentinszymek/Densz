@@ -29,7 +29,10 @@ export function Topbar() {
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
           <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-carbon/70 hover:bg-carbon/5">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-carbon text-gold text-[11px] font-semibold">
+            <span
+              className="flex h-6 w-6 items-center justify-center rounded-full bg-carbon text-gold text-[11px]"
+              style={{ fontFamily: '"Densz Avatar", "Inter", system-ui, sans-serif', fontWeight: 700, letterSpacing: "-0.02em" }}
+            >
               {sesion?.nombreCompleto?.[0]?.toUpperCase() ?? "?"}
             </span>
             <span className="hidden sm:inline">{sesion?.nombreCompleto ?? "—"}</span>

@@ -4,6 +4,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fuente moderna para la inicial de los avatares (círculos con la letra del
+   usuario) — nombre propio ("Densz Avatar") para no pisar el font-family
+   global de la app (ver regla de `body` más abajo), así queda acotada solo
+   a esos círculos. */
+@font-face {
+  font-family: "Densz Avatar";
+  src: url("@fontsource/inter/files/inter-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 html,
 body,
 #root {
