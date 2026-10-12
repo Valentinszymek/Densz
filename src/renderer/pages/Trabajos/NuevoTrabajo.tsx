@@ -619,29 +619,42 @@ export default function NuevoTrabajo() {
                 <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,42%)_minmax(0,58%)] gap-6 items-start">
                   <div className="space-y-4">
                     <FormField label="Prestación">
-                      <SelectBuscable
-                        opciones={(prestaciones ?? []).map((p) => ({ id: p.id, label: p.nombre, sublabel: p.categoriaNombre }))}
-                        value={actual.prestacionId}
-                        onChange={cambiarPrestacionActual}
-                        placeholder="Buscar prestación…"
-                      />
-                    </FormField>
-
-                    {actual.prestacionId && (
-                      <>
-                        <FormField label="Nombre">
-                          {/* Nace con el nombre del catálogo y es 100% editable — lo
-                              que quede acá es lo que se guarda en esta línea de la
-                              OT (ej. "Corona de Zirconio — repetición a mitad de
-                              precio"), sin tocar el catálogo para el resto. */}
+                      {actual.prestacionId ? (
+                        // Una vez elegida, el mismo campo pasa a ser editable
+                        // — nace con el nombre del catálogo pero lo que quede
+                        // escrito acá es lo que se guarda en esta línea de la
+                        // OT (ej. "Corona de Zirconio — repetición a mitad de
+                        // precio"), sin tocar el catálogo para el resto. La X
+                        // vuelve a abrir el buscador para elegir otra.
+                        <div className="relative">
                           <Input
                             type="text"
                             value={actual.nombreEditado}
                             onChange={(e) => actualizarActual({ nombreEditado: e.target.value })}
                             maxLength={200}
+                            className="pr-8"
                           />
-                        </FormField>
+                          <button
+                            type="button"
+                            onClick={() => cambiarPrestacionActual(null)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-carbon/35 hover:text-carbon"
+                            title="Elegir otra prestación"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <SelectBuscable
+                          opciones={(prestaciones ?? []).map((p) => ({ id: p.id, label: p.nombre, sublabel: p.categoriaNombre }))}
+                          value={actual.prestacionId}
+                          onChange={cambiarPrestacionActual}
+                          placeholder="Buscar prestación…"
+                        />
+                      )}
+                    </FormField>
 
+                    {actual.prestacionId && (
+                      <>
                         <FormField label="Cantidad">
                           {/* type="text" a propósito, no type="number": los inputs numéricos
                               nativos de Chromium tienen un manejo de selección/backspace poco
