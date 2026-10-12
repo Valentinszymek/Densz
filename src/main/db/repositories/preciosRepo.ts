@@ -168,7 +168,7 @@ export async function listarPrestaciones(db: Queryable, filtro: FiltroPrestacion
     params.push(`%${filtro.busqueda.trim()}%`);
     sql += ` AND p.nombre ILIKE $${params.length}`;
   }
-  sql += " ORDER BY p.orden, lower(p.nombre)";
+  sql += " ORDER BY lower(p.nombre)";
   const { rows } = await db.query<FilaPrestacion>(sql, params);
   return rows.map(mapearPrestacion);
 }

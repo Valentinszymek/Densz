@@ -126,7 +126,7 @@ export async function listarPrestacionesDeLista(
     JOIN categorias_precio c ON c.id = p.categoria_id
     LEFT JOIN lista_precio_items li ON li.prestacion_id = p.id AND li.lista_id = $1 AND li.vigente_hasta IS NULL
     ${soloActivas ? "WHERE p.activo = 1" : ""}
-    ORDER BY c.orden, p.orden, lower(p.nombre)
+    ORDER BY lower(p.nombre)
   `;
   const { rows } = await db.query<FilaItem>(sql, [listaId]);
   return rows.map(mapearItem);
