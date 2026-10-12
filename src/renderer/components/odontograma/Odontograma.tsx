@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Odontogram as OdontogramaLib, getViewBox, type ToothDetail } from "react-odontogram";
 import "react-odontogram/style.css";
+import "./odontogramaOverrides.css";
 import { X, CheckSquare, Square } from "lucide-react";
 import { FILA_SUPERIOR, FILA_INFERIOR, CUADRANTES, TODAS_LAS_PIEZAS, alternarPieza, alternarCuadrante } from "./piezaUtils";
 import { cn } from "../../lib/cn";

@@ -1,0 +1,9 @@
+/* react-odontogram le pone a cada pieza un outline cuadrado al quedar con
+ * foco después de un click (pensado para navegación por teclado) — en
+ * Densz se ve como un "cuadrado feo" superpuesto al diente pintado, así
+ * que se lo saca: el relleno dorado de la pieza seleccionada ya es
+ * suficiente indicación visual. */
+.Odontogram g[role="option"]:focus,
+.Odontogram g[role="option"]:focus-visible {
+  outline: none !important;
+}
