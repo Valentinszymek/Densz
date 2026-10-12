@@ -170,6 +170,22 @@ describe("HTTP /trabajos", () => {
     expect(editada.body.totalCentavos).toBe(2000000); // 2 coronas, mismo precio histórico
   });
 
+  it("el nombre editado de una línea viaja por HTTP (recortado) y, si no se manda, vuelve al del catálogo", async () => {
+    const creada = await request(app)
+      .post("/trabajos")
+      .set("Cookie", cookieAdmin)
+      .send(datosOrdenValida({ prestaciones: [{ prestacionId: coronaId, cantidad: 1, piezasFdi: [16], nombre: "  Corona Test — repetición  " }] }));
+    expect(creada.status).toBe(201);
+    expect(creada.body.prestaciones[0].prestacionNombre).toBe("Corona Test — repetición");
+
+    const editada = await request(app)
+      .put(`/trabajos/${creada.body.id}`)
+      .set("Cookie", cookieAdmin)
+      .send(datosOrdenValida({ prestaciones: [{ prestacionId: coronaId, cantidad: 1, piezasFdi: [16] }] }));
+    expect(editada.status).toBe(200);
+    expect(editada.body.prestaciones[0].prestacionNombre).toBe("Corona Test");
+  });
+
   // --- 8. Anularla ---
   it("anula una OT y su estado pasa a 'anulado'", async () => {
     const creada = await request(app).post("/trabajos").set("Cookie", cookieAdmin).send(datosOrdenValida());

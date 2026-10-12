@@ -536,6 +536,8 @@ export interface DatosLineaPrestacionDto {
   cantidad: number;
   piezasFdi: number[];
   precioManualCentavos?: number | null;
+  /** Nombre a mostrar para esta línea — si se omite, se usa el del catálogo. */
+  nombre?: string;
 }
 
 export interface DatosCrearOrdenDto {

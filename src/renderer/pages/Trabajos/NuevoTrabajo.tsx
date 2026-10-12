@@ -38,6 +38,13 @@ function nuevoRegistro() {
   return {
     key: `registro-${contadorRegistro}`,
     prestacionId: null as number | null,
+    // Nombre a mostrar/guardar para esta línea — nace vacío y se autocompleta
+    // con el nombre del catálogo apenas se elige una prestación (ver
+    // cambiarPrestacionActual), pero a partir de ahí es 100% editable: lo
+    // que quede acá es lo que se guarda en la OT, no necesariamente el
+    // nombre del catálogo (ej. "Corona de Zirconio — repetición a mitad de
+    // precio"). Nunca afecta el precio ni ningún otro cálculo.
+    nombreEditado: "" as string,
     piezas: [] as number[],
     // "" representa el campo vacío mientras se está editando a mano (el
     // usuario borró el 1 para escribir otra cantidad) — nunca se lo
@@ -64,6 +71,7 @@ type RegistroPrestacion = ReturnType<typeof nuevoRegistro>;
  * estaba, para no recalcularlo por accidente contra el catálogo de hoy. */
 function registroDesdeLinea(p: {
   prestacionId: number;
+  prestacionNombre: string;
   cantidad: number;
   piezasFdi: number[];
   precioUnitarioCentavos: number;
@@ -72,6 +80,7 @@ function registroDesdeLinea(p: {
   return {
     key: `registro-${contadorRegistro}`,
     prestacionId: p.prestacionId,
+    nombreEditado: p.prestacionNombre,
     piezas: p.piezasFdi,
     cantidad: p.cantidad,
     // Manual a propósito: si el usuario solo toca las piezas, la cantidad
@@ -297,10 +306,14 @@ export default function NuevoTrabajo() {
    * a partir de ahí vuelve a resolverse contra la lista vigente, como
    * cualquier línea nueva — nunca se sigue arrastrando el precio viejo. */
   function cambiarPrestacionActual(id: number | null) {
+    // Al elegir una prestación (o cambiarla), el nombre editable vuelve a
+    // partir del nombre del catálogo — si antes había uno personalizado
+    // para OTRA prestación, no tendría sentido arrastrarlo.
+    const nombreCatalogo = id ? (prestaciones?.find((p) => p.id === id)?.nombre ?? "") : "";
     actualizarActual(
       actual?.precioCongelado
-        ? { prestacionId: id, precioCongelado: false, editandoPrecio: false, precioManual: null }
-        : { prestacionId: id }
+        ? { prestacionId: id, precioCongelado: false, editandoPrecio: false, precioManual: null, nombreEditado: nombreCatalogo }
+        : { prestacionId: id, nombreEditado: nombreCatalogo }
     );
   }
 
@@ -374,7 +387,8 @@ export default function NuevoTrabajo() {
         prestacionId: r.prestacionId!,
         cantidad: cantidadNum(r),
         piezasFdi: r.piezas,
-        precioManualCentavos: r.editandoPrecio ? r.precioManual : null
+        precioManualCentavos: r.editandoPrecio ? r.precioManual : null,
+        nombre: r.nombreEditado.trim() || undefined
       }))
     };
 
@@ -548,7 +562,7 @@ export default function NuevoTrabajo() {
                       {idx + 1}
                     </span>
                     <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">{prestacion?.nombre ?? r.prestacionId ?? "—"}</p>
+                      <p className="font-medium text-sm truncate">{r.nombreEditado || prestacion?.nombre || r.prestacionId || "—"}</p>
                       <p className="text-xs text-carbon/45">
                         {r.piezas.length > 0 ? r.piezas.join(" · ") : "Sin piezas"} · {cantidadNum(r)}{" "}
                         {cantidadNum(r) === 1 ? "unidad" : "unidades"}
@@ -615,6 +629,19 @@ export default function NuevoTrabajo() {
 
                     {actual.prestacionId && (
                       <>
+                        <FormField label="Nombre">
+                          {/* Nace con el nombre del catálogo y es 100% editable — lo
+                              que quede acá es lo que se guarda en esta línea de la
+                              OT (ej. "Corona de Zirconio — repetición a mitad de
+                              precio"), sin tocar el catálogo para el resto. */}
+                          <Input
+                            type="text"
+                            value={actual.nombreEditado}
+                            onChange={(e) => actualizarActual({ nombreEditado: e.target.value })}
+                            maxLength={200}
+                          />
+                        </FormField>
+
                         <FormField label="Cantidad">
                           {/* type="text" a propósito, no type="number": los inputs numéricos
                               nativos de Chromium tienen un manejo de selección/backspace poco

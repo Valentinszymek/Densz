@@ -3,7 +3,7 @@ import { createTestDbConUsuario, idListaGeneral, type TestDb } from "../helpers/
 import { crearOdontologo } from "../../src/main/db/repositories/odontologosRepo";
 import { crearCategoria, crearPrestacion } from "../../src/main/db/repositories/preciosRepo";
 import { cambiarPrecioEnLista, crearLista } from "../../src/main/db/repositories/listasPrecioRepo";
-import { crearOrdenConPrestaciones, anularOrden, eliminarOrdenDefinitivo } from "../../src/main/services/ordenService";
+import { crearOrdenConPrestaciones, editarOrdenConPrestaciones, anularOrden, eliminarOrdenDefinitivo } from "../../src/main/services/ordenService";
 import { obtenerOrden } from "../../src/main/db/repositories/ordenesRepo";
 import { obtenerPaciente, crearPaciente, listarPacientes, setActivoPaciente } from "../../src/main/db/repositories/pacientesRepo";
 import { registrarMovimientoDebe, obtenerSaldos } from "../../src/main/db/repositories/movimientosRepo";
@@ -54,6 +54,41 @@ describe("ordenService", () => {
     const paciente = await obtenerPaciente(db, orden.pacienteId);
     expect(paciente?.nombreCompleto).toBe("Juan Pérez");
     expect(paciente?.odontologoId).toBe(odontologoId);
+  });
+
+  it("el nombre de una línea es editable por el usuario: si se manda uno se usa tal cual, si no se usa el del catálogo", async () => {
+    const { db, usuarioId } = ctx;
+    const creada = await crearOrdenConPrestaciones(db, {
+      odontologoId,
+      pacienteNombreCompleto: "Juan Pérez",
+      fechaTrabajo: "2026-01-01",
+      prestaciones: [
+        { prestacionId: coronaId, cantidad: 1, piezasFdi: [11], nombre: "  Corona de Zirconio — repetición a mitad de precio  " },
+        { prestacionId: tBaseId, cantidad: 1, piezasFdi: [12] }
+      ],
+      creadoPor: usuarioId
+    });
+
+    expect(creada.prestaciones.find((p) => p.prestacionId === coronaId)?.prestacionNombre).toBe(
+      "Corona de Zirconio — repetición a mitad de precio"
+    );
+    // Sin override: se usa el nombre del catálogo tal cual, como siempre.
+    expect(creada.prestaciones.find((p) => p.prestacionId === tBaseId)?.prestacionNombre).toBe("T-Base");
+
+    const editada = await editarOrdenConPrestaciones(db, creada.id, {
+      odontologoId,
+      pacienteId: creada.pacienteId,
+      fechaTrabajo: creada.fechaTrabajo,
+      prestaciones: [
+        { prestacionId: coronaId, cantidad: 1, piezasFdi: [11] },
+        { prestacionId: tBaseId, cantidad: 1, piezasFdi: [12], nombre: "T-Base urgente" }
+      ],
+      editadoPor: usuarioId
+    });
+
+    // Al editar sin mandar nombre, vuelve a ser el del catálogo (no queda "pegado" el anterior).
+    expect(editada.prestaciones.find((p) => p.prestacionId === coronaId)?.prestacionNombre).toBe("Corona de zirconio");
+    expect(editada.prestaciones.find((p) => p.prestacionId === tBaseId)?.prestacionNombre).toBe("T-Base urgente");
   });
 
   it("una OT puede tener varias prestaciones, cada una con sus propias piezas y su propio subtotal", async () => {

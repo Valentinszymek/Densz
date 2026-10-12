@@ -36,7 +36,8 @@ const esquemaLinea = z.object({
   prestacionId: z.number().int().positive(),
   cantidad: z.number().int().positive("La cantidad debe ser mayor a cero."),
   piezasFdi: z.array(z.number().int()).default([]),
-  precioManualCentavos: z.number().int().nonnegative().nullable().optional()
+  precioManualCentavos: z.number().int().nonnegative().nullable().optional(),
+  nombre: z.string().trim().max(200).optional()
 });
 
 const esquemaCrear = z

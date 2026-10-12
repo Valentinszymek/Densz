@@ -31,6 +31,11 @@ export interface DatosLineaPrestacionInput {
   cantidad: number;
   piezasFdi: number[];
   precioManualCentavos?: number | null;
+  /** Nombre a mostrar para esta línea puntual — si se omite o viene vacío,
+   * se usa el nombre de la prestación tal cual está en el catálogo. Permite
+   * aclarar algo sobre este trabajo puntual (ej. "Corona de Zirconio —
+   * repetición a mitad de precio") sin tocar el catálogo para los demás. */
+  nombre?: string;
 }
 
 export interface DatosCrearOrden {
@@ -81,7 +86,7 @@ async function resolverLineasOrden(
 
     resultado.push({
       prestacionId: p.prestacionId,
-      prestacionNombre: prestacion.nombre,
+      prestacionNombre: p.nombre?.trim() || prestacion.nombre,
       categoriaNombre: prestacion.categoriaNombre ?? "",
       cantidad: p.cantidad,
       precioUnitarioCentavos,
