@@ -26,6 +26,7 @@ import { crearRouterAuditoria } from "./routes/auditoria.route";
 import { crearRouterProteccion } from "./routes/proteccion.route";
 import { crearRouterTrabajos } from "./routes/trabajos.route";
 import { crearRouterPagos } from "./routes/pagos.route";
+import { crearRouterDeudas } from "./routes/deudas.route";
 import { crearRouterCuentas } from "./routes/cuentas.route";
 import { crearRouterComprobantes } from "./routes/comprobantes.route";
 import { crearRouterEstadisticas } from "./routes/estadisticas.route";
@@ -93,6 +94,7 @@ async function main(): Promise<void> {
   app.use("/proteccion", crearRouterProteccion(pool));
   app.use("/trabajos", crearRouterTrabajos(pool));
   app.use("/pagos", crearRouterPagos(pool));
+  app.use("/deudas", crearRouterDeudas(pool));
   app.use("/cuentas", crearRouterCuentas(pool));
   app.use("/comprobantes", crearRouterComprobantes(pool));
   app.use("/estadisticas", crearRouterEstadisticas(pool));

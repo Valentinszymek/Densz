@@ -162,6 +162,11 @@ export const IPC_CHANNELS = {
   MEDIOS_PAGO_CREAR: "mediosPago:crear",
   PAGOS_LISTAR_ULTIMOS: "pagos:listarUltimos",
 
+  /** Deuda agregada a mano, sin ninguna orden detrás (ej. saldo previo a
+   * Densz) — ver src/main/services/deudaService.ts. */
+  DEUDAS_REGISTRAR: "deudas:registrar",
+  DEUDAS_ANULAR: "deudas:anular",
+
   ESTADISTICAS_KPIS: "estadisticas:kpis",
   ESTADISTICAS_TRABAJOS_POR_DIA: "estadisticas:trabajosPorDia",
   ESTADISTICAS_INGRESOS_POR_ODONTOLOGO: "estadisticas:ingresosPorOdontologo",
@@ -411,6 +416,9 @@ export interface DenszApi {
   mediosPagoCrear: (nombre: string) => Promise<number>;
   pagosListarUltimos: (limite?: number) => Promise<PagoConOdontologo[]>;
 
+  deudasRegistrar: (data: DatosNuevaDeudaDto) => Promise<MovimientoCuenta>;
+  deudasAnular: (id: number, motivo: string) => Promise<void>;
+
   estadisticasKpis: (rango: RangoFechas) => Promise<KpisPeriodo>;
   estadisticasTrabajosPorDia: (rango: RangoFechas) => Promise<PuntoTrabajosPorDia[]>;
   estadisticasIngresosPorOdontologo: (rango: RangoFechas) => Promise<IngresoPorOdontologo[]>;
@@ -512,6 +520,16 @@ export interface DatosNuevoPagoDto {
 }
 
 export type ResultadoRegistrarPagoDto = { creado: true; pago: Pago } | { creado: false; posibleDuplicado: true };
+
+export interface DatosNuevaDeudaDto {
+  /** Exactamente uno de los dos. */
+  odontologoId?: number | null;
+  clinicaId?: number | null;
+  importeCentavos: number;
+  moneda: Moneda;
+  fecha: string;
+  descripcion: string;
+}
 
 export interface FiltroOrdenesDto {
   odontologoId?: number;

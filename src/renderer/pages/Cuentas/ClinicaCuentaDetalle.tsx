@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Wallet, FileBarChart, Ban, FileText } from "lucide-react";
+import { ArrowLeft, Wallet, FileBarChart, Ban, FileText, CircleDollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Table, Thead, Tbody, Tr, Th, Td } from "../../components/ui/Table";
@@ -19,6 +19,8 @@ import {
 import { formatearMoneda, formatearFecha, formatearFechaHora } from "../../lib/format";
 import { RegistrarPagoModal } from "./RegistrarPagoModal";
 import { AnularPagoModal } from "./AnularPagoModal";
+import { AgregarDeudaModal } from "./AgregarDeudaModal";
+import { AnularDeudaModal } from "./AnularDeudaModal";
 import type { TrabajoFacturadoMes } from "@shared/types/entities";
 
 const NOMBRES_MES = [
@@ -77,12 +79,15 @@ export default function ClinicaCuentaDetalle() {
   const { data: resumenesGenerados } = useResumenesMensualesClinica(clinicaId);
   const { data: movimientos } = useMovimientosClinica(clinicaId);
   const pagos = useMemo(() => (movimientos ?? []).filter((m) => m.tipo === "haber"), [movimientos]);
+  const deudas = useMemo(() => (movimientos ?? []).filter((m) => m.tipo === "debe" && m.ordenId === null), [movimientos]);
 
   const imprimir = useImprimirEstadoDeCuentaClinica();
   const verPdfResumen = useVerPdfResumen();
 
   const [pagoAbierto, setPagoAbierto] = useState(false);
   const [pagoAAnular, setPagoAAnular] = useState<number | null>(null);
+  const [deudaAbierta, setDeudaAbierta] = useState(false);
+  const [deudaAAnular, setDeudaAAnular] = useState<number | null>(null);
 
   return (
     <div className="max-w-4xl">
@@ -99,6 +104,9 @@ export default function ClinicaCuentaDetalle() {
               { tipo: "pagos", etiqueta: "Pagos", nombreSugerido: `pagos-${clinica?.nombre ?? clinicaId}`, clinicaId }
             ]}
           />
+          <Button size="sm" variant="secondary" onClick={() => setDeudaAbierta(true)}>
+            <CircleDollarSign size={14} /> Agregar deuda
+          </Button>
           <Button size="sm" onClick={() => setPagoAbierto(true)}>
             <Wallet size={14} /> Registrar pago
           </Button>
@@ -298,9 +306,48 @@ export default function ClinicaCuentaDetalle() {
         </Table>
       )}
 
+      <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2 mt-8">Deudas agregadas</p>
+      {deudas.length === 0 && <p className="text-sm text-carbon/40">Sin deudas agregadas a mano.</p>}
+      {deudas.length > 0 && (
+        <Table>
+          <Thead>
+            <Tr>
+              <Th>Fecha</Th>
+              <Th>Descripción</Th>
+              <Th>Importe</Th>
+              <Th></Th>
+            </Tr>
+          </Thead>
+          <Tbody>
+            {deudas.map((m) => (
+              <Tr key={m.id} className={m.anulado ? "opacity-40" : ""}>
+                <Td className="text-carbon/60">{formatearFecha(m.fecha)}</Td>
+                <Td>
+                  {m.descripcion}
+                  <Badge tono="neutral" className="ml-2">{m.moneda}</Badge>
+                  {m.anulado && <Badge tono="error" className="ml-2">Anulado</Badge>}
+                </Td>
+                <Td className="font-medium">{formatearMoneda(m.importeCentavos, m.moneda)}</Td>
+                <Td>
+                  {!m.anulado && (
+                    <Button variant="ghost" size="sm" onClick={() => setDeudaAAnular(m.id)} title="Anular deuda">
+                      <Ban size={13} />
+                    </Button>
+                  )}
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      )}
+
       <RegistrarPagoModal open={pagoAbierto} onOpenChange={setPagoAbierto} titular={{ clinicaId }} />
       {pagoAAnular !== null && (
         <AnularPagoModal open onOpenChange={(o) => !o && setPagoAAnular(null)} pagoId={pagoAAnular} />
+      )}
+      <AgregarDeudaModal open={deudaAbierta} onOpenChange={setDeudaAbierta} titular={{ clinicaId }} />
+      {deudaAAnular !== null && (
+        <AnularDeudaModal open onOpenChange={(o) => !o && setDeudaAAnular(null)} deudaId={deudaAAnular} />
       )}
     </div>
   );

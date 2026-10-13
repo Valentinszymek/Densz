@@ -14,6 +14,7 @@ import { registrarHandlersOrdenes } from "./ipc/ordenes.ipc";
 import { registrarHandlersComprobantes } from "./ipc/comprobantes.ipc";
 import { registrarHandlersCuentas } from "./ipc/cuentas.ipc";
 import { registrarHandlersPagos } from "./ipc/pagos.ipc";
+import { registrarHandlersDeudas } from "./ipc/deudas.ipc";
 import { registrarHandlersEstadisticas } from "./ipc/estadisticas.ipc";
 import { registrarHandlersBackups } from "./ipc/backups.ipc";
 import { registrarHandlersAuth } from "./ipc/auth.ipc";
@@ -68,6 +69,7 @@ if (!obtuvoElLock) {
     registrarHandlersComprobantes(pool);
     registrarHandlersCuentas(pool);
     registrarHandlersPagos(pool);
+    registrarHandlersDeudas(pool);
     registrarHandlersEstadisticas(pool);
     registrarHandlersBackups(pool);
     registrarHandlersAuth(pool);

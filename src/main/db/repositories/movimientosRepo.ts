@@ -17,15 +17,20 @@ export interface TitularCuenta {
   clinicaId: number | null;
 }
 
+/** `ordenId` acepta `null` a propósito: una OT facturada siempre pasa un id
+ * real acá, pero una deuda agregada a mano (saldo previo a Densz, sin
+ * ningún trabajo cargado) no tiene ninguna orden detrás — ver
+ * `deudaService.registrarDeuda`. Devuelve el id del movimiento creado. */
 export async function registrarMovimientoDebe(
   db: Queryable,
-  data: TitularCuenta & { ordenId: number; importeCentavos: number; moneda: Moneda; fecha: string; descripcion: string }
-): Promise<void> {
-  await db.query(
+  data: TitularCuenta & { ordenId: number | null; importeCentavos: number; moneda: Moneda; fecha: string; descripcion: string }
+): Promise<number> {
+  const { rows } = await db.query<{ id: number }>(
     `INSERT INTO movimientos_cuenta (odontologo_id, clinica_id, tipo, orden_id, importe_centavos, moneda, fecha, descripcion)
-     VALUES ($1, $2, 'debe', $3, $4, $5, $6, $7)`,
+     VALUES ($1, $2, 'debe', $3, $4, $5, $6, $7) RETURNING id`,
     [data.odontologoId, data.clinicaId, data.ordenId, data.importeCentavos, data.moneda, data.fecha, data.descripcion]
   );
+  return rows[0].id;
 }
 
 export async function registrarMovimientoHaber(
@@ -66,6 +71,16 @@ export async function obtenerMovimientoDebeActivoDeOrden(db: Queryable, ordenId:
 /** Anula (no borra) el movimiento "haber" generado por un pago. */
 export async function anularMovimientoDePago(db: Queryable, pagoId: number): Promise<void> {
   await db.query("UPDATE movimientos_cuenta SET anulado = 1 WHERE pago_id = $1 AND anulado = 0", [pagoId]);
+}
+
+/** Anula (no borra) una deuda agregada a mano — nunca toca un movimiento
+ * que venga de una orden o de un pago real (el filtro por orden_id/pago_id
+ * IS NULL es a propósito, así este endpoint no puede anular nada más). */
+export async function anularMovimientoManual(db: Queryable, id: number): Promise<void> {
+  await db.query(
+    "UPDATE movimientos_cuenta SET anulado = 1 WHERE id = $1 AND anulado = 0 AND tipo = 'debe' AND orden_id IS NULL AND pago_id IS NULL",
+    [id]
+  );
 }
 
 /** Borra en forma definitiva los movimientos asociados a una OT eliminada (§27). */
@@ -223,6 +238,14 @@ function mapearMovimiento(f: FilaMovimiento): MovimientoCuenta {
     descripcion: f.descripcion,
     anulado: f.anulado === 1
   };
+}
+
+export async function obtenerMovimiento(db: Queryable, id: number): Promise<MovimientoCuenta | null> {
+  const { rows } = await db.query<FilaMovimiento>(
+    `SELECT m.*, o.numero AS orden_numero FROM movimientos_cuenta m LEFT JOIN ordenes o ON o.id = m.orden_id WHERE m.id = $1`,
+    [id]
+  );
+  return rows[0] ? mapearMovimiento(rows[0]) : null;
 }
 
 export async function listarMovimientos(db: Queryable, odontologoId: number, limite = 500): Promise<MovimientoCuenta[]> {

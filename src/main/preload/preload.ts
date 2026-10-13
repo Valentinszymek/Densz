@@ -124,6 +124,8 @@ const api: DenszApi = {
   mediosPagoListar: () => ipcRenderer.invoke(IPC_CHANNELS.MEDIOS_PAGO_LISTAR),
   mediosPagoCrear: (nombre) => ipcRenderer.invoke(IPC_CHANNELS.MEDIOS_PAGO_CREAR, nombre),
   pagosListarUltimos: (limite) => ipcRenderer.invoke(IPC_CHANNELS.PAGOS_LISTAR_ULTIMOS, limite),
+  deudasRegistrar: (data) => ipcRenderer.invoke(IPC_CHANNELS.DEUDAS_REGISTRAR, data),
+  deudasAnular: (id, motivo) => ipcRenderer.invoke(IPC_CHANNELS.DEUDAS_ANULAR, id, motivo),
 
   estadisticasKpis: (rango) => ipcRenderer.invoke(IPC_CHANNELS.ESTADISTICAS_KPIS, rango),
   estadisticasTrabajosPorDia: (rango) => ipcRenderer.invoke(IPC_CHANNELS.ESTADISTICAS_TRABAJOS_POR_DIA, rango),

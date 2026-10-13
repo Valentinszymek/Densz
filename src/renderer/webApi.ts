@@ -1,5 +1,5 @@
 import type { DenszApi } from "@shared/types/ipc-contracts";
-import type { Orden, ResumenMensual, Pago } from "@shared/types/entities";
+import type { Orden, ResumenMensual, Pago, MovimientoCuenta } from "@shared/types/entities";
 import { useAuthStore } from "./store/authStore";
 import { toast } from "./store/toastStore";
 
@@ -486,6 +486,8 @@ export const webApi: DenszApi = {
   mediosPagoListar: () => get("/pagos/medios"),
   mediosPagoCrear: (nombre) => post<number>("/pagos/medios", { nombre }),
   pagosListarUltimos: (limite) => get(`/pagos/ultimos${buildQuery({ limite })}`),
+  deudasRegistrar: (data) => post<MovimientoCuenta>("/deudas", data),
+  deudasAnular: (id, motivo) => patch<{ ok: true }>(`/deudas/${id}/anular`, { motivo }).then(() => undefined),
 
   // --- Estadísticas: solo lectura conectada en esta etapa (Fase 9A) ---
   estadisticasKpis: (rango) => get(`/estadisticas/kpis${buildQuery(rango)}`),
