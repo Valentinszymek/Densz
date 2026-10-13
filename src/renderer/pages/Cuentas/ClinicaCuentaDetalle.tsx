@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Wallet, FileBarChart, Ban, FileText, CircleDollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
@@ -31,36 +31,15 @@ const NOMBRES_MES = [
 const ESTADO_TRABAJO_TONO = { pendiente_facturar: "neutral", facturado: "exito", anulado: "error" } as const;
 const ESTADO_TRABAJO_LABEL = { pendiente_facturar: "Pendiente", facturado: "Facturado", anulado: "Anulado" } as const;
 
-/** `fechaFacturacion` es `comprobantes.fecha_emision`, que incluye hora
- * ("2026-10-01 21:41:01", no solo la fecha) — dos OTs facturadas el mismo
- * día pero en momentos distintos nunca coinciden como string exacto.
- * Agrupar por el día solo (los primeros 10 caracteres, "YYYY-MM-DD") es
- * lo correcto acá: nunca cambia qué se muestra (formatearFecha ya
- * ignoraba la hora), solo corrige qué cuenta como "la misma fecha". */
-function soloFecha(fecha: string | null): string | null {
-  return fecha ? fecha.slice(0, 10) : null;
-}
-
 /**
- * Agrupación puramente visual (Bloque 1-C) — mismo criterio que
- * CuentaDetalle.tsx: el backend sigue devolviendo los trabajos ordenados
- * por fecha ascendente (ese orden es el que usa también el PDF del
- * resumen mensual y no se toca). Reemplaza el `.reverse()` que ya hacía
- * esta pantalla (ver comentario viejo, abajo) por una agrupación real por
- * fecha, más reciente primero — cada OT sigue siendo su propia fila.
+ * El backend sigue devolviendo los trabajos ordenados por fecha ascendente
+ * (ese orden es el que usa también el PDF del resumen mensual y no se
+ * toca). Acá solo se reordena una copia para mostrar, más reciente
+ * primero — cada OT ya muestra su propia fecha en su fila, así que no
+ * hace falta agruparlas bajo ningún encabezado de fecha aparte.
  */
-function agruparPorFecha(trabajos: TrabajoFacturadoMes[]): Array<{ fecha: string | null; trabajos: TrabajoFacturadoMes[] }> {
-  const ordenados = [...trabajos].sort((a, b) => (soloFecha(b.fechaFacturacion) ?? "").localeCompare(soloFecha(a.fechaFacturacion) ?? ""));
-  const grupos: Array<{ fecha: string | null; trabajos: TrabajoFacturadoMes[] }> = [];
-  for (const t of ordenados) {
-    const ultimo = grupos[grupos.length - 1];
-    if (ultimo && ultimo.fecha === soloFecha(t.fechaFacturacion)) {
-      ultimo.trabajos.push(t);
-    } else {
-      grupos.push({ fecha: soloFecha(t.fechaFacturacion), trabajos: [t] });
-    }
-  }
-  return grupos;
+function ordenarPorFecha(trabajos: TrabajoFacturadoMes[]): TrabajoFacturadoMes[] {
+  return [...trabajos].sort((a, b) => (b.fechaFacturacion ?? "").localeCompare(a.fechaFacturacion ?? ""));
 }
 
 export default function ClinicaCuentaDetalle() {
@@ -208,31 +187,22 @@ export default function ClinicaCuentaDetalle() {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {agruparPorFecha(b.trabajos).map((grupo) => (
-                      <Fragment key={grupo.fecha ?? "sin-fecha"}>
-                        <Tr className="hover:bg-transparent cursor-default">
-                          <Td colSpan={7} className="bg-carbon/[0.03] py-1.5 text-[11px] font-semibold uppercase tracking-wide text-carbon/45">
-                            {grupo.fecha ? formatearFecha(grupo.fecha) : "Sin fecha"}
-                          </Td>
-                        </Tr>
-                        {grupo.trabajos.map((t) => (
-                          <Tr
-                            key={`${t.ordenId}-${t.comprobanteNumero}`}
-                            className={`cursor-pointer ${t.anulado ? "opacity-40" : ""}`}
-                            onClick={() => navigate(`/trabajos/${t.ordenId}`)}
-                          >
-                            <Td className="font-mono text-xs text-carbon/60">{t.ordenNumero}</Td>
-                            <Td className="text-carbon/60">{t.fechaFacturacion ? formatearFecha(t.fechaFacturacion) : "—"}</Td>
-                            <Td className="text-carbon/70">{t.profesionalNombre}</Td>
-                            <Td>{t.pacienteNombreCompleto}</Td>
-                            <Td className={`text-carbon/70 ${t.anulado ? "line-through" : ""}`}>{t.prestacionesResumen}</Td>
-                            <Td className={`font-medium ${t.anulado ? "line-through" : ""}`}>{formatearMoneda(t.importeCentavos, t.moneda)}</Td>
-                            <Td>
-                              <Badge tono={ESTADO_TRABAJO_TONO[t.estado]}>{ESTADO_TRABAJO_LABEL[t.estado]}</Badge>
-                            </Td>
-                          </Tr>
-                        ))}
-                      </Fragment>
+                    {ordenarPorFecha(b.trabajos).map((t) => (
+                      <Tr
+                        key={`${t.ordenId}-${t.comprobanteNumero}`}
+                        className={`cursor-pointer ${t.anulado ? "opacity-40" : ""}`}
+                        onClick={() => navigate(`/trabajos/${t.ordenId}`)}
+                      >
+                        <Td className="font-mono text-xs text-carbon/60">{t.ordenNumero}</Td>
+                        <Td className="text-carbon/60">{t.fechaFacturacion ? formatearFecha(t.fechaFacturacion) : "—"}</Td>
+                        <Td className="text-carbon/70">{t.profesionalNombre}</Td>
+                        <Td>{t.pacienteNombreCompleto}</Td>
+                        <Td className={`text-carbon/70 ${t.anulado ? "line-through" : ""}`}>{t.prestacionesResumen}</Td>
+                        <Td className={`font-medium ${t.anulado ? "line-through" : ""}`}>{formatearMoneda(t.importeCentavos, t.moneda)}</Td>
+                        <Td>
+                          <Badge tono={ESTADO_TRABAJO_TONO[t.estado]}>{ESTADO_TRABAJO_LABEL[t.estado]}</Badge>
+                        </Td>
+                      </Tr>
                     ))}
                   </Tbody>
                 </Table>
