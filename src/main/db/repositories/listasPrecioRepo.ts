@@ -27,13 +27,35 @@ export async function obtenerLista(db: Queryable, id: number): Promise<ListaPrec
   return rows[0] ? mapearLista(rows[0]) : null;
 }
 
-export async function crearLista(db: Queryable, data: { nombre: string; moneda: Moneda }): Promise<number> {
-  const { rows: maxRows } = await db.query<{ m: number }>("SELECT COALESCE(MAX(orden), -1) AS m FROM listas_precio");
-  const { rows } = await db.query<{ id: number }>(
-    "INSERT INTO listas_precio (nombre, moneda, orden) VALUES ($1, $2, $3) RETURNING id",
-    [data.nombre.trim(), data.moneda, maxRows[0].m + 1]
-  );
-  return rows[0].id;
+/** `copiarPreciosDeListaId`, si se pasa, precarga la lista nueva con los
+ * precios vigentes de esa otra lista (las prestaciones sin precio ahí
+ * tampoco lo tienen en la nueva) — pensado para no tener que cargar cada
+ * precio a mano al crear una lista parecida a una que ya existe. Todo en
+ * una sola transacción: si algo falla a mitad de la copia, no queda una
+ * lista nueva a medio llenar. */
+export async function crearLista(
+  db: Queryable,
+  data: { nombre: string; moneda: Moneda; copiarPreciosDeListaId?: number | null }
+): Promise<number> {
+  return withTransaction(db, async (client) => {
+    const { rows: maxRows } = await client.query<{ m: number }>("SELECT COALESCE(MAX(orden), -1) AS m FROM listas_precio");
+    const { rows } = await client.query<{ id: number }>(
+      "INSERT INTO listas_precio (nombre, moneda, orden) VALUES ($1, $2, $3) RETURNING id",
+      [data.nombre.trim(), data.moneda, maxRows[0].m + 1]
+    );
+    const id = rows[0].id;
+
+    if (data.copiarPreciosDeListaId) {
+      const items = await listarPrestacionesDeLista(client, data.copiarPreciosDeListaId);
+      for (const item of items) {
+        if (item.precioCentavos !== null) {
+          await cambiarPrecioEnLista(client, id, item.id, item.precioCentavos);
+        }
+      }
+    }
+
+    return id;
+  });
 }
 
 export async function actualizarLista(db: Queryable, id: number, data: { nombre: string }): Promise<void> {

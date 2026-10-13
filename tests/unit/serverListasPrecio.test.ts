@@ -103,6 +103,41 @@ describe("HTTP /listas-precio", () => {
     expect(detalleUsd.body.moneda).toBe("USD");
   });
 
+  it("crear una lista con copiarPreciosDeListaId arranca con los precios vigentes de la lista de origen", async () => {
+    // Usa una lista de origen propia de este test (no listaArsId) para no
+    // dejarle un precio puesto a prestacionId — el test de más abajo
+    // ("una prestación sin precio...") espera que listaArsId siga sin
+    // precios para prestacionId, y los tests de este describe comparten la
+    // misma transacción (sin rollback entre tests).
+    const origen = await request(app)
+      .post("/listas-precio")
+      .set("Cookie", cookieAdmin)
+      .send({ nombre: `${NOMBRE_LISTA} Origen`, moneda: "ARS" });
+    expect(origen.status).toBe(201);
+    const listaOrigenId = origen.body as number;
+
+    const precio = await request(app)
+      .patch(`/listas-precio/${listaOrigenId}/items/${prestacionId}/precio`)
+      .set("Cookie", cookieAdmin)
+      .send({ nuevoPrecioCentavos: 900000 });
+    expect(precio.status).toBe(200);
+
+    const copia = await request(app)
+      .post("/listas-precio")
+      .set("Cookie", cookieAdmin)
+      .send({ nombre: `${NOMBRE_LISTA} Copia`, moneda: "ARS", copiarPreciosDeListaId: listaOrigenId });
+    expect(copia.status).toBe(201);
+    const listaCopiaId = copia.body as number;
+
+    const items = await request(app).get(`/listas-precio/${listaCopiaId}/items`).set("Cookie", cookieAdmin);
+    const item = items.body.find((i: { id: number }) => i.id === prestacionId);
+    expect(item.precioCentavos).toBe(900000);
+
+    // El origen no se toca por la copia.
+    const itemsOrigen = await request(app).get(`/listas-precio/${listaOrigenId}/items`).set("Cookie", cookieAdmin);
+    expect(itemsOrigen.body.find((i: { id: number }) => i.id === prestacionId).precioCentavos).toBe(900000);
+  });
+
   it("la lista aparece en el listado general", async () => {
     const res = await request(app).get("/listas-precio").set("Cookie", cookieAdmin);
     expect(res.body.some((l: { id: number }) => l.id === listaArsId)).toBe(true);

@@ -49,6 +49,29 @@ describe("listasPrecioRepo", () => {
     expect((await listarListas(db)).map((l) => l.nombre)).toContain("Dólares");
   });
 
+  it("al crear una lista con copiarPreciosDeListaId, arranca con los precios vigentes de esa otra lista", async () => {
+    const { db } = ctx;
+    const prestacion2Id = await crearPrestacion(db, { categoriaId, nombre: "T-Base" });
+    await cambiarPrecioEnLista(db, listaGeneralId, prestacionId, 900000);
+    // prestacion2Id queda sin precio en General a propósito.
+
+    const nuevaId = await crearLista(db, { nombre: "Aumentados", moneda: "ARS", copiarPreciosDeListaId: listaGeneralId });
+
+    expect((await precioVigenteEnLista(db, nuevaId, prestacionId))?.precioCentavos).toBe(900000);
+    // Lo que no tenía precio en el origen, tampoco lo tiene en la copia —
+    // nunca se inventa un precio en $0.
+    expect(await precioVigenteEnLista(db, nuevaId, prestacion2Id)).toBeNull();
+    // El origen no se toca.
+    expect((await precioVigenteEnLista(db, listaGeneralId, prestacionId))?.precioCentavos).toBe(900000);
+  });
+
+  it("sin copiarPreciosDeListaId, una lista nueva arranca sin ningún precio (comportamiento de siempre)", async () => {
+    const { db } = ctx;
+    await cambiarPrecioEnLista(db, listaGeneralId, prestacionId, 900000);
+    const nuevaId = await crearLista(db, { nombre: "Aumentados", moneda: "ARS" });
+    expect(await precioVigenteEnLista(db, nuevaId, prestacionId)).toBeNull();
+  });
+
   it("una prestación sin precio en una lista aparece como precioCentavos null", async () => {
     const items = await listarPrestacionesDeLista(ctx.db, listaGeneralId);
     expect(items.find((i) => i.id === prestacionId)?.precioCentavos).toBeNull();

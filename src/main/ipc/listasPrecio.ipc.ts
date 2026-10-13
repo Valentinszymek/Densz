@@ -9,7 +9,8 @@ import { IPC_CHANNELS } from "../../shared/types/ipc-contracts";
 
 const esquemaLista = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio."),
-  moneda: z.enum(["ARS", "USD"])
+  moneda: z.enum(["ARS", "USD"]),
+  copiarPreciosDeListaId: z.number().int().positive().nullable().optional()
 });
 
 const esquemaPrecio = z.number().int().nonnegative("El precio no puede ser negativo.");

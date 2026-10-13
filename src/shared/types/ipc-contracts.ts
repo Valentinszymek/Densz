@@ -300,6 +300,9 @@ export interface FiltroPrestacionesDto {
 export interface DatosListaPrecioDto {
   nombre: string;
   moneda: Moneda;
+  /** Si se pasa, la lista nueva arranca con los precios vigentes de esta
+   * otra lista (en vez de "Sin precio" en todo). */
+  copiarPreciosDeListaId?: number | null;
 }
 
 /** Fecha del trabajo (no anulado) más reciente de cada odontólogo —

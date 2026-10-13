@@ -9,9 +9,11 @@ import { zBooleanQuery } from "../utils/zQuery";
 import { generarListaPreciosWeb, descargarListaPreciosWeb } from "../listaPreciosWeb";
 
 const esquemaId = z.coerce.number().int().positive();
+// Mismo esquema exacto que src/main/ipc/listasPrecio.ipc.ts (esquemaLista).
 const esquemaLista = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio."),
-  moneda: z.enum(["ARS", "USD"])
+  moneda: z.enum(["ARS", "USD"]),
+  copiarPreciosDeListaId: z.number().int().positive().nullable().optional()
 });
 const esquemaPrecio = z.number().int().nonnegative("El precio no puede ser negativo.");
 // Mismo esquema exacto que src/main/ipc/listaPrecios.ipc.ts (esquemaOpciones).
