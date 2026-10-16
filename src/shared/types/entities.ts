@@ -15,6 +15,11 @@ export interface SesionActualDto {
   nombreCompleto: string;
   rolNombre: string;
   permisos: string[];
+  /** A qué laboratorio pertenece (plan multi-laboratorio) — `null` hasta
+   * que el usuario inició sesión con Google al menos una vez (ver
+   * googleAuthService.ts). Login con usuario/contraseña todavía no lo
+   * resuelve. */
+  laboratorioId: number | null;
 }
 
 export interface Rol {

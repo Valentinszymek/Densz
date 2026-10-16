@@ -151,6 +151,13 @@ const api: DenszApi = {
   backupsGuardarConfig: (data) => ipcRenderer.invoke(IPC_CHANNELS.BACKUPS_GUARDAR_CONFIG, data),
 
   authLogin: (nombreUsuario, password) => ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGIN, { nombreUsuario, password }),
+  // Todavía no implementado en escritorio (plan multi-laboratorio, etapa
+  // de login con Google): requiere abrir el navegador del sistema y un
+  // enlace de vuelta a la app — queda para cuando haya credenciales
+  // reales de Google para probarlo de punta a punta. Mensaje claro en
+  // vez de un canal IPC que no existe (eso rompería con un error críptico).
+  authLoginGoogle: () =>
+    Promise.reject(new Error("El login con Google todavía no está disponible en la app de escritorio.")),
   authLogout: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGOUT),
   authSesionActual: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_SESION_ACTUAL),
   authUsuariosDisponibles: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USUARIOS_DISPONIBLES),

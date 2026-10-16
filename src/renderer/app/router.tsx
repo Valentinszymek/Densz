@@ -4,6 +4,7 @@ import { RutaProtegida } from "../components/layout/RutaProtegida";
 import { RutaSoloAdmin } from "../components/layout/RutaSoloAdmin";
 import { ProteccionGuard } from "../components/proteccion/ProteccionGuard";
 import Login from "../pages/Login";
+import CallbackGoogle from "../pages/Login/CallbackGoogle";
 import Dashboard from "../pages/Dashboard";
 import Odontologos from "../pages/Odontologos";
 import OdontologoDetalle from "../pages/Odontologos/OdontologoDetalle";
@@ -32,6 +33,7 @@ export function AppRouter() {
     <HashRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<CallbackGoogle />} />
         <Route element={<RutaProtegida />}>
           <Route element={<AppShell />}>
             <Route path="/" element={<Dashboard />} />

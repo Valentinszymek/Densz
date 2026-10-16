@@ -2,9 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 import type { Pool } from "pg";
 import { login, logout } from "../../main/services/authService";
+import { loginConGoogle } from "../../main/services/googleAuthService";
 import { listarUsuariosActivosParaSeleccion } from "../../main/db/repositories/usuariosRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { crearSesionHttp, obtenerSesionHttp, destruirSesionHttp, COOKIE_SESION } from "../session";
+import { verificarTokenGoogle } from "../googleAuth";
 import {
   estaBloqueadoPorIntentos,
   registrarIntentoFallido,
@@ -15,6 +17,10 @@ import {
 const esquemaLogin = z.object({
   nombreUsuario: z.string().trim().min(1, "Ingresá tu usuario."),
   password: z.string().min(1, "Ingresá tu contraseña.")
+});
+
+const esquemaLoginGoogle = z.object({
+  accessToken: z.string().trim().min(1, "Falta el token de Google.")
 });
 
 const esProduccion = process.env.NODE_ENV === "production";
@@ -60,6 +66,28 @@ export function crearRouterAuth(db: Pool): Router {
         registrarIntentoFallido(datos.nombreUsuario);
         throw errLogin;
       }
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      res.status(401).json({ error: error.message });
+    }
+  });
+
+  // Login con Google (plan multi-laboratorio) — el frontend ya hizo todo
+  // el intercambio con Supabase Auth y llega acá solo con el access
+  // token; este endpoint lo revalida contra Supabase (nunca confía en lo
+  // que mande el navegador) y recién ahí busca/vincula el usuario de
+  // Densz correspondiente. Mismo límite de intentos por... acá no aplica
+  // "nombreUsuario" (no se sabe todavía a quién pertenece un token
+  // inválido) — el propio rate limit de Supabase Auth ya cubre intentos
+  // de login con Google mal habidos antes de llegar a este endpoint.
+  router.post("/google-callback", async (req, res) => {
+    try {
+      const { accessToken } = esquemaLoginGoogle.parse(req.body);
+      const identidad = await verificarTokenGoogle(accessToken);
+      const sesion = await loginConGoogle(db, identidad);
+      const idSesion = crearSesionHttp(sesion);
+      res.cookie(COOKIE_SESION, idSesion, opcionesCookie);
+      res.json(sesion);
     } catch (err) {
       const error = traducirErrorPostgres(err);
       res.status(401).json({ error: error.message });

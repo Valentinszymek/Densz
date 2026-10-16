@@ -444,6 +444,13 @@ export interface DenszApi {
   backupsGuardarConfig: (data: ConfigBackupsDto) => Promise<void>;
 
   authLogin: (nombreUsuario: string, password: string) => Promise<SesionActualDto>;
+  /** Login con Google (plan multi-laboratorio) — `accessToken` ya viene
+   * verificado del lado del cliente contra Supabase Auth (ver
+   * src/renderer/lib/supabaseClient.ts); el backend lo revalida antes de
+   * confiar en nada. Todavía no disponible en escritorio (ver
+   * preload.ts) — exige abrir el navegador del sistema para el paso de
+   * Google, que ese build no implementa en esta etapa. */
+  authLoginGoogle: (accessToken: string) => Promise<SesionActualDto>;
   authLogout: () => Promise<void>;
   authSesionActual: () => Promise<SesionActualDto | null>;
   authUsuariosDisponibles: () => Promise<UsuarioParaSeleccion[]>;

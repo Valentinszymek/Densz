@@ -1,6 +1,6 @@
 import type { Queryable } from "../db/types";
 import bcrypt from "bcryptjs";
-import { obtenerUsuarioPorNombre, registrarAcceso } from "../db/repositories/usuariosRepo";
+import { obtenerUsuarioPorNombre, registrarAcceso, obtenerLaboratorioIdDeUsuario } from "../db/repositories/usuariosRepo";
 import { cargarSesionDesdeUsuario, limpiarSesion, type SesionActual } from "./sessionService";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
 import { bloquearProteccion } from "./proteccionService";
@@ -46,6 +46,7 @@ export async function login(db: Queryable, nombreUsuario: string, password: stri
   await cargarSesionDesdeUsuario(db, usuario.id);
   await registrarAcceso(db, usuario.id);
   await registrarAuditoria(db, { usuarioId: usuario.id, accion: "login", entidad: "usuarios", entidadId: usuario.id });
+  const laboratorioId = await obtenerLaboratorioIdDeUsuario(db, usuario.id);
 
   return {
     usuarioId: usuario.id,
@@ -53,7 +54,7 @@ export async function login(db: Queryable, nombreUsuario: string, password: stri
     nombreCompleto: usuario.nombreCompleto,
     rolNombre: usuario.rolNombre ?? "",
     permisos: usuario.permisos,
-    laboratorioId: null
+    laboratorioId
   };
 }
 

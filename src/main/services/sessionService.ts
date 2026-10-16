@@ -4,7 +4,7 @@
  * login real por la pantalla de Login (authService.ts).
  */
 import type { Queryable } from "../db/types";
-import { obtenerUsuarioPorId } from "../db/repositories/usuariosRepo";
+import { obtenerUsuarioPorId, obtenerLaboratorioIdDeUsuario } from "../db/repositories/usuariosRepo";
 import { DenszError } from "../utils/errors";
 
 export interface SesionActual {
@@ -60,12 +60,13 @@ export function requerirPermiso(permiso: string): void {
 export async function cargarSesionDesdeUsuario(db: Queryable, usuarioId: number): Promise<void> {
   const usuario = await obtenerUsuarioPorId(db, usuarioId);
   if (!usuario) throw new Error("Usuario inexistente.");
+  const laboratorioId = await obtenerLaboratorioIdDeUsuario(db, usuarioId);
   setUsuarioActual({
     usuarioId: usuario.id,
     nombreUsuario: usuario.nombreUsuario,
     nombreCompleto: usuario.nombreCompleto,
     rolNombre: usuario.rolNombre ?? "",
     permisos: usuario.permisos,
-    laboratorioId: null
+    laboratorioId
   });
 }
