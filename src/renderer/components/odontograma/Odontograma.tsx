@@ -229,34 +229,21 @@ export function Odontograma({ piezasSeleccionadas, onChange, compacto = false }:
         </div>
       </div>
 
-      {/* Superior e inferior van lado a lado (no apiladas) para que el
-          odontograma completo entre en alto en una sola pantalla — antes,
-          apiladas, la arcada inferior quedaba fuera de vista y había que
-          scrollear para seleccionar una pieza de abajo. Cada mitad es casi
-          cuadrada (409×347 en su viewBox), así que ponerlas en fila
-          aprovecha el ancho disponible de esta columna en vez de dejarlo
-          vacío, sin perder tamaño de click en cada diente. */}
-      <div className={cn("mx-auto grid grid-cols-2 gap-3 items-start", compacto ? "max-w-[360px]" : "max-w-none")}>
-        <div>
-          <p className="text-center text-[10px] font-medium text-carbon/35 uppercase tracking-wide mb-0.5">Superior</p>
-          <MediaArcada
-            mitad="upper"
-            piezas={FILA_SUPERIOR}
-            seleccionSet={seleccionSet}
-            onCambiar={onCambioSuperior}
-            generacion={generacion}
-          />
-        </div>
-        <div>
-          <p className="text-center text-[10px] font-medium text-carbon/35 uppercase tracking-wide mb-0.5">Inferior</p>
-          <MediaArcada
-            mitad="lower"
-            piezas={FILA_INFERIOR}
-            seleccionSet={seleccionSet}
-            onCambiar={onCambioInferior}
-            generacion={generacion}
-          />
-        </div>
+      <div className={cn("mx-auto space-y-1", compacto ? "max-w-[280px]" : "max-w-[360px]")}>
+        <MediaArcada
+          mitad="upper"
+          piezas={FILA_SUPERIOR}
+          seleccionSet={seleccionSet}
+          onCambiar={onCambioSuperior}
+          generacion={generacion}
+        />
+        <MediaArcada
+          mitad="lower"
+          piezas={FILA_INFERIOR}
+          seleccionSet={seleccionSet}
+          onCambiar={onCambioInferior}
+          generacion={generacion}
+        />
       </div>
 
       <div className="flex items-center gap-2 mt-2 pt-3 border-t border-carbon/10 flex-wrap min-h-[2rem]">
