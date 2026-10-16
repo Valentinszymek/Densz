@@ -13,6 +13,13 @@ export interface SesionActual {
   nombreCompleto: string;
   rolNombre: string;
   permisos: string[];
+  /** A qué laboratorio pertenece este usuario (plan multi-laboratorio).
+   * Todavía `null` siempre: ni el login de escritorio (bcrypt) ni el de
+   * la web lo resuelven hasta que el login con Google esté implementado
+   * — se usa igual desde ya en `attachTenantDb` (src/server/middleware/
+   * tenantDb.ts) porque mientras RLS no esté activada en una tabla, fijar
+   * este valor en null no cambia el resultado de ninguna consulta. */
+  laboratorioId: number | null;
 }
 
 let sesionActual: SesionActual | null = null;
@@ -58,6 +65,7 @@ export async function cargarSesionDesdeUsuario(db: Queryable, usuarioId: number)
     nombreUsuario: usuario.nombreUsuario,
     nombreCompleto: usuario.nombreCompleto,
     rolNombre: usuario.rolNombre ?? "",
-    permisos: usuario.permisos
+    permisos: usuario.permisos,
+    laboratorioId: null
   });
 }

@@ -14,6 +14,7 @@ import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 import { generarPdfDesdeHtmlWeb } from "../pdf";
 
@@ -69,8 +70,10 @@ const esquemaMotivo = z.string().trim().min(3, "Ingresá un motivo de al menos 3
 export function crearRouterTrabajos(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const filtro = esquemaFiltro.parse(req.query);
       res.json(await listarOrdenes(db, filtro));
@@ -81,6 +84,7 @@ export function crearRouterTrabajos(db: Pool): Router {
   });
 
   router.get("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await obtenerOrden(db, id));
@@ -91,6 +95,7 @@ export function crearRouterTrabajos(db: Pool): Router {
   });
 
   router.post("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const validado = esquemaCrear.parse(req.body);
       const usuarioId = (req as unknown as RequestConSesion).sesion.usuarioId;
@@ -110,6 +115,7 @@ export function crearRouterTrabajos(db: Pool): Router {
   });
 
   router.put("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const validado = esquemaCrear.parse(req.body);
@@ -131,6 +137,7 @@ export function crearRouterTrabajos(db: Pool): Router {
   });
 
   router.patch("/:id/anular", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const motivo = esquemaMotivo.parse(req.body.motivo);
@@ -145,6 +152,7 @@ export function crearRouterTrabajos(db: Pool): Router {
   });
 
   router.patch("/:id/fecha", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const fechaTrabajo = z.string().min(1).parse(req.body.fechaTrabajo);
@@ -164,6 +172,7 @@ export function crearRouterTrabajos(db: Pool): Router {
   // bloquea con un error claro cuando corresponde (ver ordenService.ts) —
   // no se agrega ninguna regla nueva acá.
   router.delete("/:id", requirePermission(PERMISOS.ORDENES_ELIMINAR), async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const motivo = esquemaMotivo.parse(req.body.motivo);

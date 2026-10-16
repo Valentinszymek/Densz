@@ -4,6 +4,7 @@ import type { Pool } from "pg";
 import { registrarDeuda, anularDeuda } from "../../main/services/deudaService";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 
 const esquemaId = z.coerce.number().int().positive();
 
@@ -30,8 +31,10 @@ const esquemaMotivo = z.string().trim().min(3, "Ingresá un motivo de al menos 3
 export function crearRouterDeudas(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.post("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const validado = esquemaDeuda.parse(req.body);
       const usuarioId = (req as unknown as RequestConSesion).sesion.usuarioId;
@@ -44,6 +47,7 @@ export function crearRouterDeudas(db: Pool): Router {
   });
 
   router.patch("/:id/anular", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const motivo = esquemaMotivo.parse(req.body.motivo);

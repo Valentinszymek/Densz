@@ -17,6 +17,7 @@ import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres, DenszError } from "../../main/utils/errors";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 
 const NOMBRE_USUARIO = z
@@ -61,9 +62,11 @@ const esquemaPassword = z.string().min(6, "La contraseña debe tener al menos 6 
 export function crearRouterUsuarios(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
   router.use(requirePermission(PERMISOS.USUARIOS_GESTIONAR));
 
   router.get("/", async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
     // El cast refleja lo que la función realmente devuelve en runtime (ver
     // comentario arriba) — se usa solo para poder omitir passwordHash de
     // forma tipada, no para leer ningún dato adicional.
@@ -72,10 +75,12 @@ export function crearRouterUsuarios(db: Pool): Router {
   });
 
   router.get("/roles", async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
     res.json(await listarRoles(db));
   });
 
   router.post("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const validado = esquemaUsuarioCrear.parse(req.body);
       const password = esquemaPassword.parse(req.body.password);
@@ -103,6 +108,7 @@ export function crearRouterUsuarios(db: Pool): Router {
   });
 
   router.put("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = z.coerce.number().int().positive().parse(req.params.id);
       const validado = esquemaUsuario.parse(req.body);
@@ -120,6 +126,7 @@ export function crearRouterUsuarios(db: Pool): Router {
   });
 
   router.patch("/:id/password", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = z.coerce.number().int().positive().parse(req.params.id);
       const nuevaPassword = esquemaPassword.parse(req.body.nuevaPassword);
@@ -137,6 +144,7 @@ export function crearRouterUsuarios(db: Pool): Router {
   });
 
   router.patch("/:id/activo", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = z.coerce.number().int().positive().parse(req.params.id);
       const activo = z.boolean().parse(req.body.activo);
@@ -163,6 +171,7 @@ export function crearRouterUsuarios(db: Pool): Router {
   // borra en cascada. Mismo bloqueo de "no podés eliminarte a vos mismo"
   // que usuarios.ipc.ts.
   router.delete("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = z.coerce.number().int().positive().parse(req.params.id);
       const { sesion } = req as unknown as RequestConSesion;

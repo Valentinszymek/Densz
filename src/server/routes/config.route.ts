@@ -5,6 +5,7 @@ import { getConfig, setConfig } from "../../main/db/repositories/configRepo";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 
 const CLAVE_LABORATORIO_NOMBRE = "laboratorio.nombre";
@@ -16,8 +17,10 @@ const VALOR_DE_FABRICA = "Densz";
 export function crearRouterConfig(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.get("/laboratorio", requirePermission(PERMISOS.CONFIGURACION_EDITAR), async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
     const valor = await getConfig(db, CLAVE_LABORATORIO_NOMBRE);
     res.json(valor && valor.trim() !== VALOR_DE_FABRICA ? valor.trim() : null);
   });
@@ -25,6 +28,7 @@ export function crearRouterConfig(db: Pool): Router {
   // Escritura: mismo permiso que la lectura (CONFIGURACION_EDITAR),
   // igual que src/main/ipc/config.ipc.ts línea 26.
   router.put("/laboratorio", requirePermission(PERMISOS.CONFIGURACION_EDITAR), async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const nombre = z.string().trim().min(1, "Ingresá un nombre.").max(100).parse(req.body.nombre);
       await setConfig(db, CLAVE_LABORATORIO_NOMBRE, nombre);

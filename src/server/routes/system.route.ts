@@ -1,7 +1,9 @@
 import { Router } from "express";
 import type { Pool } from "pg";
+import type { Queryable } from "../../main/db/types";
 import { checkConnection } from "../../main/db/connection";
 import { requireAuth } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 
 // Mismas reglas que src/main/ipc/system.ipc.ts (SYSTEM_STATUS): nunca
 // exponer la cadena de conexión completa, solo el host; y excluir tablas
@@ -17,7 +19,7 @@ function hostDeConexion(): string {
   }
 }
 
-async function tablasDeNegocio(db: Pool): Promise<string[]> {
+async function tablasDeNegocio(db: Queryable): Promise<string[]> {
   const { rows } = await db.query<{ table_name: string }>(
     `SELECT table_name FROM information_schema.tables
      WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
@@ -30,8 +32,10 @@ async function tablasDeNegocio(db: Pool): Promise<string[]> {
 export function crearRouterSystem(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.get("/status", async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
     const tablas = await tablasDeNegocio(db);
     const conteos = await Promise.all(
       tablas.map(async (tabla) => {

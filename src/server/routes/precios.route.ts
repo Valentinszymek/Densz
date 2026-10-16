@@ -5,6 +5,7 @@ import * as repo from "../../main/db/repositories/preciosRepo";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { zBooleanQuery } from "../utils/zQuery";
@@ -30,8 +31,10 @@ const esquemaFiltroPrestaciones = z.object({
 export function crearRouterPrecios(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.get("/categorias", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const soloActivas = zBooleanQuery.parse(req.query.soloActivas as string | undefined);
       res.json(await repo.listarCategorias(db, soloActivas));
@@ -42,6 +45,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.get("/categorias/:id/uso", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await repo.contarUsoCategoria(db, id));
@@ -52,6 +56,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.get("/prestaciones", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const filtro = esquemaFiltroPrestaciones.parse(req.query);
       res.json(await repo.listarPrestaciones(db, filtro));
@@ -62,6 +67,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.get("/prestaciones/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await repo.obtenerPrestacion(db, id));
@@ -72,6 +78,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.get("/prestaciones/:id/uso", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await repo.contarUsoPrestacion(db, id));
@@ -87,6 +94,7 @@ export function crearRouterPrecios(db: Pool): Router {
   const requierePreciosEditar = requirePermission(PERMISOS.PRECIOS_EDITAR);
 
   router.post("/categorias", requierePreciosEditar, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const nombre = esquemaNombre.parse(req.body.nombre);
       const id = await repo.crearCategoria(db, nombre);
@@ -104,6 +112,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.put("/categorias/:id", requierePreciosEditar, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const nombre = esquemaNombre.parse(req.body.nombre);
@@ -122,6 +131,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.patch("/categorias/:id/activo", requierePreciosEditar, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const activo = z.boolean().parse(req.body.activo);
@@ -140,6 +150,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.patch("/categorias/:id/mover", requierePreciosEditar, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const direccion = z.enum(["arriba", "abajo"]).parse(req.body.direccion);
@@ -163,6 +174,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.post("/prestaciones", requierePreciosEditar, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const validado = esquemaPrestacionDatos.parse(req.body);
       const id = await repo.crearPrestacion(db, validado);
@@ -181,6 +193,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.put("/prestaciones/:id", requierePreciosEditar, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const validado = esquemaPrestacionDatos.parse(req.body);
@@ -199,6 +212,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.patch("/prestaciones/:id/activo", requierePreciosEditar, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const activo = z.boolean().parse(req.body.activo);
@@ -221,6 +235,7 @@ export function crearRouterPrecios(db: Pool): Router {
   // historial, nunca borra en cascada nada usado en trabajos reales.
   // Mismo permiso que el resto de la escritura de Precios (PRECIOS_EDITAR).
   router.delete("/categorias/:id", requierePreciosEditar, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       await repo.eliminarCategoria(db, id);
@@ -238,6 +253,7 @@ export function crearRouterPrecios(db: Pool): Router {
   });
 
   router.delete("/prestaciones/:id", requierePreciosEditar, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       await repo.eliminarPrestacion(db, id);

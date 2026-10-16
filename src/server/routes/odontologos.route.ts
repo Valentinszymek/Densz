@@ -15,6 +15,7 @@ import {
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { zBooleanQuery } from "../utils/zQuery";
 
 // Mismo esquema de filtro que src/main/ipc/odontologos.ipc.ts (ODONTOLOGOS_LISTAR).
@@ -39,8 +40,10 @@ const esquemaDatos = z.object({
 export function crearRouterOdontologos(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const filtro = esquemaFiltro.parse(req.query);
       res.json(await listarOdontologos(db, filtro));
@@ -51,10 +54,12 @@ export function crearRouterOdontologos(db: Pool): Router {
   });
 
   router.get("/ultima-actividad", async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
     res.json(await obtenerUltimaActividadOdontologos(db));
   });
 
   router.get("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await obtenerOdontologo(db, id));
@@ -65,6 +70,7 @@ export function crearRouterOdontologos(db: Pool): Router {
   });
 
   router.get("/:id/estadisticas", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await obtenerEstadisticasOdontologo(db, id));
@@ -79,6 +85,7 @@ export function crearRouterOdontologos(db: Pool): Router {
   // odontólogos en este archivo) — no aplica.
 
   router.post("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const validado = esquemaDatos.parse(req.body);
       const id = await crearOdontologo(db, validado);
@@ -97,6 +104,7 @@ export function crearRouterOdontologos(db: Pool): Router {
   });
 
   router.put("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const validado = esquemaDatos.parse(req.body);
@@ -116,6 +124,7 @@ export function crearRouterOdontologos(db: Pool): Router {
   });
 
   router.patch("/:id/lista-precio", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const listaPrecioId = z.coerce.number().int().positive().parse(req.body.listaPrecioId);
@@ -135,6 +144,7 @@ export function crearRouterOdontologos(db: Pool): Router {
   });
 
   router.patch("/:id/clinica", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const clinicaId = z.coerce.number().int().positive().nullable().parse(req.body.clinicaId ?? null);
@@ -154,6 +164,7 @@ export function crearRouterOdontologos(db: Pool): Router {
   });
 
   router.patch("/:id/activo", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const activo = z.boolean().parse(req.body.activo);

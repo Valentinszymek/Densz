@@ -16,6 +16,7 @@ import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 import { requireProteccion } from "../middleware/requireProteccion";
 import { generarResumenOdontologoWeb, generarResumenClinicaWeb, descargarPdfResumenWeb } from "../cuentasWeb";
@@ -48,9 +49,11 @@ const esquemaPeriodo = z.object({
 export function crearRouterCuentas(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   // Sin permiso ni protección — igual que CUENTAS_TIENE_PAGOS hoy.
   router.get("/tiene-pagos", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const odontologoId = req.query.odontologoId !== undefined ? esquemaId.parse(req.query.odontologoId) : null;
       const clinicaId = req.query.clinicaId !== undefined ? esquemaId.parse(req.query.clinicaId) : null;
@@ -64,14 +67,17 @@ export function crearRouterCuentas(db: Pool): Router {
   const requiereCuentas = [requirePermission(PERMISOS.CUENTAS_VER), requireProteccion(db)];
 
   router.get("/saldos", ...requiereCuentas, async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
     res.json(await listarSaldosTodos(db));
   });
 
   router.get("/saldos/clinicas", ...requiereCuentas, async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
     res.json(await listarSaldosClinicasTodas(db));
   });
 
   router.get("/clinica/:clinicaId/saldos", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const clinicaId = esquemaId.parse(req.params.clinicaId);
       res.json(await obtenerSaldosClinica(db, clinicaId));
@@ -82,6 +88,7 @@ export function crearRouterCuentas(db: Pool): Router {
   });
 
   router.get("/clinica/:clinicaId/movimientos", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const clinicaId = esquemaId.parse(req.params.clinicaId);
       res.json(await listarMovimientosClinica(db, clinicaId));
@@ -92,6 +99,7 @@ export function crearRouterCuentas(db: Pool): Router {
   });
 
   router.get("/clinica/:clinicaId/resumen-mes", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const clinicaId = esquemaId.parse(req.params.clinicaId);
       const periodo = esquemaPeriodo.parse(req.query);
@@ -103,6 +111,7 @@ export function crearRouterCuentas(db: Pool): Router {
   });
 
   router.get("/clinica/:clinicaId/resumenes", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const clinicaId = esquemaId.parse(req.params.clinicaId);
       res.json(await listarResumenesMensuales(db, { odontologoId: null, clinicaId }));
@@ -117,6 +126,7 @@ export function crearRouterCuentas(db: Pool): Router {
   // igual que el escritorio) y sube el PDF a Storage vía cuentasWeb.ts
   // (Fase 8D) — mismo patrón que Comprobantes.
   router.post("/clinica/:clinicaId/generar-resumen", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const clinicaId = esquemaId.parse(req.params.clinicaId);
       const periodo = esquemaPeriodo.parse(req.body);
@@ -137,6 +147,7 @@ export function crearRouterCuentas(db: Pool): Router {
   });
 
   router.get("/:odontologoId/saldos", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const odontologoId = esquemaId.parse(req.params.odontologoId);
       res.json(await obtenerSaldos(db, odontologoId));
@@ -147,6 +158,7 @@ export function crearRouterCuentas(db: Pool): Router {
   });
 
   router.get("/:odontologoId/movimientos", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const odontologoId = esquemaId.parse(req.params.odontologoId);
       res.json(await listarMovimientos(db, odontologoId));
@@ -157,6 +169,7 @@ export function crearRouterCuentas(db: Pool): Router {
   });
 
   router.get("/:odontologoId/resumen-mes", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const odontologoId = esquemaId.parse(req.params.odontologoId);
       const periodo = esquemaPeriodo.parse(req.query);
@@ -168,6 +181,7 @@ export function crearRouterCuentas(db: Pool): Router {
   });
 
   router.get("/:odontologoId/resumenes", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const odontologoId = esquemaId.parse(req.params.odontologoId);
       res.json(await listarResumenesMensuales(db, { odontologoId, clinicaId: null }));
@@ -180,6 +194,7 @@ export function crearRouterCuentas(db: Pool): Router {
   // Mismo criterio que el de clínica (ver comentario arriba): sube el PDF a
   // Storage vía cuentasWeb.ts (Fase 8D).
   router.post("/:odontologoId/generar-resumen", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const odontologoId = esquemaId.parse(req.params.odontologoId);
       const periodo = esquemaPeriodo.parse(req.body);
@@ -205,6 +220,7 @@ export function crearRouterCuentas(db: Pool): Router {
   // (§8 de Fase 8D). Mismo gate que el resto de Cuentas (permiso +
   // protección), a diferencia de Comprobantes (que no exige ninguno hoy).
   router.get("/resumenes/:id/pdf", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const buffer = await descargarPdfResumenWeb(db, id);

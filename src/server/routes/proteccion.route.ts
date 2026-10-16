@@ -12,6 +12,7 @@ import {
   restablecerPasswordConCodigo
 } from "../../main/services/proteccionService";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { traducirErrorPostgres } from "../../main/utils/errors";
@@ -38,14 +39,17 @@ const esquemaPassword = z.string().min(1);
 export function crearRouterProteccion(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   // Candado compartido para VER — cualquier usuario con sesión iniciada,
   // no una función administrativa (mismo criterio que proteccion.ipc.ts).
   router.get("/estado", async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
     res.json(await obtenerEstadoProteccionWeb(db));
   });
 
   router.post("/verificar", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const password = esquemaPassword.parse(req.body.password);
       const { sesionId } = req as RequestConSesion;
@@ -60,6 +64,7 @@ export function crearRouterProteccion(db: Pool): Router {
   // <ProteccionGuard> cada vez que se sale de Cuentas/Estadísticas. Sin
   // permiso especial, igual que PROTECCION_BLOQUEAR en Desktop.
   router.post("/bloquear", (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     const { sesionId } = req as RequestConSesion;
     bloquearProteccionHttp(sesionId);
     res.json({ ok: true });
@@ -71,6 +76,7 @@ export function crearRouterProteccion(db: Pool): Router {
   router.use(requirePermission(PERMISOS.CONFIGURACION_EDITAR));
 
   router.post("/activar", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const esquema = z.object({ password: esquemaPassword, confirmarPassword: esquemaPassword });
       const validado = esquema.parse(req.body);
@@ -84,6 +90,7 @@ export function crearRouterProteccion(db: Pool): Router {
   });
 
   router.post("/desactivar", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const passwordActual = esquemaPassword.parse(req.body.passwordActual);
       const { sesion } = req as RequestConSesion;
@@ -95,6 +102,7 @@ export function crearRouterProteccion(db: Pool): Router {
   });
 
   router.post("/cambiar-password", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const esquema = z.object({
         passwordActual: esquemaPassword,
@@ -111,6 +119,7 @@ export function crearRouterProteccion(db: Pool): Router {
   });
 
   router.post("/generar-codigo", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const { sesion } = req as RequestConSesion;
       const resultado = await generarNuevoCodigoRecuperacion(db, { usuarioId: sesion.usuarioId });
@@ -121,6 +130,7 @@ export function crearRouterProteccion(db: Pool): Router {
   });
 
   router.post("/verificar-codigo", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const codigo = esquemaPassword.parse(req.body.codigo);
       const ok = await verificarCodigoRecuperacion(db, codigo);
@@ -131,6 +141,7 @@ export function crearRouterProteccion(db: Pool): Router {
   });
 
   router.post("/restablecer-con-codigo", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const esquema = z.object({
         codigo: esquemaPassword,

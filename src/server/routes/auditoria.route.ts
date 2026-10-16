@@ -4,6 +4,7 @@ import type { Pool } from "pg";
 import { listarAuditoriaFiltrada, obtenerOpcionesFiltroAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 
 // Mismo esquema que FiltroAuditoriaDto (src/shared/types/entities.ts).
@@ -26,9 +27,11 @@ const esquemaFiltro = z.object({
 export function crearRouterAuditoria(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
   router.use(requirePermission(PERMISOS.AUDITORIA_VER));
 
   router.get("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const filtro = esquemaFiltro.parse(req.query);
       res.json(await listarAuditoriaFiltrada(db, filtro));
@@ -38,6 +41,7 @@ export function crearRouterAuditoria(db: Pool): Router {
   });
 
   router.get("/opciones-filtro", async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
     res.json(await obtenerOpcionesFiltroAuditoria(db));
   });
 

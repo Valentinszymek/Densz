@@ -12,6 +12,7 @@ import { registrarPago, anularPago } from "../../main/services/pagoService";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 
 const esquemaId = z.coerce.number().int().positive();
 
@@ -51,8 +52,10 @@ const esquemaMotivo = z.string().trim().min(3, "Ingresá un motivo de al menos 3
 export function crearRouterPagos(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const odontologoId = esquemaId.parse(req.query.odontologoId);
       res.json(await listarPagos(db, odontologoId));
@@ -63,6 +66,7 @@ export function crearRouterPagos(db: Pool): Router {
   });
 
   router.get("/clinica/:clinicaId", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const clinicaId = esquemaId.parse(req.params.clinicaId);
       res.json(await listarPagosClinica(db, clinicaId));
@@ -73,6 +77,7 @@ export function crearRouterPagos(db: Pool): Router {
   });
 
   router.get("/ultimos", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const limite = req.query.limite !== undefined ? z.coerce.number().int().positive().parse(req.query.limite) : 5;
       res.json(await listarUltimosPagos(db, limite));
@@ -83,6 +88,7 @@ export function crearRouterPagos(db: Pool): Router {
   });
 
   router.post("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const validado = esquemaPago.parse(req.body);
       const confirmarDuplicado = req.body.confirmarDuplicado === true;
@@ -105,6 +111,7 @@ export function crearRouterPagos(db: Pool): Router {
   });
 
   router.patch("/:id/anular", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const motivo = esquemaMotivo.parse(req.body.motivo);
@@ -121,6 +128,7 @@ export function crearRouterPagos(db: Pool): Router {
   });
 
   router.get("/medios", async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
     res.json(await listarMediosPago(db));
   });
 
@@ -129,6 +137,7 @@ export function crearRouterPagos(db: Pool): Router {
   // ninguna razón para seguir pendiente. Sin permiso, igual que el resto
   // de la escritura de este router (tampoco lo exige pagos.ipc.ts).
   router.post("/medios", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const nombre = z.string().trim().min(1).parse(req.body.nombre);
       const id = await crearMedioPago(db, nombre);

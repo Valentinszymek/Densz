@@ -5,6 +5,7 @@ import * as repo from "../../main/db/repositories/listasPrecioRepo";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { zBooleanQuery } from "../utils/zQuery";
 import { generarListaPreciosWeb, descargarListaPreciosWeb } from "../listaPreciosWeb";
 
@@ -26,8 +27,10 @@ const esquemaOpcionesPdf = z.object({
 export function crearRouterListasPrecio(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const soloActivas = zBooleanQuery.parse(req.query.soloActivas as string | undefined);
       res.json(await repo.listarListas(db, soloActivas));
@@ -46,6 +49,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   // "listas-precio/") vía src/server/listaPreciosWeb.ts, mismo patrón que
   // Comprobantes/Cuentas. Sin permiso, igual que listaPrecios.ipc.ts hoy.
   router.post("/pdf", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const opciones = esquemaOpcionesPdf.parse(req.body);
       const resultado = await generarListaPreciosWeb(db, opciones);
@@ -67,6 +71,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   // la forma "listas-precio/<uuid>.pdf" (ver comentario en
   // listaPreciosWeb.ts), así que no acepta un path arbitrario del bucket.
   router.get("/pdf", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const pdfPath = z.string().trim().min(1).parse(req.query.path);
       const buffer = await descargarListaPreciosWeb(pdfPath);
@@ -79,6 +84,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   });
 
   router.get("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await repo.obtenerLista(db, id));
@@ -89,6 +95,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   });
 
   router.get("/:id/uso", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await repo.contarUsoLista(db, id));
@@ -99,6 +106,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   });
 
   router.get("/:id/items", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const soloActivas = zBooleanQuery.parse(req.query.soloActivas as string | undefined) ?? false;
@@ -110,6 +118,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   });
 
   router.get("/:id/items/:prestacionId/historial", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const prestacionId = esquemaId.parse(req.params.prestacionId);
@@ -125,6 +134,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   // LISTAS_PRECIO_ELIMINAR en este bloque.
 
   router.post("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const validado = esquemaLista.parse(req.body);
       const id = await repo.crearLista(db, validado);
@@ -143,6 +153,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   });
 
   router.put("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const nombre = z.string().trim().min(1).parse(req.body.nombre);
@@ -161,6 +172,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   });
 
   router.patch("/:id/activo", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const activo = z.boolean().parse(req.body.activo);
@@ -184,6 +196,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   // vigente y abre uno nuevo, igual que el escritorio), pero no se probó
   // en vivo contra producción en este bloque — ver informe.
   router.patch("/:id/items/:prestacionId/precio", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const prestacionId = esquemaId.parse(req.params.prestacionId);
@@ -208,6 +221,7 @@ export function crearRouterListasPrecio(db: Pool): Router {
   // histórico. Sin permiso, igual que el resto de la escritura de este
   // router (ninguno de sus canales lo exige, tampoco en Desktop).
   router.delete("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       await repo.eliminarLista(db, id);

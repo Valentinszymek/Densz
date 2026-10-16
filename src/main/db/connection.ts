@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import { registrarParsersPostgres } from "./pgTypes";
+import type { Queryable } from "./types";
 
 registrarParsersPostgres();
 
@@ -51,9 +52,9 @@ export async function closeDatabase(): Promise<void> {
 }
 
 /** Prueba real de conectividad (no solo "el pool existe"): usado por el gate de conexión al arrancar. */
-export async function checkConnection(pool: Pool): Promise<boolean> {
+export async function checkConnection(db: Queryable): Promise<boolean> {
   try {
-    await pool.query("SELECT 1");
+    await db.query("SELECT 1");
     return true;
   } catch {
     return false;

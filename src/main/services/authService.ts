@@ -52,7 +52,8 @@ export async function login(db: Queryable, nombreUsuario: string, password: stri
     nombreUsuario: usuario.nombreUsuario,
     nombreCompleto: usuario.nombreCompleto,
     rolNombre: usuario.rolNombre ?? "",
-    permisos: usuario.permisos
+    permisos: usuario.permisos,
+    laboratorioId: null
   };
 }
 
