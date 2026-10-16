@@ -743,42 +743,51 @@ export default function NuevoTrabajo() {
             )}
           </div>
 
-          <div className="flex items-center justify-between rounded-lg bg-carbon text-cream px-5 py-4">
-            <span className="text-sm text-cream/60">Total{moneda === "USD" ? " (USD)" : ""}</span>
-            <span className="text-2xl font-display text-gold">{formatearMoneda(total, moneda)}</span>
-          </div>
+          {/* Pegada abajo (sticky, no fixed) para que "Guardar y generar
+              comprobante" quede siempre a la vista mientras se completa el
+              registro, sin tener que bajar con la rueda hasta el final de
+              la tarjeta — el odontograma puede ser más alto que la pantalla,
+              pero esta franja no se mueve de ahí. -mx-5/px-5 para que el
+              fondo tape el contenido que pasa por debajo hasta los bordes
+              reales de la tarjeta (CardContent trae padding horizontal). */}
+          <div className="sticky bottom-0 z-20 -mx-5 -mb-5 space-y-3 border-t border-carbon/10 bg-cream-card px-5 pb-5 pt-3">
+            <div className="flex items-center justify-between rounded-lg bg-carbon text-cream px-5 py-4">
+              <span className="text-sm text-cream/60">Total{moneda === "USD" ? " (USD)" : ""}</span>
+              <span className="text-2xl font-display text-gold">{formatearMoneda(total, moneda)}</span>
+            </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => navigate(esEdicion ? `/trabajos/${idEditar}` : "/trabajos")}>
-              Cancelar
-            </Button>
-            {esEdicion ? (
-              ordenOriginal!.estado === "pendiente_facturar" ? (
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => navigate(esEdicion ? `/trabajos/${idEditar}` : "/trabajos")}>
+                Cancelar
+              </Button>
+              {esEdicion ? (
+                ordenOriginal!.estado === "pendiente_facturar" ? (
+                  <>
+                    <Button variant="secondary" onClick={() => onGuardar(false)} disabled={guardando}>
+                      Guardar cambios
+                    </Button>
+                    <Button onClick={() => onGuardar(true)} disabled={guardando}>
+                      {guardando ? "Guardando…" : "Guardar y generar comprobante"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={() => onGuardar(false)} disabled={guardando}>
+                    {guardando ? "Guardando…" : "Guardar cambios"}
+                  </Button>
+                )
+              ) : (
                 <>
                   <Button variant="secondary" onClick={() => onGuardar(false)} disabled={guardando}>
-                    Guardar cambios
+                    Guardar
                   </Button>
                   <Button onClick={() => onGuardar(true)} disabled={guardando}>
                     {guardando ? "Guardando…" : "Guardar y generar comprobante"}
                   </Button>
                 </>
-              ) : (
-                <Button onClick={() => onGuardar(false)} disabled={guardando}>
-                  {guardando ? "Guardando…" : "Guardar cambios"}
-                </Button>
-              )
-            ) : (
-              <>
-                <Button variant="secondary" onClick={() => onGuardar(false)} disabled={guardando}>
-                  Guardar
-                </Button>
-                <Button onClick={() => onGuardar(true)} disabled={guardando}>
-                  {guardando ? "Guardando…" : "Guardar y generar comprobante"}
-                </Button>
-              </>
-            )}
+              )}
+            </div>
           </div>
           </CardContent>
         </Card>
