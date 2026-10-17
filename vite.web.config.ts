@@ -14,6 +14,14 @@ import path from "node:path";
  */
 export default defineConfig({
   root: path.resolve(__dirname, "src/renderer"),
+  // Por defecto Vite busca el .env en `root` (src/renderer) — pero el
+  // .env real del proyecto vive en la raíz del repo (junto a DATABASE_URL,
+  // etc., ver .env.example). Sin esto, ninguna variable VITE_* definida
+  // ahí se leía de verdad (bug preexistente, recién notado al agregar
+  // VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY — VITE_API_URL "funcionaba"
+  // de pura casualidad, porque su valor real coincide con el fallback
+  // hardcodeado en webApi.ts).
+  envDir: path.resolve(__dirname, "."),
   base: "./",
   plugins: [react()],
   resolve: {

@@ -5,55 +5,72 @@ import { supabase } from "../../lib/supabaseClient";
 import { useAuthStore } from "../../store/authStore";
 
 /**
- * Google redirige acá (PKCE: `?code=...` como query param real, ver
- * supabaseClient.ts sobre por qué no el fragmento `#...`) después de que
- * la persona aceptó el login en la pantalla de Google. Esta pantalla:
- * 1. Intercambia ese código por una sesión de Supabase (supabase-js).
- * 2. Manda el access token resultante al backend de Densz
- *    (window.densz.authLoginGoogle) — que lo revalida y arma la sesión
- *    REAL de Densz (la cookie propia), la única que importa de acá en
- *    más.
- * 3. Cierra la sesión de Supabase del lado del cliente (ya cumplió su
- *    propósito — Densz no la vuelve a necesitar).
+ * Google redirige acá (PKCE) después de que la persona aceptó el login.
+ * El `?code=...` que manda Supabase NUNCA lo leemos nosotros a mano: el
+ * cliente de supabase-js, al crearse (ver supabaseClient.ts), ya lo
+ * detecta y canjea solo apenas carga el módulo (`detectSessionInUrl`,
+ * default `true`) — y limpia la URL después. Por eso acá no se parsea
+ * nada de `window.location`: se escucha el evento `SIGNED_IN` (o, si ya
+ * pasó antes de que este componente montara, se lee la sesión ya
+ * establecida con `getSession()`).
+ *
+ * Una vez que supabase-js tiene sesión:
+ * 1. Se manda el access token al backend de Densz
+ *    (window.densz.authLoginGoogle) — lo revalida y arma la sesión REAL
+ *    de Densz (la cookie propia), la única que importa de acá en más.
+ * 2. Se cierra la sesión de Supabase del lado del cliente (ya cumplió su
+ *    propósito).
  */
 export default function CallbackGoogle() {
   const navigate = useNavigate();
   const setSesion = useAuthStore((s) => s.setSesion);
   const [error, setError] = useState<string | null>(null);
-  // Evita procesar el código dos veces (ej. StrictMode monta/desmonta el
-  // efecto dos veces en desarrollo) — un código de autorización de
-  // Google/Supabase solo se puede canjear una vez.
+  // Evita procesar la sesión dos veces (ej. StrictMode, o que el evento
+  // dispare más de una vez) — el access token de Densz no debe pedirse
+  // dos veces para la misma sesión de Google.
   const yaProceso = useRef(false);
 
   useEffect(() => {
-    if (yaProceso.current) return;
-    yaProceso.current = true;
+    if (!supabase) {
+      setError("Login con Google no está configurado en este entorno.");
+      return;
+    }
 
-    async function procesar() {
-      if (!supabase) {
-        setError("Login con Google no está configurado en este entorno.");
-        return;
-      }
-      const code = new URLSearchParams(window.location.search).get("code");
-      if (!code) {
-        setError("No se encontró el código de Google en la respuesta.");
-        return;
-      }
+    async function completarLoginDensz(accessToken: string) {
+      if (yaProceso.current) return;
+      yaProceso.current = true;
       try {
-        const { data, error: errorIntercambio } = await supabase.auth.exchangeCodeForSession(code);
-        if (errorIntercambio || !data.session) {
-          throw errorIntercambio ?? new Error("No se pudo completar el login con Google.");
-        }
-        const sesion = await window.densz.authLoginGoogle(data.session.access_token);
+        const sesion = await window.densz.authLoginGoogle(accessToken);
         setSesion(sesion);
         navigate("/", { replace: true });
       } catch (err) {
         setError(err instanceof Error ? err.message : "No se pudo completar el login con Google.");
       } finally {
-        await supabase.auth.signOut();
+        await supabase!.auth.signOut();
       }
     }
-    void procesar();
+
+    // Si supabase-js ya terminó de procesar la URL antes de este montaje.
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) void completarLoginDensz(data.session.access_token);
+    });
+
+    // Caso normal: todavía está procesando, se entera por este evento.
+    const { data: suscripcion } = supabase.auth.onAuthStateChange((evento, sesion) => {
+      if (evento === "SIGNED_IN" && sesion) void completarLoginDensz(sesion.access_token);
+    });
+
+    // Si en 10s no pasó nada (ni ya había sesión, ni llegó el evento), es
+    // que algo salió mal con el intercambio — nunca dejar a la persona
+    // esperando para siempre en "Completando…".
+    const timeoutId = window.setTimeout(() => {
+      if (!yaProceso.current) setError("No se pudo completar el login con Google (tiempo de espera agotado).");
+    }, 10000);
+
+    return () => {
+      suscripcion.subscription.unsubscribe();
+      window.clearTimeout(timeoutId);
+    };
   }, [navigate, setSesion]);
 
   return (
