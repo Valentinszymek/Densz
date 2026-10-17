@@ -94,12 +94,12 @@ describe("googleAuthService.loginConGoogle", () => {
     ).rejects.toThrow(/no hay ninguna cuenta/i);
   });
 
-  it("la sesión arma laboratorioId desde usuarios.laboratorio_id (null por ahora, sin backfill)", async () => {
+  it("la sesión arma laboratorioId desde usuarios.laboratorio_id (el laboratorio de prueba del test, vía el DEFAULT de la columna)", async () => {
     const { db } = ctx;
-    const id = await crearUsuario(db, { nombreUsuario: "sinlab", nombreCompleto: "Sin Lab", rolId }, bcrypt.hashSync("x", 10));
-    await db.query("UPDATE usuarios SET email = $1 WHERE id = $2", ["sinlab@example.com", id]);
+    const id = await crearUsuario(db, { nombreUsuario: "conlab", nombreCompleto: "Con Lab", rolId }, bcrypt.hashSync("x", 10));
+    await db.query("UPDATE usuarios SET email = $1 WHERE id = $2", ["conlab@example.com", id]);
 
-    const sesion = await loginConGoogle(db, { supabaseUserId: "google-sub-sinlab", email: "sinlab@example.com", nombreCompleto: "Sin Lab" });
-    expect(sesion.laboratorioId).toBeNull();
+    const sesion = await loginConGoogle(db, { supabaseUserId: "google-sub-conlab", email: "conlab@example.com", nombreCompleto: "Con Lab" });
+    expect(sesion.laboratorioId).toBe(ctx.laboratorioId);
   });
 });

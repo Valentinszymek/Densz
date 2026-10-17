@@ -70,11 +70,20 @@ export function attachTenantDb(pool: Pool | PoolClient) {
     const sesion = (req as RequestConSesion).sesion;
 
     if (esPoolClient(pool)) {
-      try {
-        await fijarLaboratorioActual(pool, sesion.laboratorioId);
-      } catch (err) {
-        next(err);
-        return;
+      // Si la sesión de este pedido no trae un laboratorio real (hoy,
+      // siempre que sea un fixture de test armado a mano sin ese campo —
+      // ver crearSesionHttp en los tests), NO se pisa el GUC: se deja el
+      // que ya tenga la conexión, fijado por tests/helpers/testDb.ts al
+      // armar su propio laboratorio de prueba. Si lo pisáramos a vacío
+      // acá, RLS bloquearía toda la transacción del test (falla cerrado),
+      // deshaciendo el aislamiento que el helper ya armó.
+      if (sesion.laboratorioId !== null && sesion.laboratorioId !== undefined) {
+        try {
+          await fijarLaboratorioActual(pool, sesion.laboratorioId);
+        } catch (err) {
+          next(err);
+          return;
+        }
       }
       (req as RequestConTenantDb).db = pool;
       next();
