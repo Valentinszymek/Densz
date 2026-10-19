@@ -6,6 +6,7 @@ import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { PERMISOS, tienePermiso } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 
 const esquemaTipo = z.enum(["odontologos", "clinicas", "pacientes", "trabajos", "cuenta", "pagos", "estadisticas", "auditoria"]);
 const esquemaFormato = z.enum(["csv", "xlsx", "pdf"]);
@@ -50,8 +51,10 @@ const esquemaBody = z.object({
 export function crearRouterExport(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.post("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const { tipo, formato, nombreSugerido, opciones } = esquemaBody.parse(req.body);
 

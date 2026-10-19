@@ -1,5 +1,8 @@
 import { Pool } from "pg";
 import { registrarParsersPostgres } from "./pgTypes";
+import type { Queryable } from "./types";
+import { getLaboratorioActualId } from "../services/sessionService";
+import { fijarLaboratorioEnConexion } from "./tenantContext";
 
 registrarParsersPostgres();
 
@@ -32,6 +35,37 @@ export function openDatabase(connectionString: string): Pool {
     console.error("Error inesperado en el pool de Postgres:", err);
   });
 
+  // Fija el laboratorio actual (RLS) en CADA conexión que se saca del
+  // pool — no solo la primera vez que se abre la conexión física. Esto
+  // es lo que necesita el escritorio (un solo proceso, una sola persona
+  // usándolo, sin "por pedido" como en la web): el evento `connect` de
+  // `pg` solo dispara una vez por conexión FÍSICA nueva, así que si nos
+  // quedáramos solo con eso, una conexión abierta ANTES del login (sin
+  // laboratorio todavía) quedaría con el GUC sin actualizar para
+  // siempre, aunque el pool la reutilice después de loguearse. Por eso
+  // se envuelve `connect()` en sí (el mismo método que usan tanto
+  // `pool.query()` como `withTransaction` por debajo): así se re-aplica
+  // en cada uso real de una conexión, sea física-nueva o reciclada.
+  const connectOriginal = poolInstance.connect.bind(poolInstance);
+  poolInstance.connect = ((callback?: Parameters<Pool["connect"]>[0]) => {
+    if (typeof callback === "function") {
+      // No usado en este proyecto (todo el código llama a la forma con
+      // Promise) — se deja pasar sin tocar para no romper el tipo.
+      return connectOriginal(callback);
+    }
+    return connectOriginal().then(async (client) => {
+      await fijarLaboratorioEnConexion(client, getLaboratorioActualId());
+      return client;
+    });
+  }) as Pool["connect"];
+
+  // En el servidor web este valor queda pisado de inmediato por
+  // `attachTenantDb` en cada pedido real (fija su propio valor por
+  // transacción) — por eso es inofensivo tener este wrapper también ahí,
+  // aunque la sesión de escritorio (`sessionService`) no tenga sentido
+  // conceptual del lado del servidor: para cuando una ruta real llega a
+  // consultar algo, su propio `set_config` ya corrió después de este.
+
   return poolInstance;
 }
 
@@ -51,9 +85,9 @@ export async function closeDatabase(): Promise<void> {
 }
 
 /** Prueba real de conectividad (no solo "el pool existe"): usado por el gate de conexión al arrancar. */
-export async function checkConnection(pool: Pool): Promise<boolean> {
+export async function checkConnection(db: Queryable): Promise<boolean> {
   try {
-    await pool.query("SELECT 1");
+    await db.query("SELECT 1");
     return true;
   } catch {
     return false;

@@ -4,7 +4,7 @@
  * login real por la pantalla de Login (authService.ts).
  */
 import type { Queryable } from "../db/types";
-import { obtenerUsuarioPorId } from "../db/repositories/usuariosRepo";
+import { obtenerUsuarioPorId, obtenerLaboratorioIdDeUsuario } from "../db/repositories/usuariosRepo";
 import { DenszError } from "../utils/errors";
 
 export interface SesionActual {
@@ -13,6 +13,11 @@ export interface SesionActual {
   nombreCompleto: string;
   rolNombre: string;
   permisos: string[];
+  /** A qué laboratorio pertenece este usuario (plan multi-laboratorio).
+   * `null` hasta que la sesión viene de un login con Google (web o
+   * escritorio) — el login de escritorio con usuario/contraseña (bcrypt)
+   * no lo resuelve. */
+  laboratorioId: number | null;
 }
 
 let sesionActual: SesionActual | null = null;
@@ -27,6 +32,14 @@ export function limpiarSesion(): void {
 
 export function getSesionActual(): SesionActual | null {
   return sesionActual;
+}
+
+/** A qué laboratorio pertenece la sesión actual del escritorio — usada
+ * por `connection.ts` para fijar `app.current_laboratorio_id` en cada
+ * conexión física nueva del pool (ver googleOAuthDesktop.ts). `null`
+ * antes de loguearse, o si todavía se usa el login bcrypt. */
+export function getLaboratorioActualId(): number | null {
+  return sesionActual?.laboratorioId ?? null;
 }
 
 /** Devuelve el id de usuario a usar como actor de una operación (creado_por/auditoría). */
@@ -53,11 +66,13 @@ export function requerirPermiso(permiso: string): void {
 export async function cargarSesionDesdeUsuario(db: Queryable, usuarioId: number): Promise<void> {
   const usuario = await obtenerUsuarioPorId(db, usuarioId);
   if (!usuario) throw new Error("Usuario inexistente.");
+  const laboratorioId = await obtenerLaboratorioIdDeUsuario(db, usuarioId);
   setUsuarioActual({
     usuarioId: usuario.id,
     nombreUsuario: usuario.nombreUsuario,
     nombreCompleto: usuario.nombreCompleto,
     rolNombre: usuario.rolNombre ?? "",
-    permisos: usuario.permisos
+    permisos: usuario.permisos,
+    laboratorioId
   });
 }

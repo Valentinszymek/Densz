@@ -78,12 +78,14 @@ describe("authService", () => {
     expect(fallo?.detalle).toEqual({ nombreUsuario: "maria" });
   });
 
-  it("registra en Auditoría un intento de login fallido con usuario inexistente, sin usuarioId", async () => {
+  it("un usuario inexistente NO deja rastro en Auditoría (no hay ningún laboratorio al que atribuirlo)", async () => {
+    // A diferencia de un intento fallido contra un usuario real (sí tiene
+    // un laboratorio conocido), acá no hay ninguno: `auditoria.laboratorio_id`
+    // es NOT NULL, así que no hay fila válida que insertar. Ver authService.ts.
     await expect(login(ctx.db, "no-existe", "cualquiera")).rejects.toThrow();
     const eventos = await listarAuditoria(ctx.db, { entidad: "usuarios" });
     const fallo = eventos.find((e) => e.accion === "login_fallido" && e.detalle?.nombreUsuario === "no-existe");
-    expect(fallo).toBeDefined();
-    expect(fallo?.usuarioId).toBeNull();
+    expect(fallo).toBeUndefined();
   });
 
   it("registra en Auditoría un intento de login fallido de un usuario desactivado, sin loguearlo como éxito", async () => {

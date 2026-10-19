@@ -14,6 +14,9 @@ interface FilaUsuario {
   activo: number;
   creado_en: string;
   ultimo_acceso: string | null;
+  email: string | null;
+  supabase_user_id: string | null;
+  laboratorio_id: number | null;
 }
 
 const SELECT_BASE = `
@@ -25,6 +28,21 @@ const SELECT_BASE = `
 export interface UsuarioConCredenciales extends Usuario {
   passwordHash: string;
   permisos: string[];
+}
+
+/** Lo mínimo necesario para armar una sesión por login con Google (plan
+ * multi-laboratorio) — nunca incluye passwordHash, no es una credencial
+ * de ese tipo de login. */
+export interface UsuarioParaSesionGoogle {
+  id: number;
+  nombreUsuario: string;
+  nombreCompleto: string;
+  rolNombre: string;
+  permisos: string[];
+  activo: boolean;
+  email: string | null;
+  supabaseUserId: string | null;
+  laboratorioId: number | null;
 }
 
 function mapear(fila: FilaUsuario): UsuarioConCredenciales {
@@ -42,6 +60,20 @@ function mapear(fila: FilaUsuario): UsuarioConCredenciales {
   };
 }
 
+function mapearParaSesionGoogle(fila: FilaUsuario): UsuarioParaSesionGoogle {
+  return {
+    id: fila.id,
+    nombreUsuario: fila.nombre_usuario,
+    nombreCompleto: fila.nombre_completo,
+    rolNombre: fila.rol_nombre,
+    permisos: JSON.parse(fila.permisos) as string[],
+    activo: fila.activo === 1,
+    email: fila.email,
+    supabaseUserId: fila.supabase_user_id,
+    laboratorioId: fila.laboratorio_id
+  };
+}
+
 export async function obtenerUsuarioPorId(db: Queryable, id: number): Promise<UsuarioConCredenciales | null> {
   const { rows } = await db.query<FilaUsuario>(SELECT_BASE + " WHERE u.id = $1", [id]);
   return rows[0] ? mapear(rows[0]) : null;
@@ -50,6 +82,127 @@ export async function obtenerUsuarioPorId(db: Queryable, id: number): Promise<Us
 export async function obtenerUsuarioPorNombre(db: Queryable, nombreUsuario: string): Promise<UsuarioConCredenciales | null> {
   const { rows } = await db.query<FilaUsuario>(SELECT_BASE + " WHERE u.nombre_usuario = $1", [nombreUsuario]);
   return rows[0] ? mapear(rows[0]) : null;
+}
+
+interface FilaUsuarioLoginPassword {
+  id: number;
+  nombre_usuario: string;
+  nombre_completo: string;
+  password_hash: string;
+  rol_id: number;
+  rol_nombre: string;
+  permisos: string;
+  activo: number;
+  creado_en: string;
+  ultimo_acceso: string | null;
+  laboratorio_id: number | null;
+}
+
+/** Busca un usuario por nombre_usuario para el login con contraseña —
+ * igual que `buscarUsuarioParaLoginGoogle`, la ÚNICA otra consulta del
+ * sistema que necesita mirar a través de TODOS los laboratorios (acá
+ * tampoco se sabe cuál es todavía). Llama a una función de Postgres
+ * `SECURITY DEFINER` (`buscar_usuario_login_password`, ver migración
+ * `multitenant_login_password_security_definer`) acotada a este paso. */
+export async function buscarUsuarioParaLoginPassword(
+  db: Queryable,
+  nombreUsuario: string
+): Promise<(UsuarioConCredenciales & { laboratorioId: number | null }) | null> {
+  const { rows } = await db.query<FilaUsuarioLoginPassword>("SELECT * FROM buscar_usuario_login_password($1)", [
+    nombreUsuario
+  ]);
+  const fila = rows[0];
+  if (!fila) return null;
+  return {
+    id: fila.id,
+    nombreUsuario: fila.nombre_usuario,
+    nombreCompleto: fila.nombre_completo,
+    rolId: fila.rol_id,
+    rolNombre: fila.rol_nombre,
+    activo: fila.activo === 1,
+    creadoEn: fila.creado_en,
+    ultimoAcceso: fila.ultimo_acceso,
+    passwordHash: fila.password_hash,
+    permisos: JSON.parse(fila.permisos) as string[],
+    laboratorioId: fila.laboratorio_id
+  };
+}
+
+/** Login con Google ya vinculado a esta cuenta en un inicio de sesión
+ * anterior (ver googleAuthService.ts) — camino rápido. */
+export async function obtenerUsuarioPorSupabaseId(db: Queryable, supabaseUserId: string): Promise<UsuarioParaSesionGoogle | null> {
+  const { rows } = await db.query<FilaUsuario>(SELECT_BASE + " WHERE u.supabase_user_id = $1", [supabaseUserId]);
+  return rows[0] ? mapearParaSesionGoogle(rows[0]) : null;
+}
+
+/** Primer login con Google de un usuario ya existente (cargado por un
+ * admin con usuario/contraseña, con su email ya cargado) — todavía sin
+ * vincular. No distingue mayúsculas: un email es el mismo
+ * independientemente de cómo se haya tipeado. */
+export async function obtenerUsuarioPorEmail(db: Queryable, email: string): Promise<UsuarioParaSesionGoogle | null> {
+  const { rows } = await db.query<FilaUsuario>(SELECT_BASE + " WHERE lower(u.email) = lower($1)", [email.trim()]);
+  return rows[0] ? mapearParaSesionGoogle(rows[0]) : null;
+}
+
+/** Vincula esta cuenta de Google a un usuario existente — una sola vez,
+ * en su primer login con Google (a partir de ahí entra por
+ * obtenerUsuarioPorSupabaseId). */
+export async function vincularSupabaseId(db: Queryable, usuarioId: number, supabaseUserId: string): Promise<void> {
+  await db.query("UPDATE usuarios SET supabase_user_id = $1 WHERE id = $2", [supabaseUserId, usuarioId]);
+}
+
+interface FilaUsuarioLoginGoogle {
+  id: number;
+  nombre_usuario: string;
+  nombre_completo: string;
+  rol_nombre: string;
+  permisos: string;
+  activo: number;
+  email: string | null;
+  supabase_user_id: string | null;
+  laboratorio_id: number | null;
+}
+
+/** Busca (y, si corresponde, vincula) el usuario dueño de esta cuenta de
+ * Google — la ÚNICA consulta de todo el sistema que necesita mirar a
+ * través de TODOS los laboratorios a la vez, porque corre ANTES de saber
+ * cuál es el actual (no hay nada que RLS pueda filtrar todavía). Por eso
+ * no es una consulta SQL directa como las demás: llama a una función de
+ * Postgres `SECURITY DEFINER` (`buscar_usuario_login_google`, ver
+ * migración `multitenant_login_google_security_definer`) acotada
+ * exactamente a este paso de login — nunca se usa para leer datos de
+ * negocio (pacientes, trabajos, etc.). */
+export async function buscarUsuarioParaLoginGoogle(
+  db: Queryable,
+  supabaseUserId: string,
+  email: string
+): Promise<UsuarioParaSesionGoogle | null> {
+  const { rows } = await db.query<FilaUsuarioLoginGoogle>("SELECT * FROM buscar_usuario_login_google($1, $2)", [
+    supabaseUserId,
+    email.trim()
+  ]);
+  const fila = rows[0];
+  if (!fila) return null;
+  return {
+    id: fila.id,
+    nombreUsuario: fila.nombre_usuario,
+    nombreCompleto: fila.nombre_completo,
+    rolNombre: fila.rol_nombre,
+    permisos: JSON.parse(fila.permisos) as string[],
+    activo: fila.activo === 1,
+    email: fila.email,
+    supabaseUserId: fila.supabase_user_id,
+    laboratorioId: fila.laboratorio_id
+  };
+}
+
+/** A qué laboratorio pertenece este usuario — consulta chica aparte
+ * (en vez de agregarlo a `Usuario`/`UsuarioConCredenciales`, que se usan
+ * en pantallas que no necesitan saberlo) para armar la sesión en
+ * sessionService.ts/authService.ts. */
+export async function obtenerLaboratorioIdDeUsuario(db: Queryable, usuarioId: number): Promise<number | null> {
+  const { rows } = await db.query<{ laboratorio_id: number | null }>("SELECT laboratorio_id FROM usuarios WHERE id = $1", [usuarioId]);
+  return rows[0]?.laboratorio_id ?? null;
 }
 
 export async function listarUsuarios(db: Queryable): Promise<Usuario[]> {

@@ -26,6 +26,8 @@ import { registrarHandlersProteccion } from "./ipc/proteccion.ipc";
 import { createMainWindow } from "./windows/mainWindow";
 import { logger } from "./utils/logger";
 import { ensureBootstrapUser } from "./db/ensureBootstrapUser";
+import { intentarRestaurarSesionGoogle } from "./services/googleOAuthDesktop";
+import { getLaboratorioActualId } from "./services/sessionService";
 
 // Evita instancias múltiples de Densz pisándose entre sí al arrancar.
 const obtuvoElLock = app.requestSingleInstanceLock();
@@ -44,17 +46,26 @@ if (!obtuvoElLock) {
     loadEnvFile();
     const pool = openDatabase(getDatabaseUrl());
 
+    // Se intenta restaurar la sesión de Google guardada LO ANTES POSIBLE
+    // (antes de cualquier otra cosa que toque la base) para que el
+    // laboratorio quede resuelto cuanto antes — ver connection.ts, cada
+    // conexión nueva del pool lo lee. Nunca tira: si no hay sesión
+    // guardada o falla, sigue el arranque normal sin laboratorio todavía.
+    await intentarRestaurarSesionGoogle(pool);
+
     // A diferencia de SQLite (siempre disponible localmente), acá la base
     // depende de la red: el arranque NO bloquea esperando la conexión —
     // la ventana se muestra enseguida y es el `ConexionGate` del renderer
     // (con `window.densz.ping()`) el que muestra el spinner/reintento
     // hasta que la primera consulta real funcione. `ensureBootstrapUser`
-    // igual se intenta ya mismo: si la red no está lista todavía, sale en
-    // el log y no bloquea nada — la base real migrada siempre tiene
-    // usuarios, así que en la práctica no hace nada de todos modos.
-    ensureBootstrapUser(pool).catch((err) => {
-      logger.error("No se pudo verificar/crear el usuario administrador de arranque:", err);
-    });
+    // solo tiene sentido si ya se sabe a qué laboratorio pertenece esta
+    // instalación (si no, no hay dónde crear el usuario todavía — recién
+    // se resuelve con el primer login de Google, ver plan §4).
+    if (getLaboratorioActualId() !== null) {
+      ensureBootstrapUser(pool).catch((err) => {
+        logger.error("No se pudo verificar/crear el usuario administrador de arranque:", err);
+      });
+    }
 
     registrarHandlersSistema(pool);
     registrarHandlersConfig(pool);

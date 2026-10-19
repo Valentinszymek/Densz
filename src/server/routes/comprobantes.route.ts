@@ -5,6 +5,7 @@ import { obtenerComprobantePorOrden, listarComprobantes, type FiltroComprobantes
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { generarComprobanteWeb, descargarPdfComprobanteWeb } from "../comprobantesWeb";
 
 const esquemaId = z.coerce.number().int().positive();
@@ -33,8 +34,10 @@ const esquemaFiltro = z.object({
 export function crearRouterComprobantes(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const filtro = esquemaFiltro.parse(req.query);
       res.json(await listarComprobantes(db, filtro));
@@ -45,6 +48,7 @@ export function crearRouterComprobantes(db: Pool): Router {
   });
 
   router.get("/orden/:ordenId", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const ordenId = esquemaId.parse(req.params.ordenId);
       res.json(await obtenerComprobantePorOrden(db, ordenId));
@@ -55,6 +59,7 @@ export function crearRouterComprobantes(db: Pool): Router {
   });
 
   router.post("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const ordenId = esquemaId.parse(req.body.ordenId);
       const usuarioId = (req as unknown as RequestConSesion).sesion.usuarioId;
@@ -77,6 +82,7 @@ export function crearRouterComprobantes(db: Pool): Router {
   // reconstruye siempre a partir del comprobante real (id validado),
   // nunca de un path recibido en el pedido.
   router.get("/:id/pdf", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const buffer = await descargarPdfComprobanteWeb(db, id);

@@ -16,6 +16,7 @@ import {
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 import { requireProteccion } from "../middleware/requireProteccion";
 
@@ -42,9 +43,11 @@ const esquemaRango = z.object({
 export function crearRouterEstadisticas(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   // Sin permiso ni protección — igual que ESTADISTICAS_RESUMEN_OPERATIVO hoy.
   router.get("/resumen-operativo", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const rango = esquemaRango.parse(req.query);
       res.json(await obtenerResumenOperativo(db, rango));
@@ -57,6 +60,7 @@ export function crearRouterEstadisticas(db: Pool): Router {
   const requiereEstadisticas = [requirePermission(PERMISOS.ESTADISTICAS_VER), requireProteccion(db)];
 
   router.get("/kpis", ...requiereEstadisticas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const rango = esquemaRango.parse(req.query);
       res.json(await obtenerKpisPeriodo(db, rango));
@@ -67,6 +71,7 @@ export function crearRouterEstadisticas(db: Pool): Router {
   });
 
   router.get("/trabajos-por-dia", ...requiereEstadisticas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const rango = esquemaRango.parse(req.query);
       res.json(await trabajosPorDia(db, rango));
@@ -77,6 +82,7 @@ export function crearRouterEstadisticas(db: Pool): Router {
   });
 
   router.get("/ingresos-por-odontologo", ...requiereEstadisticas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const rango = esquemaRango.parse(req.query);
       res.json(await ingresosPorOdontologo(db, rango));
@@ -87,6 +93,7 @@ export function crearRouterEstadisticas(db: Pool): Router {
   });
 
   router.get("/trabajos-por-categoria", ...requiereEstadisticas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const rango = esquemaRango.parse(req.query);
       res.json(await trabajosPorCategoria(db, rango));
@@ -97,6 +104,7 @@ export function crearRouterEstadisticas(db: Pool): Router {
   });
 
   router.get("/evolucion", ...requiereEstadisticas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const rango = esquemaRango.parse(req.query);
       res.json(await obtenerEvolucion(db, rango));
@@ -107,6 +115,7 @@ export function crearRouterEstadisticas(db: Pool): Router {
   });
 
   router.get("/ranking-odontologos", ...requiereEstadisticas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const rango = esquemaRango.parse(req.query);
       res.json(await rankingOdontologos(db, rango));
@@ -117,6 +126,7 @@ export function crearRouterEstadisticas(db: Pool): Router {
   });
 
   router.get("/ranking-clinicas", ...requiereEstadisticas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const rango = esquemaRango.parse(req.query);
       res.json(await rankingClinicas(db, rango));
@@ -127,6 +137,7 @@ export function crearRouterEstadisticas(db: Pool): Router {
   });
 
   router.get("/prestaciones-ranking", ...requiereEstadisticas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const rango = esquemaRango.parse(req.query);
       res.json(await prestacionesRanking(db, rango));
@@ -137,6 +148,7 @@ export function crearRouterEstadisticas(db: Pool): Router {
   });
 
   router.get("/saldos-pendientes-top", ...requiereEstadisticas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const limite = req.query.limite !== undefined ? z.coerce.number().int().positive().parse(req.query.limite) : 20;
       res.json(await saldosPendientesTop(db, limite));

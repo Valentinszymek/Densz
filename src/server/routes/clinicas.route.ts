@@ -14,6 +14,7 @@ import {
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { zBooleanQuery } from "../utils/zQuery";
 
 // Mismo esquema de filtro que src/main/ipc/clinicas.ipc.ts (CLINICAS_LISTAR).
@@ -35,8 +36,10 @@ const esquemaDatos = z.object({
 export function crearRouterClinicas(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const filtro = esquemaFiltro.parse(req.query);
       res.json(await listarClinicas(db, filtro));
@@ -47,6 +50,7 @@ export function crearRouterClinicas(db: Pool): Router {
   });
 
   router.get("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await obtenerClinica(db, id));
@@ -57,6 +61,7 @@ export function crearRouterClinicas(db: Pool): Router {
   });
 
   router.get("/:id/estadisticas", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await obtenerEstadisticasClinica(db, id));
@@ -69,6 +74,7 @@ export function crearRouterClinicas(db: Pool): Router {
   // Escritura: sin chequeo de permiso, igual que src/main/ipc/clinicas.ipc.ts hoy.
 
   router.post("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const validado = esquemaDatos.parse(req.body);
       const id = await crearClinica(db, validado);
@@ -87,6 +93,7 @@ export function crearRouterClinicas(db: Pool): Router {
   });
 
   router.put("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const validado = esquemaDatos.parse(req.body);
@@ -106,6 +113,7 @@ export function crearRouterClinicas(db: Pool): Router {
   });
 
   router.patch("/:id/activo", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const activo = z.boolean().parse(req.body.activo);
@@ -124,6 +132,7 @@ export function crearRouterClinicas(db: Pool): Router {
   });
 
   router.get("/:id/uso", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await contarUsoClinica(db, id));
@@ -137,6 +146,7 @@ export function crearRouterClinicas(db: Pool): Router {
   // cual — bloquea si tiene cualquier historial asociado. Sin permiso,
   // igual que el resto de la escritura de este router.
   router.delete("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       await eliminarClinica(db, id);

@@ -28,9 +28,14 @@ export async function getConfigPrefijo(db: Queryable, prefijo: string): Promise<
 }
 
 export async function setConfig(db: Queryable, clave: string, valor: string): Promise<void> {
+  // ON CONFLICT (laboratorio_id, clave): plan multi-laboratorio — cada
+  // laboratorio tiene su propia fila para la misma clave (ej.
+  // "laboratorio.nombre"), nunca pisa la de otro. laboratorio_id no se
+  // pasa acá a propósito: toma el DEFAULT de la columna (el laboratorio
+  // ya fijado en la conexión, ver src/server/middleware/tenantDb.ts).
   await db.query(
     `INSERT INTO configuracion (clave, valor, actualizado_en) VALUES ($1, $2, densz_now())
-     ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor, actualizado_en = densz_now()`,
+     ON CONFLICT (laboratorio_id, clave) DO UPDATE SET valor = excluded.valor, actualizado_en = densz_now()`,
     [clave, valor]
   );
 }

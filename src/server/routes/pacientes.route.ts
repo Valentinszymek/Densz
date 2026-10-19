@@ -13,6 +13,7 @@ import {
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { zBooleanQuery } from "../utils/zQuery";
 
 // Mismo esquema de filtro que src/main/ipc/pacientes.ipc.ts (PACIENTES_LISTAR).
@@ -35,8 +36,10 @@ const esquemaDatos = z.object({
 export function crearRouterPacientes(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const filtro = esquemaFiltro.parse(req.query);
       res.json(await listarPacientes(db, filtro));
@@ -47,6 +50,7 @@ export function crearRouterPacientes(db: Pool): Router {
   });
 
   router.get("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await obtenerPaciente(db, id));
@@ -57,6 +61,7 @@ export function crearRouterPacientes(db: Pool): Router {
   });
 
   router.get("/:id/cantidad-trabajos", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       res.json(await contarTrabajosPaciente(db, id));
@@ -70,6 +75,7 @@ export function crearRouterPacientes(db: Pool): Router {
   // hoy. No se porta PACIENTES_ELIMINAR (borrado físico condicional) en este bloque.
 
   router.post("/", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const validado = esquemaDatos.parse(req.body);
       const id = await crearPaciente(db, validado);
@@ -88,6 +94,7 @@ export function crearRouterPacientes(db: Pool): Router {
   });
 
   router.put("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const validado = esquemaDatos.parse(req.body);
@@ -106,6 +113,7 @@ export function crearRouterPacientes(db: Pool): Router {
   });
 
   router.patch("/:id/activo", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const activo = z.boolean().parse(req.body.activo);
@@ -128,6 +136,7 @@ export function crearRouterPacientes(db: Pool): Router {
   // inactiva en vez de borrarlo, nunca rompe una OT/comprobante existente.
   // Sin permiso, igual que el resto de la escritura de este router.
   router.delete("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
       const paciente = await obtenerPaciente(db, id);

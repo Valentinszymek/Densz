@@ -193,6 +193,7 @@ export const IPC_CHANNELS = {
   BACKUPS_GUARDAR_CONFIG: "backups:guardarConfig",
 
   AUTH_LOGIN: "auth:login",
+  AUTH_LOGIN_GOOGLE: "auth:loginGoogle",
   AUTH_LOGOUT: "auth:logout",
   AUTH_SESION_ACTUAL: "auth:sesionActual",
   AUTH_USUARIOS_DISPONIBLES: "auth:usuariosDisponibles",
@@ -314,6 +315,11 @@ export interface UltimaActividadOdontologo {
 }
 
 export interface DenszApi {
+  /** "web" o "escritorio" — para que la pantalla de login sepa qué camino
+   * de Google usar (redirect del navegador vs. navegador del sistema +
+   * servidor local, ver googleOAuthDesktop.ts). */
+  plataforma: "web" | "escritorio";
+
   obtenerEstadoSistema: () => Promise<EstadoSistema>;
   /** Chequeo liviano de conectividad con la base (SELECT 1) — usado por
    * el gate de conexión en el arranque, no trae ni cuenta ninguna tabla. */
@@ -444,6 +450,12 @@ export interface DenszApi {
   backupsGuardarConfig: (data: ConfigBackupsDto) => Promise<void>;
 
   authLogin: (nombreUsuario: string, password: string) => Promise<SesionActualDto>;
+  /** Login con Google (plan multi-laboratorio). En la web, `accessToken`
+   * viene verificado del lado del cliente contra Supabase Auth (ver
+   * src/renderer/lib/supabaseClient.ts) y el backend lo revalida antes de
+   * confiar en nada. En escritorio no se pasa nada: abre el navegador del
+   * sistema y hace todo el trámite él solo (ver googleOAuthDesktop.ts). */
+  authLoginGoogle: (accessToken?: string) => Promise<SesionActualDto>;
   authLogout: () => Promise<void>;
   authSesionActual: () => Promise<SesionActualDto | null>;
   authUsuariosDisponibles: () => Promise<UsuarioParaSeleccion[]>;

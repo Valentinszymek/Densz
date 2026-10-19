@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import { login, logout } from "../services/authService";
 import { getSesionActual } from "../services/sessionService";
+import { iniciarLoginGoogleEscritorio } from "../services/googleOAuthDesktop";
+import { borrarSesionGuardada } from "../services/supabaseSessionStorage";
 import { listarUsuariosActivosParaSeleccion } from "../db/repositories/usuariosRepo";
 import { traducirErrorPostgres } from "../utils/errors";
 import { IPC_CHANNELS } from "../../shared/types/ipc-contracts";
@@ -22,9 +24,21 @@ export function registrarHandlersAuth(db: Pool): void {
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN_GOOGLE, async () => {
+    try {
+      return await iniciarLoginGoogleEscritorio(db);
+    } catch (err) {
+      throw traducirErrorPostgres(err);
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.AUTH_LOGOUT, async () => {
     const sesion = getSesionActual();
     if (sesion) await logout(db, sesion.usuarioId);
+    // Por si la sesión era de Google: se borra el archivo guardado — si
+    // no, el próximo arranque la restauraría sola sin pedir login de
+    // nuevo, contradiciendo "cerrar sesión". No-op si no existe.
+    borrarSesionGuardada();
   });
 
   ipcMain.handle(IPC_CHANNELS.AUTH_SESION_ACTUAL, () => getSesionActual());

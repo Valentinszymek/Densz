@@ -1,8 +1,9 @@
 import type { Queryable } from "../db/types";
 import bcrypt from "bcryptjs";
-import { obtenerUsuarioPorNombre, registrarAcceso } from "../db/repositories/usuariosRepo";
+import { buscarUsuarioParaLoginPassword, registrarAcceso } from "../db/repositories/usuariosRepo";
 import { cargarSesionDesdeUsuario, limpiarSesion, type SesionActual } from "./sessionService";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
+import { fijarLaboratorioEnConexion } from "../db/tenantContext";
 import { bloquearProteccion } from "./proteccionService";
 import { DenszError } from "../utils/errors";
 
@@ -14,32 +15,48 @@ import { DenszError } from "../utils/errors";
  */
 export async function login(db: Queryable, nombreUsuario: string, password: string): Promise<SesionActual> {
   const nombreLimpio = nombreUsuario.trim();
-  const usuario = await obtenerUsuarioPorNombre(db, nombreLimpio);
+  const usuario = await buscarUsuarioParaLoginPassword(db, nombreLimpio);
   const credencialesInvalidas = new DenszError("Usuario o contraseña incorrectos.");
 
+  if (!usuario) {
+    // Nombre de usuario que no existe en NINGÚN laboratorio — a
+    // diferencia de los casos de abajo, acá no hay ningún laboratorio al
+    // que atribuir una fila de auditoría (su columna es NOT NULL), así
+    // que no se registra el intento. No es una pérdida real de
+    // trazabilidad: antes del login multi-laboratorio tampoco existía
+    // ningún lugar significativo donde guardar esto.
+    throw credencialesInvalidas;
+  }
+
+  // A partir de acá ya se sabe a qué laboratorio pertenece este nombre de
+  // usuario — se fija ANTES de cualquier otra consulta sobre esta misma
+  // conexión (auditoría, último acceso, re-fetch de cargarSesionDesdeUsuario),
+  // que de otra forma seguirían viendo el laboratorio sin resolver.
+  await fijarLaboratorioEnConexion(db, usuario.laboratorioId);
+
   // Registra el intento fallido con el mismo detalle sin importar el motivo
-  // (usuario inexistente, inactivo o contraseña incorrecta) — la Auditoría
-  // es solo para ADMINISTRADOR (requerirPermiso(AUDITORIA_VER)), así que acá
-  // sí puede quedar registrado el motivo real sin que eso filtre nada hacia
-  // quien intentó entrar (que siempre recibe el mismo mensaje genérico).
-  async function registrarIntentoFallido(): Promise<void> {
-    await registrarAuditoria(db, {
-      usuarioId: usuario?.id ?? null,
+  // (inactivo o contraseña incorrecta) — la Auditoría es solo para
+  // ADMINISTRADOR (requerirPermiso(AUDITORIA_VER)), así que acá sí puede
+  // quedar registrado el motivo real sin que eso filtre nada hacia quien
+  // intentó entrar (que siempre recibe el mismo mensaje genérico).
+  function registrarIntentoFallido(id: number): Promise<void> {
+    return registrarAuditoria(db, {
+      usuarioId: id,
       accion: "login_fallido",
       entidad: "usuarios",
-      entidadId: usuario?.id ?? null,
+      entidadId: id,
       detalle: { nombreUsuario: nombreLimpio }
     });
   }
 
-  if (!usuario || !usuario.activo) {
-    await registrarIntentoFallido();
+  if (!usuario.activo) {
+    await registrarIntentoFallido(usuario.id);
     throw credencialesInvalidas;
   }
 
   const passwordOk = bcrypt.compareSync(password, usuario.passwordHash);
   if (!passwordOk) {
-    await registrarIntentoFallido();
+    await registrarIntentoFallido(usuario.id);
     throw credencialesInvalidas;
   }
 
@@ -52,7 +69,8 @@ export async function login(db: Queryable, nombreUsuario: string, password: stri
     nombreUsuario: usuario.nombreUsuario,
     nombreCompleto: usuario.nombreCompleto,
     rolNombre: usuario.rolNombre ?? "",
-    permisos: usuario.permisos
+    permisos: usuario.permisos,
+    laboratorioId: usuario.laboratorioId
   };
 }
 
