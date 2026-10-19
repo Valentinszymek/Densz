@@ -13,6 +13,7 @@ import {
   limpiarIntentos,
   MENSAJE_BLOQUEADO_POR_INTENTOS
 } from "../loginRateLimit";
+import { logger } from "../../main/utils/logger";
 
 const esquemaLogin = z.object({
   nombreUsuario: z.string().trim().min(1, "Ingresá tu usuario."),
@@ -67,6 +68,7 @@ export function crearRouterAuth(db: Pool): Router {
         throw errLogin;
       }
     } catch (err) {
+      logger.error("Error en POST /auth/login:", err);
       const error = traducirErrorPostgres(err);
       res.status(401).json({ error: error.message });
     }
@@ -89,6 +91,12 @@ export function crearRouterAuth(db: Pool): Router {
       res.cookie(COOKIE_SESION, idSesion, opcionesCookie);
       res.json(sesion);
     } catch (err) {
+      // Este catch responde con su propio 401 (nunca pasa por el
+      // errorHandler global, que ya loguea) — sin esto, un fallo real acá
+      // queda invisible en los logs de Railway (confirmado en vivo:
+      // 2026-10-19, el login con Google en la web fallaba y no dejaba
+      // ningún rastro server-side).
+      logger.error("Error en POST /auth/google-callback:", err);
       const error = traducirErrorPostgres(err);
       res.status(401).json({ error: error.message });
     }
