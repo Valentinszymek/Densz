@@ -1,12 +1,8 @@
 import type { Queryable } from "../db/types";
-import {
-  obtenerUsuarioPorSupabaseId,
-  obtenerUsuarioPorEmail,
-  vincularSupabaseId,
-  type UsuarioParaSesionGoogle
-} from "../db/repositories/usuariosRepo";
+import { buscarUsuarioParaLoginGoogle } from "../db/repositories/usuariosRepo";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
 import { cargarSesionDesdeUsuario, type SesionActual } from "./sessionService";
+import { fijarLaboratorioEnConexion } from "../db/tenantContext";
 import { DenszError } from "../utils/errors";
 
 export interface IdentidadGoogle {
@@ -31,36 +27,28 @@ export interface IdentidadGoogle {
  * laboratorio nuevo (eso es una etapa aparte, con Stripe de por medio) —
  * tira un error claro en vez de crear algo a medias.
  *
- * NOTA (Etapa 3 del plan, pendiente): esta función busca por
- * supabase_user_id/email a través de TODOS los laboratorios a la vez —
- * es, a propósito, la única consulta de todo el sistema que necesita
- * mirar más allá del laboratorio actual (todavía no se sabe cuál es).
- * Cuando RLS esté activada, este camino va a necesitar correr con una
- * conexión que la sortee para esta búsqueda puntual (ver plan, "Detalle
- * técnico" en Login con Google) — todavía no aplica porque RLS no está
- * prendida.
+ * La búsqueda por supabase_user_id/email corre a través de TODOS los
+ * laboratorios a la vez — a propósito, la única consulta de todo el
+ * sistema que necesita mirar más allá del laboratorio actual (todavía no
+ * se sabe cuál es). Con RLS activa eso es imposible de resolver con una
+ * consulta normal, así que `buscarUsuarioParaLoginGoogle` la sortea con
+ * una función de Postgres `SECURITY DEFINER` acotada solo a este paso
+ * (ver usuariosRepo.ts) — nunca para leer datos de negocio.
  */
 export async function loginConGoogle(db: Queryable, identidad: IdentidadGoogle): Promise<SesionActual> {
   const credencialesInvalidas = () =>
     new DenszError("No hay ninguna cuenta de Densz asociada a este email todavía. Pedile a un administrador que te cargue como usuario primero.");
 
-  let usuario: UsuarioParaSesionGoogle | null = await obtenerUsuarioPorSupabaseId(db, identidad.supabaseUserId);
-
-  if (!usuario) {
-    const porEmail = await obtenerUsuarioPorEmail(db, identidad.email);
-    if (!porEmail) throw credencialesInvalidas();
-    // Un email ⇒ un laboratorio en esta etapa (ver plan): si ese usuario
-    // ya está vinculado a OTRA cuenta de Google, no se re-vincula acá.
-    if (porEmail.supabaseUserId && porEmail.supabaseUserId !== identidad.supabaseUserId) {
-      throw credencialesInvalidas();
-    }
-    if (!porEmail.supabaseUserId) {
-      await vincularSupabaseId(db, porEmail.id, identidad.supabaseUserId);
-    }
-    usuario = porEmail;
-  }
+  const usuario = await buscarUsuarioParaLoginGoogle(db, identidad.supabaseUserId, identidad.email);
+  if (!usuario) throw credencialesInvalidas();
 
   if (!usuario.activo) throw credencialesInvalidas();
+
+  // Ya se sabe a qué laboratorio pertenece — se fija ANTES de cualquier
+  // otra consulta sobre esta misma conexión (auditoría, re-fetch de
+  // cargarSesionDesdeUsuario), que de otra forma seguirían viendo el
+  // laboratorio sin resolver (ver tenantContext.ts).
+  await fijarLaboratorioEnConexion(db, usuario.laboratorioId);
 
   await cargarSesionDesdeUsuario(db, usuario.id);
   await registrarAuditoria(db, { usuarioId: usuario.id, accion: "login_google", entidad: "usuarios", entidadId: usuario.id });

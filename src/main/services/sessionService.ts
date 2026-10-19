@@ -14,11 +14,9 @@ export interface SesionActual {
   rolNombre: string;
   permisos: string[];
   /** A qué laboratorio pertenece este usuario (plan multi-laboratorio).
-   * Todavía `null` siempre: ni el login de escritorio (bcrypt) ni el de
-   * la web lo resuelven hasta que el login con Google esté implementado
-   * — se usa igual desde ya en `attachTenantDb` (src/server/middleware/
-   * tenantDb.ts) porque mientras RLS no esté activada en una tabla, fijar
-   * este valor en null no cambia el resultado de ninguna consulta. */
+   * `null` hasta que la sesión viene de un login con Google (web o
+   * escritorio) — el login de escritorio con usuario/contraseña (bcrypt)
+   * no lo resuelve. */
   laboratorioId: number | null;
 }
 
@@ -34,6 +32,14 @@ export function limpiarSesion(): void {
 
 export function getSesionActual(): SesionActual | null {
   return sesionActual;
+}
+
+/** A qué laboratorio pertenece la sesión actual del escritorio — usada
+ * por `connection.ts` para fijar `app.current_laboratorio_id` en cada
+ * conexión física nueva del pool (ver googleOAuthDesktop.ts). `null`
+ * antes de loguearse, o si todavía se usa el login bcrypt. */
+export function getLaboratorioActualId(): number | null {
+  return sesionActual?.laboratorioId ?? null;
 }
 
 /** Devuelve el id de usuario a usar como actor de una operación (creado_por/auditoría). */

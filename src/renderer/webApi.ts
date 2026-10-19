@@ -319,6 +319,8 @@ function pendiente<T extends (...args: never[]) => unknown>(nombreMetodo: string
 }
 
 export const webApi: DenszApi = {
+  plataforma: "web",
+
   // Conectados en Fase 12D: ambos tenían ruta HTTP ya construida
   // (system.route.ts, search.route.ts), sin ningún consumidor en webApi.ts.
   obtenerEstadoSistema: () => get("/system/status"),

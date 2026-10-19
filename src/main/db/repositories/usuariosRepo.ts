@@ -84,6 +84,50 @@ export async function obtenerUsuarioPorNombre(db: Queryable, nombreUsuario: stri
   return rows[0] ? mapear(rows[0]) : null;
 }
 
+interface FilaUsuarioLoginPassword {
+  id: number;
+  nombre_usuario: string;
+  nombre_completo: string;
+  password_hash: string;
+  rol_id: number;
+  rol_nombre: string;
+  permisos: string;
+  activo: number;
+  creado_en: string;
+  ultimo_acceso: string | null;
+  laboratorio_id: number | null;
+}
+
+/** Busca un usuario por nombre_usuario para el login con contraseña —
+ * igual que `buscarUsuarioParaLoginGoogle`, la ÚNICA otra consulta del
+ * sistema que necesita mirar a través de TODOS los laboratorios (acá
+ * tampoco se sabe cuál es todavía). Llama a una función de Postgres
+ * `SECURITY DEFINER` (`buscar_usuario_login_password`, ver migración
+ * `multitenant_login_password_security_definer`) acotada a este paso. */
+export async function buscarUsuarioParaLoginPassword(
+  db: Queryable,
+  nombreUsuario: string
+): Promise<(UsuarioConCredenciales & { laboratorioId: number | null }) | null> {
+  const { rows } = await db.query<FilaUsuarioLoginPassword>("SELECT * FROM buscar_usuario_login_password($1)", [
+    nombreUsuario
+  ]);
+  const fila = rows[0];
+  if (!fila) return null;
+  return {
+    id: fila.id,
+    nombreUsuario: fila.nombre_usuario,
+    nombreCompleto: fila.nombre_completo,
+    rolId: fila.rol_id,
+    rolNombre: fila.rol_nombre,
+    activo: fila.activo === 1,
+    creadoEn: fila.creado_en,
+    ultimoAcceso: fila.ultimo_acceso,
+    passwordHash: fila.password_hash,
+    permisos: JSON.parse(fila.permisos) as string[],
+    laboratorioId: fila.laboratorio_id
+  };
+}
+
 /** Login con Google ya vinculado a esta cuenta en un inicio de sesión
  * anterior (ver googleAuthService.ts) — camino rápido. */
 export async function obtenerUsuarioPorSupabaseId(db: Queryable, supabaseUserId: string): Promise<UsuarioParaSesionGoogle | null> {
@@ -105,6 +149,51 @@ export async function obtenerUsuarioPorEmail(db: Queryable, email: string): Prom
  * obtenerUsuarioPorSupabaseId). */
 export async function vincularSupabaseId(db: Queryable, usuarioId: number, supabaseUserId: string): Promise<void> {
   await db.query("UPDATE usuarios SET supabase_user_id = $1 WHERE id = $2", [supabaseUserId, usuarioId]);
+}
+
+interface FilaUsuarioLoginGoogle {
+  id: number;
+  nombre_usuario: string;
+  nombre_completo: string;
+  rol_nombre: string;
+  permisos: string;
+  activo: number;
+  email: string | null;
+  supabase_user_id: string | null;
+  laboratorio_id: number | null;
+}
+
+/** Busca (y, si corresponde, vincula) el usuario dueño de esta cuenta de
+ * Google — la ÚNICA consulta de todo el sistema que necesita mirar a
+ * través de TODOS los laboratorios a la vez, porque corre ANTES de saber
+ * cuál es el actual (no hay nada que RLS pueda filtrar todavía). Por eso
+ * no es una consulta SQL directa como las demás: llama a una función de
+ * Postgres `SECURITY DEFINER` (`buscar_usuario_login_google`, ver
+ * migración `multitenant_login_google_security_definer`) acotada
+ * exactamente a este paso de login — nunca se usa para leer datos de
+ * negocio (pacientes, trabajos, etc.). */
+export async function buscarUsuarioParaLoginGoogle(
+  db: Queryable,
+  supabaseUserId: string,
+  email: string
+): Promise<UsuarioParaSesionGoogle | null> {
+  const { rows } = await db.query<FilaUsuarioLoginGoogle>("SELECT * FROM buscar_usuario_login_google($1, $2)", [
+    supabaseUserId,
+    email.trim()
+  ]);
+  const fila = rows[0];
+  if (!fila) return null;
+  return {
+    id: fila.id,
+    nombreUsuario: fila.nombre_usuario,
+    nombreCompleto: fila.nombre_completo,
+    rolNombre: fila.rol_nombre,
+    permisos: JSON.parse(fila.permisos) as string[],
+    activo: fila.activo === 1,
+    email: fila.email,
+    supabaseUserId: fila.supabase_user_id,
+    laboratorioId: fila.laboratorio_id
+  };
 }
 
 /** A qué laboratorio pertenece este usuario — consulta chica aparte
