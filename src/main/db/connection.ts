@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { registrarParsersPostgres } from "./pgTypes";
 import type { Queryable } from "./types";
 import { getLaboratorioActualId } from "../services/sessionService";
@@ -44,14 +44,33 @@ export function openDatabase(connectionString: string): Pool {
   // laboratorio todavía) quedaría con el GUC sin actualizar para
   // siempre, aunque el pool la reutilice después de loguearse. Por eso
   // se envuelve `connect()` en sí (el mismo método que usan tanto
-  // `pool.query()` como `withTransaction` por debajo): así se re-aplica
-  // en cada uso real de una conexión, sea física-nueva o reciclada.
+  // `pool.query()` como `withTransaction` por debajo).
+  //
+  // IMPORTANTE: `pg-pool` internamente SIEMPRE usa la forma con callback
+  // de `connect()` — incluso cuando quien llama a `pool.query()` lo hace
+  // con la forma de Promise, `query()` por dentro hace
+  // `this.connect((err, client) => {...})`. Una primera versión de este
+  // arreglo solo cubría la forma de Promise (asumiendo, mal, que nadie
+  // usaba la de callback) y dejaba pasar la de callback sin tocar —
+  // dejaba el 100% de los `pool.query()` normales sin el GUC fijado.
+  // Confirmado en vivo: con RLS ya activa, el escritorio mostraba cero
+  // filas en el panel principal pese a tener sesión iniciada. Por eso
+  // acá se envuelven las DOS formas.
   const connectOriginal = poolInstance.connect.bind(poolInstance);
-  poolInstance.connect = ((callback?: Parameters<Pool["connect"]>[0]) => {
+  poolInstance.connect = ((
+    callback?: (err: Error | undefined, client: PoolClient | undefined, done: (release?: unknown) => void) => void
+  ) => {
     if (typeof callback === "function") {
-      // No usado en este proyecto (todo el código llama a la forma con
-      // Promise) — se deja pasar sin tocar para no romper el tipo.
-      return connectOriginal(callback);
+      connectOriginal((err: Error | undefined, client: PoolClient | undefined, done: (release?: unknown) => void) => {
+        if (err || !client) {
+          callback(err, client, done);
+          return;
+        }
+        fijarLaboratorioEnConexion(client, getLaboratorioActualId())
+          .then(() => callback(undefined, client, done))
+          .catch((gucErr: Error) => callback(gucErr, undefined, done));
+      });
+      return;
     }
     return connectOriginal().then(async (client) => {
       await fijarLaboratorioEnConexion(client, getLaboratorioActualId());

@@ -3,6 +3,7 @@ import { buscarUsuarioParaLoginGoogle } from "../db/repositories/usuariosRepo";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
 import { cargarSesionDesdeUsuario, type SesionActual } from "./sessionService";
 import { fijarLaboratorioEnConexion } from "../db/tenantContext";
+import { withTransaction } from "../db/withTransaction";
 import { DenszError } from "../utils/errors";
 
 export interface IdentidadGoogle {
@@ -44,21 +45,25 @@ export async function loginConGoogle(db: Queryable, identidad: IdentidadGoogle):
 
   if (!usuario.activo) throw credencialesInvalidas();
 
-  // Ya se sabe a qué laboratorio pertenece — se fija ANTES de cualquier
-  // otra consulta sobre esta misma conexión (auditoría, re-fetch de
-  // cargarSesionDesdeUsuario), que de otra forma seguirían viendo el
-  // laboratorio sin resolver (ver tenantContext.ts).
-  await fijarLaboratorioEnConexion(db, usuario.laboratorioId);
+  // Ya se sabe a qué laboratorio pertenece. Todo lo que sigue corre
+  // DENTRO de una única transacción (una sola conexión física) — si no,
+  // `fijarLaboratorioEnConexion` y las consultas de después (auditoría,
+  // re-fetch de cargarSesionDesdeUsuario) podrían terminar en conexiones
+  // DISTINTAS del pool, y las de después nunca verían el laboratorio
+  // recién fijado (ver tenantContext.ts).
+  return withTransaction(db, async (client) => {
+    await fijarLaboratorioEnConexion(client, usuario.laboratorioId);
 
-  await cargarSesionDesdeUsuario(db, usuario.id);
-  await registrarAuditoria(db, { usuarioId: usuario.id, accion: "login_google", entidad: "usuarios", entidadId: usuario.id });
+    await cargarSesionDesdeUsuario(client, usuario.id);
+    await registrarAuditoria(client, { usuarioId: usuario.id, accion: "login_google", entidad: "usuarios", entidadId: usuario.id });
 
-  return {
-    usuarioId: usuario.id,
-    nombreUsuario: usuario.nombreUsuario,
-    nombreCompleto: usuario.nombreCompleto,
-    rolNombre: usuario.rolNombre,
-    permisos: usuario.permisos,
-    laboratorioId: usuario.laboratorioId
-  };
+    return {
+      usuarioId: usuario.id,
+      nombreUsuario: usuario.nombreUsuario,
+      nombreCompleto: usuario.nombreCompleto,
+      rolNombre: usuario.rolNombre,
+      permisos: usuario.permisos,
+      laboratorioId: usuario.laboratorioId
+    };
+  });
 }

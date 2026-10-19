@@ -4,6 +4,7 @@ import { buscarUsuarioParaLoginPassword, registrarAcceso } from "../db/repositor
 import { cargarSesionDesdeUsuario, limpiarSesion, type SesionActual } from "./sessionService";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
 import { fijarLaboratorioEnConexion } from "../db/tenantContext";
+import { withTransaction } from "../db/withTransaction";
 import { bloquearProteccion } from "./proteccionService";
 import { DenszError } from "../utils/errors";
 
@@ -28,50 +29,57 @@ export async function login(db: Queryable, nombreUsuario: string, password: stri
     throw credencialesInvalidas;
   }
 
+  const usuarioEncontrado = usuario;
+
   // A partir de acá ya se sabe a qué laboratorio pertenece este nombre de
-  // usuario — se fija ANTES de cualquier otra consulta sobre esta misma
-  // conexión (auditoría, último acceso, re-fetch de cargarSesionDesdeUsuario),
-  // que de otra forma seguirían viendo el laboratorio sin resolver.
-  await fijarLaboratorioEnConexion(db, usuario.laboratorioId);
+  // usuario. Todo lo que sigue corre DENTRO de una única transacción (una
+  // sola conexión física) — si no, `fijarLaboratorioEnConexion` y las
+  // consultas de después (auditoría, último acceso, re-fetch de
+  // cargarSesionDesdeUsuario) podrían terminar en conexiones DISTINTAS
+  // del pool, y las de después nunca verían el laboratorio recién fijado.
+  const resultado = await withTransaction(db, async (client) => {
+    await fijarLaboratorioEnConexion(client, usuarioEncontrado.laboratorioId);
 
-  // Registra el intento fallido con el mismo detalle sin importar el motivo
-  // (inactivo o contraseña incorrecta) — la Auditoría es solo para
-  // ADMINISTRADOR (requerirPermiso(AUDITORIA_VER)), así que acá sí puede
-  // quedar registrado el motivo real sin que eso filtre nada hacia quien
-  // intentó entrar (que siempre recibe el mismo mensaje genérico).
-  function registrarIntentoFallido(id: number): Promise<void> {
-    return registrarAuditoria(db, {
-      usuarioId: id,
-      accion: "login_fallido",
-      entidad: "usuarios",
-      entidadId: id,
-      detalle: { nombreUsuario: nombreLimpio }
-    });
-  }
+    // Registra el intento fallido con el mismo detalle sin importar el
+    // motivo (inactivo o contraseña incorrecta) — la Auditoría es solo
+    // para ADMINISTRADOR (requerirPermiso(AUDITORIA_VER)), así que acá sí
+    // puede quedar registrado el motivo real sin que eso filtre nada
+    // hacia quien intentó entrar (que siempre recibe el mismo mensaje
+    // genérico). Nunca tira acá adentro — tirar haría ROLLBACK y se
+    // perdería la fila; en cambio devuelve `null` y quien llama decide
+    // afuera, ya con la transacción commiteada.
+    async function registrarIntentoFallido(): Promise<null> {
+      await registrarAuditoria(client, {
+        usuarioId: usuarioEncontrado.id,
+        accion: "login_fallido",
+        entidad: "usuarios",
+        entidadId: usuarioEncontrado.id,
+        detalle: { nombreUsuario: nombreLimpio }
+      });
+      return null;
+    }
 
-  if (!usuario.activo) {
-    await registrarIntentoFallido(usuario.id);
-    throw credencialesInvalidas;
-  }
+    if (!usuarioEncontrado.activo) return registrarIntentoFallido();
 
-  const passwordOk = bcrypt.compareSync(password, usuario.passwordHash);
-  if (!passwordOk) {
-    await registrarIntentoFallido(usuario.id);
-    throw credencialesInvalidas;
-  }
+    const passwordOk = bcrypt.compareSync(password, usuarioEncontrado.passwordHash);
+    if (!passwordOk) return registrarIntentoFallido();
 
-  await cargarSesionDesdeUsuario(db, usuario.id);
-  await registrarAcceso(db, usuario.id);
-  await registrarAuditoria(db, { usuarioId: usuario.id, accion: "login", entidad: "usuarios", entidadId: usuario.id });
+    await cargarSesionDesdeUsuario(client, usuarioEncontrado.id);
+    await registrarAcceso(client, usuarioEncontrado.id);
+    await registrarAuditoria(client, { usuarioId: usuarioEncontrado.id, accion: "login", entidad: "usuarios", entidadId: usuarioEncontrado.id });
 
-  return {
-    usuarioId: usuario.id,
-    nombreUsuario: usuario.nombreUsuario,
-    nombreCompleto: usuario.nombreCompleto,
-    rolNombre: usuario.rolNombre ?? "",
-    permisos: usuario.permisos,
-    laboratorioId: usuario.laboratorioId
-  };
+    return {
+      usuarioId: usuarioEncontrado.id,
+      nombreUsuario: usuarioEncontrado.nombreUsuario,
+      nombreCompleto: usuarioEncontrado.nombreCompleto,
+      rolNombre: usuarioEncontrado.rolNombre ?? "",
+      permisos: usuarioEncontrado.permisos,
+      laboratorioId: usuarioEncontrado.laboratorioId
+    };
+  });
+
+  if (!resultado) throw credencialesInvalidas;
+  return resultado;
 }
 
 export async function logout(db: Queryable, usuarioId: number): Promise<void> {
