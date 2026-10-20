@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import { login, logout } from "../services/authService";
 import { getSesionActual } from "../services/sessionService";
-import { iniciarLoginGoogleEscritorio } from "../services/googleOAuthDesktop";
+import { iniciarLoginGoogleEscritorio, iniciarRegistroLaboratorioEscritorio } from "../services/googleOAuthDesktop";
 import { borrarSesionGuardada } from "../services/supabaseSessionStorage";
 import { listarUsuariosActivosParaSeleccion } from "../db/repositories/usuariosRepo";
 import { traducirErrorPostgres } from "../utils/errors";
@@ -12,6 +12,10 @@ import { IPC_CHANNELS } from "../../shared/types/ipc-contracts";
 const esquemaLogin = z.object({
   nombreUsuario: z.string().trim().min(1, "Ingresá tu usuario."),
   password: z.string().min(1, "Ingresá tu contraseña.")
+});
+
+const esquemaRegistroLaboratorio = z.object({
+  nombreLaboratorio: z.string().trim().min(1, "Ingresá el nombre de tu laboratorio.")
 });
 
 export function registrarHandlersAuth(db: Pool): void {
@@ -27,6 +31,15 @@ export function registrarHandlersAuth(db: Pool): void {
   ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN_GOOGLE, async () => {
     try {
       return await iniciarLoginGoogleEscritorio(db);
+    } catch (err) {
+      throw traducirErrorPostgres(err);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.AUTH_REGISTRAR_LABORATORIO, async (_e, data) => {
+    try {
+      const { nombreLaboratorio } = esquemaRegistroLaboratorio.parse(data);
+      return await iniciarRegistroLaboratorioEscritorio(db, nombreLaboratorio);
     } catch (err) {
       throw traducirErrorPostgres(err);
     }

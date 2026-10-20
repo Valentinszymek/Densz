@@ -194,6 +194,7 @@ export const IPC_CHANNELS = {
 
   AUTH_LOGIN: "auth:login",
   AUTH_LOGIN_GOOGLE: "auth:loginGoogle",
+  AUTH_REGISTRAR_LABORATORIO: "auth:registrarLaboratorio",
   AUTH_LOGOUT: "auth:logout",
   AUTH_SESION_ACTUAL: "auth:sesionActual",
   AUTH_USUARIOS_DISPONIBLES: "auth:usuariosDisponibles",
@@ -456,6 +457,13 @@ export interface DenszApi {
    * confiar en nada. En escritorio no se pasa nada: abre el navegador del
    * sistema y hace todo el trámite él solo (ver googleOAuthDesktop.ts). */
   authLoginGoogle: (accessToken?: string) => Promise<SesionActualDto>;
+  /** Alta de laboratorio nuevo ("Crear mi laboratorio") — mismo reparto
+   * web/escritorio que authLoginGoogle: en la web, accessToken ya viene
+   * verificado del lado del cliente; en escritorio no se pasa (abre el
+   * navegador del sistema él solo). Si la identidad de Google ya
+   * pertenece a un laboratorio existente, no es un error: loguea directo
+   * a ese laboratorio en vez de crear uno nuevo (ver googleAuthService.ts). */
+  authRegistrarseConGoogle: (nombreLaboratorio: string, accessToken?: string) => Promise<SesionActualDto>;
   authLogout: () => Promise<void>;
   authSesionActual: () => Promise<SesionActualDto | null>;
   authUsuariosDisponibles: () => Promise<UsuarioParaSeleccion[]>;

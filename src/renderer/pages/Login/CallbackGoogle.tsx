@@ -16,10 +16,17 @@ import { useAuthStore } from "../../store/authStore";
  *
  * Una vez que supabase-js tiene sesión:
  * 1. Se manda el access token al backend de Densz
- *    (window.densz.authLoginGoogle) — lo revalida y arma la sesión REAL
- *    de Densz (la cookie propia), la única que importa de acá en más.
+ *    (window.densz.authLoginGoogle, o authRegistrarseConGoogle si venía
+ *    de "Crear mi laboratorio" — ver `labName` abajo) — lo revalida y
+ *    arma la sesión REAL de Densz (la cookie propia), la única que
+ *    importa de acá en más.
  * 2. Se cierra la sesión de Supabase del lado del cliente (ya cumplió su
  *    propósito).
+ *
+ * `labName`: si la persona vino de RegistroLaboratorio.tsx, el nombre
+ * tipeado viaja en la query string (`?labName=...#/auth/callback`, ver
+ * supabaseClient.ts) — nunca se pisa con el `?code=...` que agrega
+ * Supabase, así que sigue disponible acá sin guardar nada entre medio.
  */
 export default function CallbackGoogle() {
   const navigate = useNavigate();
@@ -40,7 +47,10 @@ export default function CallbackGoogle() {
       if (yaProceso.current) return;
       yaProceso.current = true;
       try {
-        const sesion = await window.densz.authLoginGoogle(accessToken);
+        const labName = new URLSearchParams(window.location.search).get("labName");
+        const sesion = labName
+          ? await window.densz.authRegistrarseConGoogle(labName, accessToken)
+          : await window.densz.authLoginGoogle(accessToken);
         setSesion(sesion);
         navigate("/", { replace: true });
       } catch (err) {

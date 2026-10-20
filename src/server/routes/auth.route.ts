@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import type { Pool } from "pg";
 import { login, logout } from "../../main/services/authService";
-import { loginConGoogle } from "../../main/services/googleAuthService";
+import { loginConGoogle, registrarseConGoogle } from "../../main/services/googleAuthService";
 import { listarUsuariosActivosParaSeleccion } from "../../main/db/repositories/usuariosRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { crearSesionHttp, obtenerSesionHttp, destruirSesionHttp, COOKIE_SESION } from "../session";
@@ -22,6 +22,11 @@ const esquemaLogin = z.object({
 
 const esquemaLoginGoogle = z.object({
   accessToken: z.string().trim().min(1, "Falta el token de Google.")
+});
+
+const esquemaRegistroGoogle = z.object({
+  accessToken: z.string().trim().min(1, "Falta el token de Google."),
+  nombreLaboratorio: z.string().trim().min(1, "Ingresá el nombre de tu laboratorio.")
 });
 
 const esProduccion = process.env.NODE_ENV === "production";
@@ -97,6 +102,25 @@ export function crearRouterAuth(db: Pool): Router {
       // 2026-10-19, el login con Google en la web fallaba y no dejaba
       // ningún rastro server-side).
       logger.error("Error en POST /auth/google-callback:", err);
+      const error = traducirErrorPostgres(err);
+      res.status(401).json({ error: error.message });
+    }
+  });
+
+  // Alta de laboratorio nuevo ("Crear mi laboratorio") — mismo chequeo de
+  // token que /google-callback; si la identidad ya pertenece a un
+  // laboratorio existente, registrarseConGoogle no duplica nada, loguea
+  // directo (ver googleAuthService.ts).
+  router.post("/google-register", async (req, res) => {
+    try {
+      const { accessToken, nombreLaboratorio } = esquemaRegistroGoogle.parse(req.body);
+      const identidad = await verificarTokenGoogle(accessToken);
+      const sesion = await registrarseConGoogle(db, identidad, nombreLaboratorio);
+      const idSesion = crearSesionHttp(sesion);
+      res.cookie(COOKIE_SESION, idSesion, opcionesCookie);
+      res.json(sesion);
+    } catch (err) {
+      logger.error("Error en POST /auth/google-register:", err);
       const error = traducirErrorPostgres(err);
       res.status(401).json({ error: error.message });
     }

@@ -29,14 +29,21 @@ export const supabase = supabaseAuthDisponible
 /** Arranca el login con Google — redirige la pestaña actual a Google
  * (lo hace supabase-js solo, no hace falta navegar a mano) y, si todo
  * sale bien, Google vuelve a `#/auth/callback` (ver CallbackGoogle.tsx)
- * con el código de autorización en la URL. */
-export async function iniciarLoginGoogle(): Promise<void> {
+ * con el código de autorización en la URL.
+ *
+ * Si se pasa `nombreLaboratorio` (pantalla "Crear mi laboratorio"), viaja
+ * como query param ANTES del `#` (`?labName=...#/auth/callback`) — ahí
+ * sigue disponible en `window.location.search` cuando vuelve de Google,
+ * sin necesidad de guardar nada server-side entre medio (Supabase agrega
+ * su propio `?code=...` a la query existente, nunca lo pisa). */
+export async function iniciarLoginGoogle(nombreLaboratorio?: string): Promise<void> {
   if (!supabase) {
     throw new Error("Login con Google no está configurado en este entorno (faltan VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY).");
   }
+  const query = nombreLaboratorio ? `?labName=${encodeURIComponent(nombreLaboratorio)}` : "";
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: `${window.location.origin}${window.location.pathname}#/auth/callback` }
+    options: { redirectTo: `${window.location.origin}${window.location.pathname}${query}#/auth/callback` }
   });
   if (error) throw error;
 }

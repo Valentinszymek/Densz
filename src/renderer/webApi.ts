@@ -519,6 +519,8 @@ export const webApi: DenszApi = {
   // --- Implementados de verdad en esta etapa (Fase 1+2+3) ---
   authLogin: (nombreUsuario, password) => post("/auth/login", { nombreUsuario, password }),
   authLoginGoogle: (accessToken) => post("/auth/google-callback", { accessToken }),
+  authRegistrarseConGoogle: (nombreLaboratorio, accessToken) =>
+    post("/auth/google-register", { accessToken, nombreLaboratorio }),
   authLogout: () => post("/auth/logout"),
   authSesionActual: () => get("/auth/session"),
   authUsuariosDisponibles: () => get("/auth/usuarios-disponibles"),

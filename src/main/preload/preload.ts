@@ -157,6 +157,10 @@ const api: DenszApi = {
   // sistema + servidor local, ver googleOAuthDesktop.ts) — nunca recibe
   // un accessToken de afuera, por eso el argumento se ignora acá.
   authLoginGoogle: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGIN_GOOGLE),
+  // Mismo criterio: el escritorio ignora el accessToken (no aplica) y
+  // solo manda lo que sí necesita, el nombre tipeado del laboratorio.
+  authRegistrarseConGoogle: (nombreLaboratorio) =>
+    ipcRenderer.invoke(IPC_CHANNELS.AUTH_REGISTRAR_LABORATORIO, { nombreLaboratorio }),
   authLogout: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGOUT),
   authSesionActual: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_SESION_ACTUAL),
   authUsuariosDisponibles: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USUARIOS_DISPONIBLES),

@@ -3,7 +3,7 @@ import type { Pool } from "pg";
 import { shell, BrowserWindow } from "electron";
 import { GoTrueClient } from "@supabase/auth-js";
 import { crearAlmacenamientoDeSesion } from "./supabaseSessionStorage";
-import { loginConGoogle, type IdentidadGoogle } from "./googleAuthService";
+import { loginConGoogle, registrarseConGoogle, type IdentidadGoogle } from "./googleAuthService";
 import type { SesionActual } from "./sessionService";
 import { logger } from "../utils/logger";
 
@@ -92,10 +92,11 @@ function paginaRespuesta(ok: boolean): string {
 </body></html>`;
 }
 
-/** Levanta el servidor local (127.0.0.1 únicamente — nunca accesible
- * desde la red), abre el navegador del sistema, y devuelve la sesión ya
- * autenticada una vez que la persona completa el login en Google. */
-export async function iniciarLoginGoogleEscritorio(pool: Pool): Promise<SesionActual> {
+/** Abre el navegador del sistema, espera el login de Google, e
+ * intercambia el código por una identidad ya verificada — el mismo
+ * trámite para "Iniciar sesión" y para "Crear mi laboratorio", que solo
+ * difieren en qué hacen con la identidad una vez resuelta. */
+async function completarLoginGoogle(): Promise<IdentidadGoogle> {
   const auth = getAuthClient();
   const redirectTo = `http://127.0.0.1:${PUERTO_CALLBACK}/callback`;
 
@@ -113,10 +114,29 @@ export async function iniciarLoginGoogleEscritorio(pool: Pool): Promise<SesionAc
     throw new Error(errorIntercambio?.message ?? "No se pudo completar el login con Google.");
   }
 
-  const identidad = identidadDesdeSesion(sesionData.session.user);
+  return identidadDesdeSesion(sesionData.session.user);
+}
+
+/** Levanta el servidor local (127.0.0.1 únicamente — nunca accesible
+ * desde la red), abre el navegador del sistema, y devuelve la sesión ya
+ * autenticada una vez que la persona completa el login en Google. */
+export async function iniciarLoginGoogleEscritorio(pool: Pool): Promise<SesionActual> {
+  const identidad = await completarLoginGoogle();
   const sesion = await loginConGoogle(pool, identidad);
 
   // La persona va a estar en el navegador — la traemos de vuelta a Densz.
+  BrowserWindow.getAllWindows()[0]?.focus();
+
+  return sesion;
+}
+
+/** Variante de "Crear mi laboratorio" — mismo navegador del sistema +
+ * servidor local, solo que al volver da de alta el laboratorio nuevo en
+ * vez de buscar uno existente (ver googleAuthService.ts). */
+export async function iniciarRegistroLaboratorioEscritorio(pool: Pool, nombreLaboratorio: string): Promise<SesionActual> {
+  const identidad = await completarLoginGoogle();
+  const sesion = await registrarseConGoogle(pool, identidad, nombreLaboratorio);
+
   BrowserWindow.getAllWindows()[0]?.focus();
 
   return sesion;
