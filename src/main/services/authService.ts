@@ -1,7 +1,7 @@
 import type { Queryable } from "../db/types";
 import bcrypt from "bcryptjs";
 import { buscarUsuarioParaLoginPassword, registrarAcceso } from "../db/repositories/usuariosRepo";
-import { cargarSesionDesdeUsuario, limpiarSesion, type SesionActual } from "./sessionService";
+import { cargarSesionDesdeUsuario, getSesionActual, limpiarSesion, type SesionActual } from "./sessionService";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
 import { fijarLaboratorioEnConexion } from "../db/tenantContext";
 import { withTransaction } from "../db/withTransaction";
@@ -68,14 +68,9 @@ export async function login(db: Queryable, nombreUsuario: string, password: stri
     await registrarAcceso(client, usuarioEncontrado.id);
     await registrarAuditoria(client, { usuarioId: usuarioEncontrado.id, accion: "login", entidad: "usuarios", entidadId: usuarioEncontrado.id });
 
-    return {
-      usuarioId: usuarioEncontrado.id,
-      nombreUsuario: usuarioEncontrado.nombreUsuario,
-      nombreCompleto: usuarioEncontrado.nombreCompleto,
-      rolNombre: usuarioEncontrado.rolNombre ?? "",
-      permisos: usuarioEncontrado.permisos,
-      laboratorioId: usuarioEncontrado.laboratorioId
-    };
+    // cargarSesionDesdeUsuario ya armó la sesión completa (incluido
+    // superAdmin) — se devuelve esa, nunca una reconstruida a mano.
+    return getSesionActual()!;
   });
 
   if (!resultado) throw credencialesInvalidas;

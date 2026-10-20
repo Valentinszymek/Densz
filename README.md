@@ -165,6 +165,38 @@ partir de `build/icon-source.png`.
 `signAndEditExecutable: false` porque Densz no tiene certificado de firma
 de código. Si en el futuro se agrega uno, hay que quitar esa línea.
 
+### Publicar una versión nueva (auto-actualización)
+
+Densz se actualiza solo en las instalaciones existentes (`electron-updater`,
+ver `src/main/services/autoUpdaterService.ts`) — cada versión nueva se
+publica como GitHub Release de este mismo repo, y el escritorio instalado
+la detecta, la descarga en segundo plano, y avisa con un botón
+"Reiniciar" cuando ya está lista (nunca fuerza nada).
+
+Pasos para publicar:
+
+1. Subir el número de `version` en `package.json` (semver — `electron-updater`
+   compara contra la última release publicada).
+2. Generar un **Personal Access Token de GitHub** (una sola vez, dura hasta
+   que se revoque): GitHub → Settings → Developer settings → Personal
+   access tokens → Fine-grained tokens → acceso solo al repo `Densz`,
+   permiso "Contents: Read and write". **Nunca compartir este token con
+   nadie, incluido Claude** — se guarda localmente como variable de
+   entorno.
+3. Con el token en la variable de entorno `GH_TOKEN` (PowerShell:
+   `$env:GH_TOKEN = "..."`), correr:
+
+   ```bash
+   npm run release
+   ```
+
+   Esto compila, arma el instalador, y lo sube como GitHub Release —
+   electron-updater lee `latest.yml` desde ahí automáticamente.
+
+Instalaciones viejas (de antes de que esto existiera) necesitan bajar el
+instalador una vez a mano — desde esa versión en adelante, se actualizan
+solas.
+
 ## Estructura del proyecto
 
 ```

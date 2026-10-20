@@ -33,8 +33,10 @@ describe("HTTP /pagos", () => {
   let medioPagoId: number;
   let sesionAdminId: string;
   let sesionRecepcionId: string;
+  let sesionRecepcionConPagosId: string;
   let cookieAdmin: string;
   let cookieRecepcion: string;
+  let cookieRecepcionConPagos: string;
 
   beforeAll(async () => {
     ctx = await createTestDbConUsuario();
@@ -54,7 +56,9 @@ describe("HTTP /pagos", () => {
       permisos: ["*"]
     });
     // Sesión SIN ningún permiso "pagos.*" a propósito — sirve para probar
-    // el punto 13 (permisos): hoy el escritorio no exige ninguno acá.
+    // que los endpoints de pagos ahora SÍ exigen el permiso correspondiente
+    // (corrección pre-lanzamiento comercial, 2026-10-20: antes no exigían
+    // ninguno, ver pagos.route.ts).
     sesionRecepcionId = crearSesionHttp({
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-pagos",
@@ -62,13 +66,24 @@ describe("HTTP /pagos", () => {
       rolNombre: "RECEPCION",
       permisos: ["odontologos.ver"]
     });
+    // Caso real que motivó la corrección: alguien de RECEPCION con
+    // permiso para ver/crear pagos pero NO para anularlos.
+    sesionRecepcionConPagosId = crearSesionHttp({
+      usuarioId: ctx.usuarioId,
+      nombreUsuario: "recepcion-con-pagos-test",
+      nombreCompleto: "Recepcion Con Pagos Test",
+      rolNombre: "RECEPCION",
+      permisos: ["pagos.ver", "pagos.crear"]
+    });
     cookieAdmin = `${COOKIE_SESION}=${sesionAdminId}`;
     cookieRecepcion = `${COOKIE_SESION}=${sesionRecepcionId}`;
+    cookieRecepcionConPagos = `${COOKIE_SESION}=${sesionRecepcionConPagosId}`;
   });
 
   afterAll(async () => {
     destruirSesionHttp(sesionAdminId);
     destruirSesionHttp(sesionRecepcionId);
+    destruirSesionHttp(sesionRecepcionConPagosId);
     await ctx.finalizar(); // ROLLBACK real
 
     // Punto 14: verificación real, no asumida — conexión nueva, después
@@ -261,22 +276,48 @@ describe("HTTP /pagos", () => {
     expect(pago.rows[0].anulado).toBe(1);
   });
 
-  // --- 13. Permisos: hoy no hay ningún chequeo, se prueba explícitamente ---
-  it("no exige ningún permiso 'pagos.*' — paridad exacta con el escritorio (sin chequeo en el IPC actual)", async () => {
+  // --- 13. Permisos: corrección pre-lanzamiento comercial (2026-10-20) ---
+  it("exige pagos.ver/pagos.crear/pagos.anular — un rol sin ninguno recibe 403 en los tres", async () => {
     const listado = await request(app).get(`/pagos?odontologoId=${odontologoId}`).set("Cookie", cookieRecepcion);
-    expect(listado.status).toBe(200);
+    expect(listado.status).toBe(403);
 
     const registrado = await request(app)
       .post("/pagos")
       .set("Cookie", cookieRecepcion)
       .send(datosPagoValido({ fecha: "2026-03-01", importeCentavos: 100000 }));
+    expect(registrado.status).toBe(403);
+
+    const anulado = await request(app)
+      .patch("/pagos/1/anular")
+      .set("Cookie", cookieRecepcion)
+      .send({ motivo: "RECEPCION sin ningún permiso de pagos" });
+    expect(anulado.status).toBe(403);
+  });
+
+  // --- Caso real que motivó la corrección: puede ver/crear pagos, pero no anularlos ---
+  it("un rol con pagos.ver/pagos.crear pero SIN pagos.anular puede registrar pagos, nunca anularlos", async () => {
+    const listado = await request(app).get(`/pagos?odontologoId=${odontologoId}`).set("Cookie", cookieRecepcionConPagos);
+    expect(listado.status).toBe(200);
+
+    const registrado = await request(app)
+      .post("/pagos")
+      .set("Cookie", cookieRecepcionConPagos)
+      .send(datosPagoValido({ fecha: "2026-03-02", importeCentavos: 50000 }));
     expect(registrado.status).toBe(201);
 
     const anulado = await request(app)
       .patch(`/pagos/${registrado.body.pago.id}/anular`)
-      .set("Cookie", cookieRecepcion)
-      .send({ motivo: "RECEPCION anulando sin pagos.anular" });
-    expect(anulado.status).toBe(200);
+      .set("Cookie", cookieRecepcionConPagos)
+      .send({ motivo: "intento anular sin pagos.anular" });
+    expect(anulado.status).toBe(403);
+
+    // El admin sí puede anular ese mismo pago — confirma que el 403 de
+    // arriba es por el permiso, no porque el pago no se pueda anular.
+    const anuladoAdmin = await request(app)
+      .patch(`/pagos/${registrado.body.pago.id}/anular`)
+      .set("Cookie", cookieAdmin)
+      .send({ motivo: "admin anula el pago de la prueba anterior" });
+    expect(anuladoAdmin.status).toBe(200);
   });
 
   // --- Bloque 2 / Parte D: mediosPagoCrear, conectado en el barrido final ---

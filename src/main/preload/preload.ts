@@ -177,6 +177,8 @@ const api: DenszApi = {
   auditoriaListar: (filtro) => ipcRenderer.invoke(IPC_CHANNELS.AUDITORIA_LISTAR, filtro),
   auditoriaOpcionesFiltro: () => ipcRenderer.invoke(IPC_CHANNELS.AUDITORIA_OPCIONES_FILTRO),
 
+  laboratoriosListar: () => ipcRenderer.invoke(IPC_CHANNELS.LABORATORIOS_LISTAR),
+
   exportGenerar: (tipo, formato, nombreSugerido, opciones) =>
     ipcRenderer.invoke(IPC_CHANNELS.EXPORT_GENERAR, tipo, formato, nombreSugerido, opciones),
 
@@ -185,7 +187,16 @@ const api: DenszApi = {
   impresoraSeleccionar: (nombreDispositivo, nombreVisible) =>
     ipcRenderer.invoke(IPC_CHANNELS.IMPRESORA_SELECCIONAR, nombreDispositivo, nombreVisible),
   impresoraPrueba: (nombreDispositivo) => ipcRenderer.invoke(IPC_CHANNELS.IMPRESORA_PRUEBA, nombreDispositivo),
-  impresoraImprimirPdf: (pdfPath) => ipcRenderer.invoke(IPC_CHANNELS.IMPRESORA_IMPRIMIR_PDF, pdfPath)
+  impresoraImprimirPdf: (pdfPath) => ipcRenderer.invoke(IPC_CHANNELS.IMPRESORA_IMPRIMIR_PDF, pdfPath),
+
+  onActualizacionLista: (callback) => {
+    const listener = (_e: unknown, version: string) => callback(version);
+    ipcRenderer.on(IPC_CHANNELS.ACTUALIZACION_LISTA, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.ACTUALIZACION_LISTA, listener);
+  },
+  reiniciarParaActualizar: () => {
+    void ipcRenderer.invoke(IPC_CHANNELS.ACTUALIZACION_REINICIAR);
+  }
 };
 
 contextBridge.exposeInMainWorld("densz", api);

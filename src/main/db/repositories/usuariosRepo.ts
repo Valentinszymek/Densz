@@ -205,6 +205,16 @@ export async function obtenerLaboratorioIdDeUsuario(db: Queryable, usuarioId: nu
   return rows[0]?.laboratorio_id ?? null;
 }
 
+/** Si este usuario es el dueño del producto Densz (no de un laboratorio
+ * cliente) — habilita el panel de laboratorios registrados (ver
+ * laboratoriosRepo.ts). Nunca confundir con el rol ADMINISTRADOR de un
+ * laboratorio: ese es por-tenant, esto es global y solo lo tiene una
+ * cuenta (la del dueño), marcada a mano en la base. */
+export async function esSuperAdmin(db: Queryable, usuarioId: number): Promise<boolean> {
+  const { rows } = await db.query<{ super_admin: number }>("SELECT super_admin FROM usuarios WHERE id = $1", [usuarioId]);
+  return rows[0]?.super_admin === 1;
+}
+
 export async function listarUsuarios(db: Queryable): Promise<Usuario[]> {
   const { rows } = await db.query<FilaUsuario>(SELECT_BASE + " ORDER BY u.nombre_usuario");
   return rows.map(mapear);

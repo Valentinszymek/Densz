@@ -4,7 +4,8 @@ import type { Pool } from "pg";
 import { listarPagos, listarPagosClinica, listarUltimosPagos, listarMediosPago, crearMedioPago } from "../db/repositories/pagosRepo";
 import { registrarPago, anularPago } from "../services/pagoService";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
-import { getUsuarioActualId } from "../services/sessionService";
+import { getUsuarioActualId, requerirPermiso } from "../services/sessionService";
+import { PERMISOS } from "../../shared/constants/permisos";
 import { traducirErrorPostgres } from "../utils/errors";
 import { IPC_CHANNELS } from "../../shared/types/ipc-contracts";
 
@@ -21,14 +22,31 @@ const esquemaPago = z
   .transform((d) => ({ ...d, odontologoId: d.odontologoId ?? null, clinicaId: d.clinicaId ?? null }));
 
 export function registrarHandlersPagos(db: Pool): void {
-  ipcMain.handle(IPC_CHANNELS.PAGOS_LISTAR, (_e, odontologoId: number) => listarPagos(db, odontologoId));
+  // Corrección (hallazgo pre-lanzamiento comercial, 2026-10-20): ningún
+  // canal de pagos exigía permiso hasta ahora — solo sesión iniciada. El
+  // botón de "Anular" se ocultaba según el rol del lado de la pantalla,
+  // pero nada lo hacía cumplir acá, así que un rol sin pagos.anular (ej.
+  // RECEPCION) igual podía anular si llamaba al canal directamente. Con
+  // Densz vendiéndose a otros laboratorios, cada uno carga sus propios
+  // roles confiando en que esta restricción es real.
+  ipcMain.handle(IPC_CHANNELS.PAGOS_LISTAR, (_e, odontologoId: number) => {
+    requerirPermiso(PERMISOS.PAGOS_VER);
+    return listarPagos(db, odontologoId);
+  });
 
-  ipcMain.handle(IPC_CHANNELS.PAGOS_LISTAR_CLINICA, (_e, clinicaId: number) => listarPagosClinica(db, clinicaId));
+  ipcMain.handle(IPC_CHANNELS.PAGOS_LISTAR_CLINICA, (_e, clinicaId: number) => {
+    requerirPermiso(PERMISOS.PAGOS_VER);
+    return listarPagosClinica(db, clinicaId);
+  });
 
-  ipcMain.handle(IPC_CHANNELS.PAGOS_LISTAR_ULTIMOS, (_e, limite?: number) => listarUltimosPagos(db, limite ?? 5));
+  ipcMain.handle(IPC_CHANNELS.PAGOS_LISTAR_ULTIMOS, (_e, limite?: number) => {
+    requerirPermiso(PERMISOS.PAGOS_VER);
+    return listarUltimosPagos(db, limite ?? 5);
+  });
 
   ipcMain.handle(IPC_CHANNELS.PAGOS_REGISTRAR, async (_e, data, confirmarDuplicado?: boolean) => {
     try {
+      requerirPermiso(PERMISOS.PAGOS_CREAR);
       const validado = esquemaPago.parse(data);
       const usuarioId = getUsuarioActualId();
       // registrarPago ya audita "crear" adentro de su propia transacción
@@ -41,6 +59,7 @@ export function registrarHandlersPagos(db: Pool): void {
 
   ipcMain.handle(IPC_CHANNELS.PAGOS_ANULAR, async (_e, id: number, motivo: string) => {
     try {
+      requerirPermiso(PERMISOS.PAGOS_ANULAR);
       const motivoValidado = z.string().trim().min(3, "Ingresá un motivo de al menos 3 caracteres.").parse(motivo);
       const usuarioId = getUsuarioActualId();
       // anularPago ya audita "anular" adentro de su propia transacción

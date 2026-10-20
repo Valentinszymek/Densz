@@ -13,6 +13,8 @@ import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
+import { requirePermission } from "../middleware/requirePermission";
+import { PERMISOS } from "../../shared/constants/permisos";
 
 const esquemaId = z.coerce.number().int().positive();
 
@@ -37,24 +39,30 @@ const esquemaMotivo = z.string().trim().min(3, "Ingresá un motivo de al menos 3
  * mismo mecanismo de movimientos DEBE/HABER (via movimientosRepo, llamado
  * adentro de pagoService.ts), misma transacción.
  *
- * PERMISOS — revisado antes de implementar: ningún canal de
- * src/main/ipc/pagos.ipc.ts llama a requerirPermiso hoy (existen
- * PERMISOS.PAGOS_CREAR/PAGOS_VER/PAGOS_ANULAR en permisos.ts, sin uso acá).
- * Se repite exactamente ese comportamiento — solo se exige sesión
- * (requireAuth), sin agregar ningún chequeo de permiso nuevo. Ver el
- * informe de este bloque para un hallazgo relacionado (RECEPCION no tiene
- * "pagos.anular" en su rol, pero nada lo hace cumplir hoy — ni acá ni en
- * el escritorio).
+ * PERMISOS — corrección pre-lanzamiento comercial (2026-10-20): hasta
+ * acá, ningún canal de pagos (ni este router ni pagos.ipc.ts) exigía
+ * PAGOS_CREAR/PAGOS_VER/PAGOS_ANULAR — solo sesión iniciada. El botón de
+ * "Anular" se ocultaba según el rol del lado de la pantalla, pero nada
+ * lo hacía cumplir del lado del servidor: un rol sin pagos.anular (ej.
+ * RECEPCION) igual podía anular llamando al endpoint directo. Con Densz
+ * vendiéndose a otros laboratorios, cada uno carga sus propios roles
+ * confiando en que esa restricción es real — se agrega acá y en
+ * pagos.ipc.ts (mismo permiso, misma regla en las dos plataformas).
  *
- * A propósito NO se porta MEDIOS_PAGO_CREAR (crear un método de pago) —
- * fuera del alcance pedido para este bloque (solo lectura de métodos).
+ * MEDIOS_PAGO_CREAR (/medios) queda tal cual, sin permiso — no es parte
+ * de este hallazgo (no hay anulación ni dato sensible de por medio) y
+ * ninguna constante de permiso lo cubre todavía.
  */
 export function crearRouterPagos(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
   router.use(attachTenantDb(db));
 
-  router.get("/", async (req, res) => {
+  const requierePagosVer = requirePermission(PERMISOS.PAGOS_VER);
+  const requierePagosCrear = requirePermission(PERMISOS.PAGOS_CREAR);
+  const requierePagosAnular = requirePermission(PERMISOS.PAGOS_ANULAR);
+
+  router.get("/", requierePagosVer, async (req, res) => {
     const db = (req as unknown as RequestConTenantDb).db;
     try {
       const odontologoId = esquemaId.parse(req.query.odontologoId);
@@ -65,7 +73,7 @@ export function crearRouterPagos(db: Pool): Router {
     }
   });
 
-  router.get("/clinica/:clinicaId", async (req, res) => {
+  router.get("/clinica/:clinicaId", requierePagosVer, async (req, res) => {
     const db = (req as unknown as RequestConTenantDb).db;
     try {
       const clinicaId = esquemaId.parse(req.params.clinicaId);
@@ -76,7 +84,7 @@ export function crearRouterPagos(db: Pool): Router {
     }
   });
 
-  router.get("/ultimos", async (req, res) => {
+  router.get("/ultimos", requierePagosVer, async (req, res) => {
     const db = (req as unknown as RequestConTenantDb).db;
     try {
       const limite = req.query.limite !== undefined ? z.coerce.number().int().positive().parse(req.query.limite) : 5;
@@ -87,7 +95,7 @@ export function crearRouterPagos(db: Pool): Router {
     }
   });
 
-  router.post("/", async (req, res) => {
+  router.post("/", requierePagosCrear, async (req, res) => {
     const db = (req as unknown as RequestConTenantDb).db;
     try {
       const validado = esquemaPago.parse(req.body);
@@ -110,7 +118,7 @@ export function crearRouterPagos(db: Pool): Router {
     }
   });
 
-  router.patch("/:id/anular", async (req, res) => {
+  router.patch("/:id/anular", requierePagosAnular, async (req, res) => {
     const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);

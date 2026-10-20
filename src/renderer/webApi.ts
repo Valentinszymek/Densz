@@ -210,9 +210,26 @@ async function imprimirPdf(obtenerBlob: () => Promise<Blob>): Promise<void> {
   }
 
   const url = URL.createObjectURL(blob);
+  let resuelto = false;
   const limpiar = () => {
     iframe.remove();
     URL.revokeObjectURL(url);
+  };
+
+  // Si el navegador bloquea el diálogo directo (o el PDF nunca termina de
+  // cargar), se cae a una pestaña visible — pero avisando SIEMPRE por qué,
+  // nunca en silencio (antes de esta corrección, la persona veía "se abrió
+  // una pestaña en vez de imprimir" sin ninguna explicación).
+  const caerAPestanaVisible = () => {
+    if (resuelto) return;
+    resuelto = true;
+    window.open(url, "_blank");
+    toast({
+      titulo: "Se abrió en una pestaña nueva",
+      descripcion: "Tu navegador no permitió abrir el diálogo de impresión directo — imprimí desde ahí con el botón de imprimir del visor.",
+      tono: "info"
+    });
+    setTimeout(limpiar, 60_000);
   };
 
   const iframe = document.createElement("iframe");
@@ -224,17 +241,23 @@ async function imprimirPdf(obtenerBlob: () => Promise<Blob>): Promise<void> {
   iframe.style.border = "none";
   iframe.src = url;
 
+  // Si el iframe nunca dispara `load` (PDF corrupto, bloqueado, lo que
+  // sea), antes esto se quedaba colgado sin avisar nada — ahora cae al
+  // respaldo visible después de un tiempo razonable.
+  const timeoutCarga = setTimeout(caerAPestanaVisible, 8_000);
+
   iframe.onload = () => {
+    clearTimeout(timeoutCarga);
     setTimeout(() => {
+      if (resuelto) return;
       try {
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
+        resuelto = true;
+        setTimeout(limpiar, 60_000);
       } catch {
-        window.open(url, "_blank");
+        caerAPestanaVisible();
       }
-      // Recién se libera después de darle tiempo real al diálogo de
-      // impresión (confirmarlo/cancelarlo) — nunca antes.
-      setTimeout(limpiar, 60_000);
     }, 300);
   };
 
@@ -541,6 +564,8 @@ export const webApi: DenszApi = {
   auditoriaListar: (filtro) => get(`/auditoria${buildQuery(filtro ?? {})}`),
   auditoriaOpcionesFiltro: () => get("/auditoria/opciones-filtro"),
 
+  laboratoriosListar: () => get("/laboratorios"),
+
   // Exportación (Bloque 2 / Parte A): descarga real vía el navegador
   // (Content-Disposition: attachment) — nunca un diálogo nativo, que no
   // existe en la web. Devuelve el nombre de archivo real como "ruta" (en
@@ -565,6 +590,12 @@ export const webApi: DenszApi = {
   impresoraSeleccionar: pendiente("impresoraSeleccionar"),
   impresoraPrueba: pendiente("impresoraPrueba"),
   impresoraImprimirPdf: pendiente("impresoraImprimirPdf"),
+
+  // No existe "versión instalada" que actualizar en un navegador — nunca
+  // hay nada que escuchar acá, a diferencia del resto de `pendiente(...)`
+  // esto no es un gap, es la web funcionando como corresponde.
+  onActualizacionLista: () => () => {},
+  reiniciarParaActualizar: () => {},
 
   // Protección de Cuentas/Estadísticas — completo (Fase 8B lectura/
   // desbloqueo + Fase 10C administración). El desbloqueo y el bloqueo son

@@ -21,13 +21,16 @@ import { registrarHandlersAuth } from "./ipc/auth.ipc";
 import { registrarHandlersUsuarios } from "./ipc/usuarios.ipc";
 import { registrarHandlersAuditoria } from "./ipc/auditoria.ipc";
 import { registrarHandlersExport } from "./ipc/export.ipc";
+import { registrarHandlersLaboratorios } from "./ipc/laboratorios.ipc";
 import { registrarHandlersImpresora } from "./ipc/impresora.ipc";
 import { registrarHandlersProteccion } from "./ipc/proteccion.ipc";
+import { registrarHandlersActualizacion } from "./ipc/actualizacion.ipc";
 import { createMainWindow } from "./windows/mainWindow";
 import { logger } from "./utils/logger";
 import { ensureBootstrapUser } from "./db/ensureBootstrapUser";
 import { intentarRestaurarSesionGoogle } from "./services/googleOAuthDesktop";
 import { getLaboratorioActualId } from "./services/sessionService";
+import { iniciarAutoUpdate } from "./services/autoUpdaterService";
 
 // Evita instancias múltiples de Densz pisándose entre sí al arrancar.
 const obtuvoElLock = app.requestSingleInstanceLock();
@@ -87,10 +90,13 @@ if (!obtuvoElLock) {
     registrarHandlersUsuarios(pool);
     registrarHandlersAuditoria(pool);
     registrarHandlersExport(pool);
+    registrarHandlersLaboratorios(pool);
     registrarHandlersImpresora(pool);
     registrarHandlersProteccion(pool);
+    registrarHandlersActualizacion();
 
     createMainWindow();
+    iniciarAutoUpdate();
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {

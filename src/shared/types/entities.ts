@@ -20,6 +20,22 @@ export interface SesionActualDto {
    * googleAuthService.ts). Login con usuario/contraseña todavía no lo
    * resuelve. */
   laboratorioId: number | null;
+  /** Dueño del producto Densz (no de un laboratorio cliente) — habilita
+   * el panel de laboratorios registrados. Nunca confundir con el rol
+   * ADMINISTRADOR de un laboratorio (por-tenant). Opcional por el mismo
+   * motivo que en sessionService.ts#SesionActual. */
+  superAdmin?: boolean;
+}
+
+export interface LaboratorioParaAdmin {
+  id: number;
+  nombre: string;
+  emailContacto: string;
+  plan: string;
+  estadoSuscripcion: string;
+  trialTerminaEn: string | null;
+  activo: boolean;
+  creadoEn: string;
 }
 
 export interface Rol {

@@ -7,6 +7,7 @@ import { AppRouter } from "./app/router";
 import { useAuthStore } from "./store/authStore";
 import { DenszLogo } from "./components/brand/DenszLogo";
 import { ConexionGate } from "./components/system/ConexionGate";
+import { ActualizacionBanner } from "./components/system/ActualizacionBanner";
 
 function Splash() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
           </SesionInicial>
         </ConexionGate>
         <Toaster />
+        <ActualizacionBanner />
       </TooltipProvider>
     </QueryClientProvider>
   );

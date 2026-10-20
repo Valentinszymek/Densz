@@ -31,6 +31,7 @@ import { crearRouterCuentas } from "./routes/cuentas.route";
 import { crearRouterComprobantes } from "./routes/comprobantes.route";
 import { crearRouterEstadisticas } from "./routes/estadisticas.route";
 import { crearRouterExport } from "./routes/export.route";
+import { crearRouterLaboratorios } from "./routes/laboratorios.route";
 
 /**
  * Punto de entrada del backend web (Etapa 1 del plan de conversión a web:
@@ -98,6 +99,7 @@ async function main(): Promise<void> {
   app.use("/cuentas", crearRouterCuentas(pool));
   app.use("/comprobantes", crearRouterComprobantes(pool));
   app.use("/estadisticas", crearRouterEstadisticas(pool));
+  app.use("/laboratorios", crearRouterLaboratorios(pool));
   app.use("/export", crearRouterExport(pool));
 
   // Red de seguridad centralizada (corrección post-auditoría §23.7/§38.2):

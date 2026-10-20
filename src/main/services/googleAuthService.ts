@@ -2,7 +2,7 @@ import type { Queryable } from "../db/types";
 import { buscarUsuarioParaLoginGoogle, listarRoles } from "../db/repositories/usuariosRepo";
 import { crearLista } from "../db/repositories/listasPrecioRepo";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
-import { cargarSesionDesdeUsuario, type SesionActual } from "./sessionService";
+import { cargarSesionDesdeUsuario, getSesionActual, type SesionActual } from "./sessionService";
 import { fijarLaboratorioEnConexion } from "../db/tenantContext";
 import { withTransaction } from "../db/withTransaction";
 import { DenszError } from "../utils/errors";
@@ -58,14 +58,10 @@ export async function loginConGoogle(db: Queryable, identidad: IdentidadGoogle):
     await cargarSesionDesdeUsuario(client, usuario.id);
     await registrarAuditoria(client, { usuarioId: usuario.id, accion: "login_google", entidad: "usuarios", entidadId: usuario.id });
 
-    return {
-      usuarioId: usuario.id,
-      nombreUsuario: usuario.nombreUsuario,
-      nombreCompleto: usuario.nombreCompleto,
-      rolNombre: usuario.rolNombre,
-      permisos: usuario.permisos,
-      laboratorioId: usuario.laboratorioId
-    };
+    // cargarSesionDesdeUsuario ya armó la sesión completa (incluido
+    // superAdmin) — se devuelve esa, nunca una reconstruida a mano, para
+    // que no se puedan desincronizar.
+    return getSesionActual()!;
   });
 }
 
@@ -136,13 +132,9 @@ export async function registrarseConGoogle(
       entidadId: laboratorioId
     });
 
-    return {
-      usuarioId,
-      nombreUsuario: "admin",
-      nombreCompleto: identidad.nombreCompleto,
-      rolNombre: rolAdmin.nombre,
-      permisos: rolAdmin.permisos,
-      laboratorioId
-    };
+    // Igual que loginConGoogle: se devuelve la sesión ya armada por
+    // cargarSesionDesdeUsuario (incluido superAdmin), nunca una
+    // reconstruida a mano.
+    return getSesionActual()!;
   });
 }

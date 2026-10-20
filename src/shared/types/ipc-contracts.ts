@@ -54,7 +54,8 @@ import type {
   FiltroAuditoriaDto,
   ResultadoAuditoriaDto,
   OpcionesFiltroAuditoriaDto,
-  Moneda
+  Moneda,
+  LaboratorioParaAdmin
 } from "./entities";
 
 export const IPC_CHANNELS = {
@@ -212,12 +213,20 @@ export const IPC_CHANNELS = {
 
   EXPORT_GENERAR: "export:generar",
 
+  LABORATORIOS_LISTAR: "laboratorios:listar",
+
   IMPRESORA_LISTAR: "impresora:listar",
   IMPRESORA_OBTENER_SELECCIONADA: "impresora:obtenerSeleccionada",
   IMPRESORA_SELECCIONAR: "impresora:seleccionar",
   IMPRESORA_PRUEBA: "impresora:prueba",
   IMPRESORA_IMPRIMIR_PDF: "impresora:imprimirPdf",
   COMPROBANTES_IMPRIMIR: "comprobantes:imprimir",
+
+  // Evento PUSH (main -> renderer, nunca invoke/handle) — ver
+  // autoUpdaterService.ts. Solo existe en escritorio: la web no tiene
+  // "versión instalada" que actualizar.
+  ACTUALIZACION_LISTA: "actualizacion:lista",
+  ACTUALIZACION_REINICIAR: "actualizacion:reiniciar",
 
   PROTECCION_ESTADO: "proteccion:estado",
   PROTECCION_BLOQUEAR: "proteccion:bloquear",
@@ -479,6 +488,11 @@ export interface DenszApi {
   auditoriaListar: (filtro?: FiltroAuditoriaDto) => Promise<ResultadoAuditoriaDto>;
   auditoriaOpcionesFiltro: () => Promise<OpcionesFiltroAuditoriaDto>;
 
+  /** Panel privado del dueño de Densz — tira 403 (web) o un error claro
+   * (escritorio) si la sesión actual no es superAdmin. Nunca se muestra
+   * el link en la UI para nadie más (ver router.tsx / Sidebar.tsx). */
+  laboratoriosListar: () => Promise<LaboratorioParaAdmin[]>;
+
   exportGenerar: (
     tipo: "odontologos" | "clinicas" | "pacientes" | "trabajos" | "cuenta" | "pagos" | "estadisticas" | "auditoria",
     formato: "csv" | "xlsx" | "pdf",
@@ -492,6 +506,15 @@ export interface DenszApi {
   impresoraPrueba: (nombreDispositivo: string) => Promise<void>;
   impresoraImprimirPdf: (pdfPath: string) => Promise<void>;
   comprobantesImprimir: (comprobanteId: number) => Promise<void>;
+
+  /** Solo escritorio: suscribe a "hay una versión nueva ya descargada,
+   * lista para instalar" (ver autoUpdaterService.ts). En web es un no-op
+   * silencioso (nunca hay nada que escuchar). Devuelve una función para
+   * des-suscribirse. */
+  onActualizacionLista: (callback: (version: string) => void) => () => void;
+  /** Reinicia la app para aplicar la actualización ya descargada — solo
+   * tiene sentido llamarlo después de que onActualizacionLista avisó. */
+  reiniciarParaActualizar: () => void;
 
   proteccionEstado: () => Promise<EstadoProteccionDto>;
   proteccionBloquear: () => Promise<void>;

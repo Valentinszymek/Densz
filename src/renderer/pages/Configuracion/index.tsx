@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Printer, CheckCircle2, XCircle, Building2 } from "lucide-react";
+import { Printer, CheckCircle2, XCircle, Building2, Download } from "lucide-react";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -16,6 +16,14 @@ import { SeccionProteccion } from "./SeccionProteccion";
 import { esAdministrador } from "../../store/authStore";
 
 export default function Configuracion() {
+  // La selección de impresora física es exclusiva de escritorio (no hay
+  // ninguna API de navegador que la exponga) — mostrarla en la web es
+  // peor que no mostrar nada: se ve terminada pero no hace nada si se
+  // toca. Al revés, el link de descarga del escritorio solo tiene
+  // sentido en la web (quien ya está en el escritorio no necesita
+  // bajarlo).
+  const esEscritorio = window.densz.plataforma === "escritorio";
+
   return (
     <div>
       <PageHeader
@@ -25,12 +33,36 @@ export default function Configuracion() {
 
       <div className="max-w-xl space-y-6">
         <SeccionIdentidadLaboratorio />
-        <SeccionImpresora />
+        {esEscritorio ? <SeccionImpresora /> : <SeccionDescargaEscritorio />}
         {/* Solo el Administrador puede activar/desactivar/cambiar esta
             protección (§16) — al resto ni se le muestra la sección. */}
         {esAdministrador() && <SeccionProteccion />}
       </div>
     </div>
+  );
+}
+
+function SeccionDescargaEscritorio() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Download size={16} /> Densz para escritorio
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-carbon/60 mb-4">
+          Usá Densz también desde una app de Windows — misma cuenta, mismos datos en tiempo real, ideal si imprimís
+          mucho (la app de escritorio imprime directo, sin pasos extra). Se actualiza sola cuando sale una versión
+          nueva.
+        </p>
+        <Button variant="secondary" size="sm" asChild>
+          <a href="https://github.com/Valentinszymek/Densz/releases/latest" target="_blank" rel="noopener noreferrer">
+            <Download size={14} /> Descargar para Windows
+          </a>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

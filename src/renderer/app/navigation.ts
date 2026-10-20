@@ -12,6 +12,7 @@ import {
   Settings,
   UserCog,
   History,
+  Factory,
   type LucideIcon
 } from "lucide-react";
 
@@ -20,6 +21,9 @@ export interface ItemNavegacion {
   label: string;
   icon: LucideIcon;
   soloAdmin?: boolean;
+  /** Solo el dueño del producto Densz (ver SesionActual#superAdmin) —
+   * nunca el ADMINISTRADOR de un laboratorio cliente. */
+  soloSuperAdmin?: boolean;
 }
 
 export const NAVEGACION_PRINCIPAL: ItemNavegacion[] = [
@@ -38,5 +42,6 @@ export const NAVEGACION_SECUNDARIA: ItemNavegacion[] = [
   { path: "/backups", label: "Backups", icon: DatabaseBackup, soloAdmin: true },
   { path: "/usuarios", label: "Usuarios", icon: UserCog, soloAdmin: true },
   { path: "/auditoria", label: "Auditoría", icon: History, soloAdmin: true },
-  { path: "/configuracion", label: "Configuración", icon: Settings, soloAdmin: true }
+  { path: "/configuracion", label: "Configuración", icon: Settings, soloAdmin: true },
+  { path: "/laboratorios", label: "Laboratorios", icon: Factory, soloSuperAdmin: true }
 ];

@@ -62,3 +62,18 @@ nsis:
   createStartMenuShortcut: true
 asarUnpack:
   - "**/*.node"
+# Auto-actualización (electron-updater, ver autoUpdaterService.ts): cada
+# instalador nuevo se publica como GitHub Release de este mismo repo
+# (público, así que el escritorio instalado no necesita ningún token para
+# BAJAR actualizaciones — solo hace falta uno para PUBLICARLAS, ver
+# "npm run release"). electron-builder sube automáticamente latest.yml +
+# el .exe al crear la release cuando se le pasa --publish.
+publish:
+  provider: github
+  owner: Valentinszymek
+  repo: Densz
+  # Sin esto, electron-builder sube todo pero deja la release como
+  # BORRADOR (hallazgo real, 2026-10-20: tocó publicarla a mano desde
+  # github.com) — invisible para electron-updater hasta publicarla. Con
+  # esto, "npm run release" queda público solo, sin ese paso extra.
+  releaseType: release

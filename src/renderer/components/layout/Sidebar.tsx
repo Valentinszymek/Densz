@@ -42,8 +42,9 @@ export function Sidebar() {
   const colapsado = useUiStore((s) => s.sidebarColapsado);
   const alternar = useUiStore((s) => s.alternarSidebar);
   const esAdmin = useAuthStore((s) => s.sesion?.rolNombre === "ADMINISTRADOR");
-  const principal = NAVEGACION_PRINCIPAL.filter((item) => !item.soloAdmin || esAdmin);
-  const secundaria = NAVEGACION_SECUNDARIA.filter((item) => !item.soloAdmin || esAdmin);
+  const esSuperAdmin = useAuthStore((s) => s.sesion?.superAdmin === true);
+  const principal = NAVEGACION_PRINCIPAL.filter((item) => (!item.soloAdmin || esAdmin) && (!item.soloSuperAdmin || esSuperAdmin));
+  const secundaria = NAVEGACION_SECUNDARIA.filter((item) => (!item.soloAdmin || esAdmin) && (!item.soloSuperAdmin || esSuperAdmin));
   const { data: proteccion } = useEstadoProteccion();
 
   return (

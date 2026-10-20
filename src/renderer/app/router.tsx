@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import { AppShell } from "../components/layout/AppShell";
 import { RutaProtegida } from "../components/layout/RutaProtegida";
 import { RutaSoloAdmin } from "../components/layout/RutaSoloAdmin";
+import { RutaSoloSuperAdmin } from "../components/layout/RutaSoloSuperAdmin";
 import { ProteccionGuard } from "../components/proteccion/ProteccionGuard";
 import Login from "../pages/Login";
 import CallbackGoogle from "../pages/Login/CallbackGoogle";
@@ -25,6 +26,7 @@ import Backups from "../pages/Backups";
 import Configuracion from "../pages/Configuracion";
 import Usuarios from "../pages/Usuarios";
 import Auditoria from "../pages/Auditoria";
+import Laboratorios from "../pages/Laboratorios";
 
 // HashRouter (en vez de BrowserRouter): la app se sirve desde file://
 // en producción, sin servidor HTTP que resuelva rutas arbitrarias.
@@ -69,6 +71,11 @@ export function AppRouter() {
                 <Route path="/cuentas/:id" element={<CuentaDetalle />} />
                 <Route path="/estadisticas" element={<Estadisticas />} />
               </Route>
+            </Route>
+            {/* Panel del dueño de Densz — distinto de RutaSoloAdmin: ese es
+                por-laboratorio, este es global a la plataforma. */}
+            <Route element={<RutaSoloSuperAdmin />}>
+              <Route path="/laboratorios" element={<Laboratorios />} />
             </Route>
           </Route>
         </Route>

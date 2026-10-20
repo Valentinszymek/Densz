@@ -4,7 +4,7 @@
  * login real por la pantalla de Login (authService.ts).
  */
 import type { Queryable } from "../db/types";
-import { obtenerUsuarioPorId, obtenerLaboratorioIdDeUsuario } from "../db/repositories/usuariosRepo";
+import { obtenerUsuarioPorId, obtenerLaboratorioIdDeUsuario, esSuperAdmin } from "../db/repositories/usuariosRepo";
 import { DenszError } from "../utils/errors";
 
 export interface SesionActual {
@@ -18,6 +18,12 @@ export interface SesionActual {
    * escritorio) — el login de escritorio con usuario/contraseña (bcrypt)
    * no lo resuelve. */
   laboratorioId: number | null;
+  /** Dueño del producto Densz (no de un laboratorio cliente) — habilita
+   * el panel de laboratorios registrados. Ver usuariosRepo.ts#esSuperAdmin.
+   * Opcional (nunca `undefined` en sesiones reales, siempre lo setea
+   * cargarSesionDesdeUsuario) solo para no obligar a cada sesión sintética
+   * de test a declararlo — todo chequeo lo trata como `false` si falta. */
+  superAdmin?: boolean;
 }
 
 let sesionActual: SesionActual | null = null;
@@ -67,12 +73,14 @@ export async function cargarSesionDesdeUsuario(db: Queryable, usuarioId: number)
   const usuario = await obtenerUsuarioPorId(db, usuarioId);
   if (!usuario) throw new Error("Usuario inexistente.");
   const laboratorioId = await obtenerLaboratorioIdDeUsuario(db, usuarioId);
+  const superAdmin = await esSuperAdmin(db, usuarioId);
   setUsuarioActual({
     usuarioId: usuario.id,
     nombreUsuario: usuario.nombreUsuario,
     nombreCompleto: usuario.nombreCompleto,
     rolNombre: usuario.rolNombre ?? "",
     permisos: usuario.permisos,
-    laboratorioId
+    laboratorioId,
+    superAdmin
   });
 }
