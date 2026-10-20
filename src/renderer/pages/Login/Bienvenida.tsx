@@ -3,6 +3,7 @@ import { DenszLogo } from "../../components/brand/DenszLogo";
 import capturaDashboard from "../../assets/landing/dashboard.jpg";
 import capturaTrabajos from "../../assets/landing/trabajos.jpg";
 import capturaPrecios from "../../assets/landing/precios.jpg";
+import demoGif from "../../assets/landing/densz-demo.gif";
 
 const PASOS = [
   {
@@ -124,11 +125,16 @@ export function Bienvenida({
         </div>
       </div>
 
-      {/* Capturas reales */}
+      {/* Demo animado + capturas reales */}
       <div className="border-t border-cream/10 px-6 py-16">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-cream text-lg font-medium text-center mb-2">Así se ve por dentro</h2>
           <p className="text-cream/40 text-sm text-center mb-10">Pantallas reales de Densz, con datos de ejemplo.</p>
+
+          <div className="max-w-3xl mx-auto mb-8">
+            <MarcoCaptura src={demoGif} alt="Recorrido animado por el panel, trabajos, precios y cuentas de Densz" />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {CAPTURAS.map((c) => (
               <MarcoCaptura key={c.alt} src={c.src} alt={c.alt} />
