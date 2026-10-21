@@ -1,9 +1,148 @@
-import { Tags, ClipboardList, Receipt, Landmark } from "lucide-react";
+import { useState } from "react";
+import { Tags, ClipboardList, Receipt, Landmark, Check } from "lucide-react";
 import { DenszLogo } from "../../components/brand/DenszLogo";
+import { PLANES_COMERCIALES, type PlanId } from "../../../shared/constants/planes";
+import { monedaPorDefecto } from "../../lib/moneda";
+import type { Moneda } from "@shared/types/entities";
 import capturaDashboard from "../../assets/landing/dashboard.jpg";
 import capturaTrabajos from "../../assets/landing/trabajos.jpg";
 import capturaPrecios from "../../assets/landing/precios.jpg";
 import demoGif from "../../assets/landing/densz-demo.gif";
+
+// Precio y nombre salen de la misma fuente que usa el backend para el
+// checkout (shared/constants/planes.ts) — acá solo se agrega qué incluye
+// cada uno, que es puramente informativo para la landing.
+const INCLUYE_POR_PLAN: Record<PlanId, string[]> = {
+  essential: [
+    "Pacientes, odontólogos y clínicas",
+    "Órdenes de trabajo con odontograma FDI",
+    "Precios y listas por categoría",
+    "Comprobantes de entrega imprimibles",
+    "Cuentas corrientes y pagos",
+    "Usuarios con roles (Administración / Recepción)"
+  ],
+  professional: [
+    "Todo lo de Essential",
+    "Auditoría completa de la actividad",
+    "Estadísticas y dashboard",
+    "App de escritorio (Windows) con impresión directa",
+    "Actualización automática del escritorio",
+    "Exportación de datos"
+  ]
+};
+
+const PLANES = PLANES_COMERCIALES.map((p) => ({
+  nombre: p.nombre,
+  precioArs: p.precioArs,
+  precioUsd: p.precioUsd,
+  incluye: INCLUYE_POR_PLAN[p.id]
+}));
+
+const PREGUNTAS_FRECUENTES = [
+  {
+    pregunta: "¿Densz funciona en Argentina y en el exterior?",
+    respuesta: "Sí. En Argentina los precios y los cobros son en pesos (ARS); fuera de Argentina, en dólares (USD)."
+  },
+  {
+    pregunta: "¿Necesito tarjeta para probarlo?",
+    respuesta: "No. Tenés 30 días gratis para probar Densz con tus propios datos, sin tarjeta."
+  },
+  {
+    pregunta: "¿Qué pasa cuando termina la prueba?",
+    respuesta: "Elegís un plan y activás tu suscripción para seguir usando Densz sin interrupciones. Mientras no lo hagas, tus datos quedan guardados."
+  },
+  {
+    pregunta: "¿Mis datos están separados de los de otros laboratorios?",
+    respuesta: "Sí — cada laboratorio tiene sus propios datos, aislados a nivel de base de datos del resto."
+  },
+  {
+    pregunta: "¿Puedo usar Densz desde Windows además del navegador?",
+    respuesta: "Sí: Professional incluye la app de escritorio, con impresión directa y actualización automática. Essential funciona desde el navegador."
+  },
+  {
+    pregunta: "¿Puedo cambiar de plan o cancelar más adelante?",
+    respuesta: "Sí, cuando quieras, desde tu cuenta."
+  }
+];
+
+function formatearPrecio(valor: number, moneda: Moneda): string {
+  return moneda === "ARS" ? `$${valor.toLocaleString("es-AR")}` : `US$${valor.toLocaleString("en-US")}`;
+}
+
+function SeccionPlanes({ onCrearLaboratorio }: { onCrearLaboratorio: () => void }) {
+  const [moneda, setMoneda] = useState<Moneda>(monedaPorDefecto);
+
+  return (
+    <div className="border-t border-cream/10 px-6 py-16">
+      <div className="max-w-4xl mx-auto">
+        <h2 className="text-cream text-lg font-medium text-center mb-2">Planes</h2>
+        <p className="text-cream/40 text-sm text-center mb-6">30 días de prueba gratis, sin tarjeta — cancelás cuando quieras.</p>
+
+        <div className="flex justify-center mb-10">
+          <div className="inline-flex rounded-lg border border-cream/15 p-1 text-xs">
+            {(["ARS", "USD"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMoneda(m)}
+                className={`px-3 py-1.5 rounded-md transition-colors ${
+                  moneda === m ? "bg-gold text-carbon font-medium" : "text-cream/50 hover:text-cream/80"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+          {PLANES.map((plan) => (
+            <div key={plan.nombre} className="rounded-xl border border-cream/10 bg-cream/[0.03] p-6 flex flex-col">
+              <h3 className="text-cream font-medium mb-1">{plan.nombre}</h3>
+              <p className="text-cream text-2xl font-semibold mb-1">
+                {formatearPrecio(moneda === "ARS" ? plan.precioArs : plan.precioUsd, moneda)}
+                <span className="text-cream/40 text-sm font-normal"> /mes</span>
+              </p>
+              <ul className="flex-1 space-y-2 my-5">
+                {plan.incluye.map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-sm text-cream/60">
+                    <Check size={14} className="text-gold shrink-0 mt-0.5" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={onCrearLaboratorio}
+                className="rounded-lg bg-gold text-carbon font-medium px-4 py-2.5 text-sm hover:bg-gold/90 transition-colors"
+              >
+                Empezá gratis
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SeccionPreguntasFrecuentes() {
+  return (
+    <div className="border-t border-cream/10 px-6 py-16">
+      <div className="max-w-2xl mx-auto">
+        <h2 className="text-cream text-lg font-medium text-center mb-10">Preguntas frecuentes</h2>
+        <div className="space-y-6">
+          {PREGUNTAS_FRECUENTES.map((f) => (
+            <div key={f.pregunta}>
+              <p className="text-cream text-sm font-medium mb-1">{f.pregunta}</p>
+              <p className="text-cream/45 text-sm leading-relaxed">{f.respuesta}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const PASOS = [
   {
@@ -125,6 +264,8 @@ export function Bienvenida({
         </div>
       </div>
 
+      <SeccionPlanes onCrearLaboratorio={onCrearLaboratorio} />
+
       {/* Demo animado + capturas reales */}
       <div className="border-t border-cream/10 px-6 py-16">
         <div className="max-w-5xl mx-auto">
@@ -142,6 +283,8 @@ export function Bienvenida({
           </div>
         </div>
       </div>
+
+      <SeccionPreguntasFrecuentes />
 
       {/* Cierre */}
       <div className="border-t border-cream/10 px-6 py-16 flex flex-col items-center text-center">

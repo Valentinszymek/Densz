@@ -5,6 +5,7 @@ import { getConfig, setConfig } from "../../main/db/repositories/configRepo";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 
@@ -17,6 +18,7 @@ const VALOR_DE_FABRICA = "Densz";
 export function crearRouterConfig(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
 
   router.get("/laboratorio", requirePermission(PERMISOS.CONFIGURACION_EDITAR), async (_req, res) => {

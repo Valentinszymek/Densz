@@ -43,8 +43,16 @@ export function Sidebar() {
   const alternar = useUiStore((s) => s.alternarSidebar);
   const esAdmin = useAuthStore((s) => s.sesion?.rolNombre === "ADMINISTRADOR");
   const esSuperAdmin = useAuthStore((s) => s.sesion?.superAdmin === true);
-  const principal = NAVEGACION_PRINCIPAL.filter((item) => (!item.soloAdmin || esAdmin) && (!item.soloSuperAdmin || esSuperAdmin));
-  const secundaria = NAVEGACION_SECUNDARIA.filter((item) => (!item.soloAdmin || esAdmin) && (!item.soloSuperAdmin || esSuperAdmin));
+  // Un trial da acceso completo (igual que el backend, ver
+  // requireActiveSubscription.ts#requirePlan) — solo Essential ya
+  // confirmado queda sin estas secciones.
+  const facturacion = useAuthStore((s) => s.sesion?.facturacion);
+  const tieneProfessional =
+    esSuperAdmin || facturacion?.exentoFacturacion || facturacion?.plan === "trial" || facturacion?.plan === "professional";
+  const puedeVer = (item: ItemNavegacion) =>
+    (!item.soloAdmin || esAdmin) && (!item.soloSuperAdmin || esSuperAdmin) && (!item.soloProfessional || tieneProfessional);
+  const principal = NAVEGACION_PRINCIPAL.filter(puedeVer);
+  const secundaria = NAVEGACION_SECUNDARIA.filter(puedeVer);
   const { data: proteccion } = useEstadoProteccion();
 
   return (

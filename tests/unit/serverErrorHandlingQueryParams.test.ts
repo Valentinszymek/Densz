@@ -52,6 +52,7 @@ describe("HTTP — las 5 rutas que antes podían quedar colgadas ante un paráme
     ctx = await createTestDbConUsuario();
     app = construirApp(ctx.db as unknown as Pool);
     sesionId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-errores",
       nombreCompleto: "Admin Test",

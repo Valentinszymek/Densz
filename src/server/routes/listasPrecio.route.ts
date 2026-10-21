@@ -5,6 +5,7 @@ import * as repo from "../../main/db/repositories/listasPrecioRepo";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { zBooleanQuery } from "../utils/zQuery";
 import { generarListaPreciosWeb, descargarListaPreciosWeb } from "../listaPreciosWeb";
@@ -27,6 +28,7 @@ const esquemaOpcionesPdf = z.object({
 export function crearRouterListasPrecio(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {

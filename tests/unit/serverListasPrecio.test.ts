@@ -40,6 +40,7 @@ describe("HTTP /listas-precio", () => {
     app = construirApp(ctx.db as unknown as Pool);
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-listasprecio",
       nombreCompleto: "Admin Test",

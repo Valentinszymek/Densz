@@ -12,6 +12,7 @@ import {
   restablecerPasswordConCodigo
 } from "../../main/services/proteccionService";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 import { PERMISOS } from "../../shared/constants/permisos";
@@ -39,6 +40,7 @@ const esquemaPassword = z.string().min(1);
 export function crearRouterProteccion(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
 
   // Candado compartido para VER — cualquier usuario con sesión iniciada,

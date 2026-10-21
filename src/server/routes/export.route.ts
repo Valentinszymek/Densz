@@ -6,6 +6,7 @@ import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { PERMISOS, tienePermiso } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { requireActiveSubscription, requirePlan } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 
 const esquemaTipo = z.enum(["odontologos", "clinicas", "pacientes", "trabajos", "cuenta", "pagos", "estadisticas", "auditoria"]);
@@ -51,6 +52,9 @@ const esquemaBody = z.object({
 export function crearRouterExport(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
+  // Exportación de datos es exclusiva de Professional (ver docs/PLAN_COMERCIAL_DENSZ.md §8).
+  router.use(requirePlan("professional"));
   router.use(attachTenantDb(db));
 
   router.post("/", async (req, res) => {

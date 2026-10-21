@@ -43,6 +43,7 @@ describe("HTTP /pacientes", () => {
     odontologoId = await crearOdontologo(db, { nombre: "Dr. Pacientes Test Fase12D", listaPrecioId: listaId });
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-pacientes",
       nombreCompleto: "Admin Test",
@@ -52,6 +53,7 @@ describe("HTTP /pacientes", () => {
     // Sesión SIN ningún permiso "pacientes.*" — prueba si el backend lo
     // exige (Parte E: no inventar, solo documentar lo real).
     sesionSinPermisoId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "sin-permiso-test-pacientes",
       nombreCompleto: "Sin Permiso Test",

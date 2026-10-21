@@ -5,6 +5,7 @@ import * as repo from "../../main/db/repositories/preciosRepo";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 import { PERMISOS } from "../../shared/constants/permisos";
@@ -31,6 +32,7 @@ const esquemaFiltroPrestaciones = z.object({
 export function crearRouterPrecios(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
 
   router.get("/categorias", async (req, res) => {

@@ -29,6 +29,10 @@ export interface IdentidadGoogle {
  * laboratorio nuevo (eso es una etapa aparte, con Stripe de por medio) —
  * tira un error claro en vez de crear algo a medias.
  *
+ * Nota: `identidad` puede venir de Google o de email+contraseña (Supabase
+ * Auth) por igual — `verificarTokenGoogle` (googleAuth.ts) solo valida el
+ * access token de Supabase, sin importar qué proveedor lo generó.
+ *
  * La búsqueda por supabase_user_id/email corre a través de TODOS los
  * laboratorios a la vez — a propósito, la única consulta de todo el
  * sistema que necesita mirar más allá del laboratorio actual (todavía no
@@ -66,13 +70,14 @@ export async function loginConGoogle(db: Queryable, identidad: IdentidadGoogle):
 }
 
 /**
- * Alta de laboratorio nuevo ("Crear mi laboratorio"): si la identidad de
- * Google ya está vinculada a un laboratorio existente, es exactamente
- * `loginConGoogle` (no es un error elegir "crear" con una cuenta ya
- * conocida — entra directo a lo suyo). Si no, crea todo en una sola
- * transacción: el laboratorio (trial de 14 días, placeholder hasta que
- * entre Stripe), un usuario ADMINISTRADOR vinculado a esa identidad, y el
- * seed mínimo para operar — mismo patrón ya probado en
+ * Alta de laboratorio nuevo ("Crear mi laboratorio" / registro con email):
+ * si la identidad ya está vinculada a un laboratorio existente, es
+ * exactamente `loginConGoogle` (no es un error elegir "crear" con una
+ * cuenta ya conocida — entra directo a lo suyo). Si no, crea todo en una
+ * sola transacción: el laboratorio (trial de 30 días — decisión comercial,
+ * ver docs/PLAN_COMERCIAL_DENSZ.md §0 —, placeholder de estado hasta que
+ * entre el proveedor de pago real), un usuario ADMINISTRADOR vinculado a
+ * esa identidad, y el seed mínimo para operar — mismo patrón ya probado en
  * tests/helpers/testDb.ts's `crearLaboratorioDePrueba`.
  */
 export async function registrarseConGoogle(
@@ -93,7 +98,7 @@ export async function registrarseConGoogle(
   return withTransaction(db, async (client) => {
     const { rows: labRows } = await client.query<{ id: number }>(
       `INSERT INTO laboratorios (nombre, email_contacto, plan, estado_suscripcion, trial_termina_en, activo)
-       VALUES ($1, $2, 'trial', 'trialing', to_char((now() AT TIME ZONE 'UTC') + interval '14 days', 'YYYY-MM-DD HH24:MI:SS'), 1)
+       VALUES ($1, $2, 'trial', 'trialing', to_char((now() AT TIME ZONE 'UTC') + interval '30 days', 'YYYY-MM-DD HH24:MI:SS'), 1)
        RETURNING id`,
       [nombre, identidad.email]
     );

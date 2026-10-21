@@ -73,6 +73,7 @@ describe("HTTP /comprobantes", () => {
     await cambiarPrecioEnLista(db, listaId, prestacionId, 400000);
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-comprobantes",
       nombreCompleto: "Admin Test",
@@ -82,6 +83,7 @@ describe("HTTP /comprobantes", () => {
     // Sesión SIN ningún permiso "comprobantes.*" — prueba el punto 19
     // (hoy no hay ningún chequeo en el IPC, ver informe).
     sesionOtraId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-comprobantes",
       nombreCompleto: "Recepcion Test",

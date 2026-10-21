@@ -57,6 +57,7 @@ describe("Casos borde (Bloque 3)", () => {
 
   it("una sesión destruida (logout) deja de servir de inmediato, aunque la cookie siga siendo la misma", async () => {
     const sesionId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-casos-borde",
       nombreCompleto: "Admin Test",
@@ -86,6 +87,7 @@ describe("Casos borde (Bloque 3)", () => {
 
     beforeAll(() => {
       sesionId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
         usuarioId: ctx.usuarioId,
         nombreUsuario: "admin-test-casos-borde-2",
         nombreCompleto: "Admin Test",

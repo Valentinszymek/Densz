@@ -57,6 +57,7 @@ describe("Protección compartida — Cuentas y Estadísticas (Bloque 7)", () => 
 
   function crearSesionAdmin(nombre: string) {
     const id = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: nombre,
       nombreCompleto: nombre,

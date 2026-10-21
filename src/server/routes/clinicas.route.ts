@@ -14,6 +14,7 @@ import {
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { zBooleanQuery } from "../utils/zQuery";
 
@@ -36,6 +37,7 @@ const esquemaDatos = z.object({
 export function crearRouterClinicas(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {

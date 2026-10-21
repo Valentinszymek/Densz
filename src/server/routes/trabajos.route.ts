@@ -14,6 +14,7 @@ import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 import { generarPdfDesdeHtmlWeb } from "../pdf";
@@ -70,6 +71,7 @@ const esquemaMotivo = z.string().trim().min(3, "Ingresá un motivo de al menos 3
 export function crearRouterTrabajos(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {

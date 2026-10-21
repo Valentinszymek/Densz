@@ -41,6 +41,7 @@ describe("HTTP /laboratorios", () => {
     segundoLaboratorioId = await crearLaboratorioDePrueba(db, "Laboratorio Panel Test 2");
 
     sesionSuperAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "dueno-densz-test",
       nombreCompleto: "Dueño Densz Test",
@@ -50,6 +51,7 @@ describe("HTTP /laboratorios", () => {
       superAdmin: true
     });
     sesionNormalId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-laboratorio-cliente",
       nombreCompleto: "Admin De Un Laboratorio Cliente",

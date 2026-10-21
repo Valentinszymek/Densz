@@ -49,6 +49,7 @@ describe("HTTP /listas-precio/pdf", () => {
     await cambiarPrecioEnLista(db, listaId, prestacionId, 123456);
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-lista-pdf",
       nombreCompleto: "Admin Test",

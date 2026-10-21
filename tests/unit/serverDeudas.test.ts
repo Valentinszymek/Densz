@@ -44,6 +44,7 @@ describe("HTTP /deudas", () => {
     clinicaId = await crearClinica(db, { nombre: "Clinica Deudas Test" });
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-deudas",
       nombreCompleto: "Admin Test",
@@ -53,6 +54,7 @@ describe("HTTP /deudas", () => {
     // Sesión SIN ningún permiso "pagos.*"/"deudas.*" a propósito — misma
     // paridad que pagos.route.ts: hoy no se exige ninguno acá.
     sesionRecepcionId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-deudas",
       nombreCompleto: "Recepcion Test",

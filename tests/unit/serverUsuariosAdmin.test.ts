@@ -43,6 +43,7 @@ describe("HTTP /usuarios — administración (Bloque 1)", () => {
     rolId = rows[0].id;
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-a-test-usuarios-admin",
       nombreCompleto: "Admin Test",
@@ -52,6 +53,7 @@ describe("HTTP /usuarios — administración (Bloque 1)", () => {
     // Mismo conjunto real que tiene RECEPCION hoy en producción (sin
     // "usuarios.gestionar").
     sesionSinPermisoId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-usuarios-admin",
       nombreCompleto: "Recepcion Test",

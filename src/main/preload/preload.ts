@@ -179,6 +179,10 @@ const api: DenszApi = {
 
   laboratoriosListar: () => ipcRenderer.invoke(IPC_CHANNELS.LABORATORIOS_LISTAR),
 
+  billingEstado: () => ipcRenderer.invoke(IPC_CHANNELS.BILLING_ESTADO),
+  billingCheckout: (plan, moneda) => ipcRenderer.invoke(IPC_CHANNELS.BILLING_CHECKOUT, plan, moneda),
+  billingCancelar: () => ipcRenderer.invoke(IPC_CHANNELS.BILLING_CANCELAR),
+
   exportGenerar: (tipo, formato, nombreSugerido, opciones) =>
     ipcRenderer.invoke(IPC_CHANNELS.EXPORT_GENERAR, tipo, formato, nombreSugerido, opciones),
 

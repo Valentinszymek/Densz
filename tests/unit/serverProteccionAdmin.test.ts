@@ -42,6 +42,7 @@ describe("HTTP /proteccion — administración (Fase 10C)", () => {
     app = construirApp(ctx.db as unknown as Pool);
 
     sesionAdminAId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-a-test-proteccion",
       nombreCompleto: "Admin A Test",
@@ -49,6 +50,7 @@ describe("HTTP /proteccion — administración (Fase 10C)", () => {
       permisos: ["*"]
     });
     sesionAdminBId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-b-test-proteccion",
       nombreCompleto: "Admin B Test",
@@ -58,6 +60,7 @@ describe("HTTP /proteccion — administración (Fase 10C)", () => {
     // Mismo conjunto real que tiene RECEPCION hoy en producción (sin
     // "configuracion.editar") — para probar el permiso, no un set inventado.
     sesionSinPermisoId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-proteccion",
       nombreCompleto: "Recepcion Test",
@@ -230,6 +233,7 @@ describe("HTTP /proteccion — administración (Fase 10C)", () => {
     // Recrear la sesión B (equivalente a un login nuevo) para el resto de
     // los tests: debe arrancar bloqueada, nunca heredar el desbloqueo viejo.
     sesionAdminBId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-b-test-proteccion-2",
       nombreCompleto: "Admin B Test 2",

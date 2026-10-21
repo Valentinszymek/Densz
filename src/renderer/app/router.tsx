@@ -1,11 +1,13 @@
 import { HashRouter, Routes, Route } from "react-router-dom";
 import { AppShell } from "../components/layout/AppShell";
 import { RutaProtegida } from "../components/layout/RutaProtegida";
+import { RutaSuscripcionActiva } from "../components/layout/RutaSuscripcionActiva";
 import { RutaSoloAdmin } from "../components/layout/RutaSoloAdmin";
 import { RutaSoloSuperAdmin } from "../components/layout/RutaSoloSuperAdmin";
 import { ProteccionGuard } from "../components/proteccion/ProteccionGuard";
 import Login from "../pages/Login";
 import CallbackGoogle from "../pages/Login/CallbackGoogle";
+import RestablecerContrasena from "../pages/Login/RestablecerContrasena";
 import Dashboard from "../pages/Dashboard";
 import Odontologos from "../pages/Odontologos";
 import OdontologoDetalle from "../pages/Odontologos/OdontologoDetalle";
@@ -36,46 +38,49 @@ export function AppRouter() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/auth/callback" element={<CallbackGoogle />} />
+        <Route path="/auth/restablecer" element={<RestablecerContrasena />} />
         <Route element={<RutaProtegida />}>
-          <Route element={<AppShell />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/odontologos" element={<Odontologos />} />
-            <Route path="/odontologos/:id" element={<OdontologoDetalle />} />
-            <Route path="/clinicas" element={<Clinicas />} />
-            <Route path="/clinicas/:id" element={<ClinicaDetalle />} />
-            <Route path="/pacientes" element={<Pacientes />} />
-            <Route path="/pacientes/:id" element={<PacienteDetalle />} />
-            <Route path="/trabajos" element={<Trabajos />} />
-            <Route path="/trabajos/nuevo" element={<NuevoTrabajo />} />
-            <Route path="/trabajos/:id/editar" element={<NuevoTrabajo />} />
-            <Route path="/trabajos/:id" element={<OrdenDetalle />} />
-            {/* Secciones restringidas a ADMINISTRADOR: además de estar
-                ocultas del sidebar (navigation.ts), un RutaSoloAdmin evita
-                llegar por URL directa. La validación real igual vive en el
-                proceso main (requerirPermiso en cada handler IPC) — esto
-                es solo para no mostrar una pantalla que de entrada va a
-                fallar. */}
-            <Route element={<RutaSoloAdmin />}>
-              <Route path="/precios" element={<Precios />} />
-              <Route path="/comprobantes" element={<Comprobantes />} />
-              <Route path="/backups" element={<Backups />} />
-              <Route path="/configuracion" element={<Configuracion />} />
-              <Route path="/usuarios" element={<Usuarios />} />
-              <Route path="/auditoria" element={<Auditoria />} />
-              {/* Cuentas y Estadísticas comparten la misma protección
-                  opcional por contraseña (§3, §4) — un único guard cubre
-                  ambas, así el desbloqueo también se comparte (§11). */}
-              <Route element={<ProteccionGuard />}>
-                <Route path="/cuentas" element={<Cuentas />} />
-                <Route path="/cuentas/clinica/:id" element={<ClinicaCuentaDetalle />} />
-                <Route path="/cuentas/:id" element={<CuentaDetalle />} />
-                <Route path="/estadisticas" element={<Estadisticas />} />
+          <Route element={<RutaSuscripcionActiva />}>
+            <Route element={<AppShell />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/odontologos" element={<Odontologos />} />
+              <Route path="/odontologos/:id" element={<OdontologoDetalle />} />
+              <Route path="/clinicas" element={<Clinicas />} />
+              <Route path="/clinicas/:id" element={<ClinicaDetalle />} />
+              <Route path="/pacientes" element={<Pacientes />} />
+              <Route path="/pacientes/:id" element={<PacienteDetalle />} />
+              <Route path="/trabajos" element={<Trabajos />} />
+              <Route path="/trabajos/nuevo" element={<NuevoTrabajo />} />
+              <Route path="/trabajos/:id/editar" element={<NuevoTrabajo />} />
+              <Route path="/trabajos/:id" element={<OrdenDetalle />} />
+              {/* Secciones restringidas a ADMINISTRADOR: además de estar
+                  ocultas del sidebar (navigation.ts), un RutaSoloAdmin evita
+                  llegar por URL directa. La validación real igual vive en el
+                  proceso main (requerirPermiso en cada handler IPC) — esto
+                  es solo para no mostrar una pantalla que de entrada va a
+                  fallar. */}
+              <Route element={<RutaSoloAdmin />}>
+                <Route path="/precios" element={<Precios />} />
+                <Route path="/comprobantes" element={<Comprobantes />} />
+                <Route path="/backups" element={<Backups />} />
+                <Route path="/configuracion" element={<Configuracion />} />
+                <Route path="/usuarios" element={<Usuarios />} />
+                <Route path="/auditoria" element={<Auditoria />} />
+                {/* Cuentas y Estadísticas comparten la misma protección
+                    opcional por contraseña (§3, §4) — un único guard cubre
+                    ambas, así el desbloqueo también se comparte (§11). */}
+                <Route element={<ProteccionGuard />}>
+                  <Route path="/cuentas" element={<Cuentas />} />
+                  <Route path="/cuentas/clinica/:id" element={<ClinicaCuentaDetalle />} />
+                  <Route path="/cuentas/:id" element={<CuentaDetalle />} />
+                  <Route path="/estadisticas" element={<Estadisticas />} />
+                </Route>
               </Route>
-            </Route>
-            {/* Panel del dueño de Densz — distinto de RutaSoloAdmin: ese es
-                por-laboratorio, este es global a la plataforma. */}
-            <Route element={<RutaSoloSuperAdmin />}>
-              <Route path="/laboratorios" element={<Laboratorios />} />
+              {/* Panel del dueño de Densz — distinto de RutaSoloAdmin: ese es
+                  por-laboratorio, este es global a la plataforma. */}
+              <Route element={<RutaSoloSuperAdmin />}>
+                <Route path="/laboratorios" element={<Laboratorios />} />
+              </Route>
             </Route>
           </Route>
         </Route>

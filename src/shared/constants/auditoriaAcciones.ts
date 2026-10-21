@@ -29,7 +29,10 @@ export const ACCION_LABEL: Record<string, string> = {
   cambiar_password_proteccion: "Cambió la contraseña de acceso protegido",
   recuperar_proteccion: "Recuperó el acceso protegido",
   generar_codigo_proteccion: "Generó un nuevo código de recuperación",
-  exportar: "Exportó"
+  exportar: "Exportó",
+  checkout_suscripcion: "Inició el pago de una suscripción",
+  cancelar_suscripcion: "Canceló la suscripción",
+  alta_laboratorio: "Creó el laboratorio"
 };
 
 export function etiquetaAccion(accion: string): string {

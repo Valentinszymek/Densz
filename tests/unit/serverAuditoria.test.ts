@@ -66,6 +66,7 @@ describe("HTTP /auditoria", () => {
     idTercero = r3Rows[0].id;
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId,
       nombreUsuario: "admin-test-auditoria",
       nombreCompleto: "Admin Test",
@@ -75,6 +76,7 @@ describe("HTTP /auditoria", () => {
     // Mismo conjunto real que tiene RECEPCION hoy en producción (sin
     // "auditoria.ver").
     sesionSinPermisoId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId,
       nombreUsuario: "recepcion-test-auditoria",
       nombreCompleto: "Recepcion Test",

@@ -566,6 +566,10 @@ export const webApi: DenszApi = {
 
   laboratoriosListar: () => get("/laboratorios"),
 
+  billingEstado: () => get("/billing/estado"),
+  billingCheckout: (plan, moneda) => post("/billing/checkout", { plan, moneda }),
+  billingCancelar: () => post<{ ok: true }>("/billing/cancelar").then(() => undefined),
+
   // Exportación (Bloque 2 / Parte A): descarga real vía el navegador
   // (Content-Disposition: attachment) — nunca un diálogo nativo, que no
   // existe en la web. Devuelve el nombre de archivo real como "ruta" (en

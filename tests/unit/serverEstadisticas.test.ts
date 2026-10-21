@@ -65,6 +65,7 @@ describe("HTTP /estadisticas", () => {
     await generarComprobante(db, orden.id, ctx.usuarioId, pdfFalso);
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-estadisticas",
       nombreCompleto: "Admin Test",
@@ -73,6 +74,7 @@ describe("HTTP /estadisticas", () => {
     });
     // Sin "estadisticas.ver" a propósito, para probar el permiso.
     sesionSinPermisoId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-estadisticas",
       nombreCompleto: "Recepcion Test",
@@ -212,6 +214,7 @@ describe("HTTP /estadisticas", () => {
       await setConfig(ctx.db, "proteccion.passwordHash", bcrypt.hashSync(PASSWORD_PROTECCION, 10));
 
       sesionA = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
         usuarioId: ctx.usuarioId,
         nombreUsuario: "sesion-a-estadisticas",
         nombreCompleto: "Sesion A",
@@ -219,6 +222,7 @@ describe("HTTP /estadisticas", () => {
         permisos: ["*"]
       });
       sesionB = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
         usuarioId: ctx.usuarioId,
         nombreUsuario: "sesion-b-estadisticas",
         nombreCompleto: "Sesion B",
@@ -258,6 +262,7 @@ describe("HTTP /estadisticas", () => {
     it("A: logout — vuelve a quedar bloqueada", async () => {
       destruirSesionHttp(sesionA);
       sesionA = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
         usuarioId: ctx.usuarioId,
         nombreUsuario: "sesion-a-estadisticas",
         nombreCompleto: "Sesion A",

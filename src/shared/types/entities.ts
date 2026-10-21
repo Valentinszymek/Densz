@@ -25,6 +25,27 @@ export interface SesionActualDto {
    * ADMINISTRADOR de un laboratorio (por-tenant). Opcional por el mismo
    * motivo que en sessionService.ts#SesionActual. */
   superAdmin?: boolean;
+  /** Estado comercial del laboratorio — `null` en los mismos casos que
+   * `laboratorioId`. Ver sessionService.ts#SesionActual. */
+  facturacion?: {
+    plan: string;
+    estadoSuscripcion: string;
+    trialTerminaEn: string | null;
+    exentoFacturacion: boolean;
+  } | null;
+}
+
+export interface InfoFacturacionLaboratorioDto {
+  emailContacto: string;
+  plan: string;
+  estadoSuscripcion: string;
+  trialTerminaEn: string | null;
+  monedaFacturacion: Moneda | null;
+  exentoFacturacion: boolean;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  mercadopagoCustomerId: string | null;
+  mercadopagoSubscriptionId: string | null;
 }
 
 export interface LaboratorioParaAdmin {

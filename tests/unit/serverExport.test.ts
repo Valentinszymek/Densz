@@ -39,6 +39,7 @@ describe("HTTP /export", () => {
     await crearOdontologo(ctx.db, { nombre: "Dr. Export Test Bloque2", listaPrecioId: listaId });
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-export",
       nombreCompleto: "Admin Test",
@@ -48,6 +49,7 @@ describe("HTTP /export", () => {
     // Mismo conjunto real que tiene RECEPCION hoy en producción (sin
     // "auditoria.ver") — prueba que exportar auditoría lo exige.
     sesionSinAuditoriaId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-export",
       nombreCompleto: "Recepcion Test",

@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import type { Queryable } from "../../main/db/types";
 import { checkConnection } from "../../main/db/connection";
 import { requireAuth } from "../middleware/requireAuth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 
 // Mismas reglas que src/main/ipc/system.ipc.ts (SYSTEM_STATUS): nunca
@@ -32,6 +33,7 @@ async function tablasDeNegocio(db: Queryable): Promise<string[]> {
 export function crearRouterSystem(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
 
   router.get("/status", async (_req, res) => {

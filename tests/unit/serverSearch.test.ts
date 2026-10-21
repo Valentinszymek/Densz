@@ -39,6 +39,7 @@ describe("HTTP /search", () => {
     await crearOdontologo(db, { nombre: NOMBRE_UNICO, listaPrecioId: listaId });
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-search",
       nombreCompleto: "Admin Test",

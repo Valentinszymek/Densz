@@ -57,6 +57,7 @@ describe("Flujo completo de negocio (Bloque 3)", () => {
     ctx = await createTestDbConUsuario();
     app = construirApp(ctx.db as unknown as Pool);
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-flujo-completo",
       nombreCompleto: "Admin Test",

@@ -17,6 +17,7 @@ import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres, DenszError } from "../../main/utils/errors";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 
@@ -62,6 +63,7 @@ const esquemaPassword = z.string().min(6, "La contraseña debe tener al menos 6 
 export function crearRouterUsuarios(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
   router.use(requirePermission(PERMISOS.USUARIOS_GESTIONAR));
 

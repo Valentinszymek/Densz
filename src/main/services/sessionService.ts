@@ -5,6 +5,7 @@
  */
 import type { Queryable } from "../db/types";
 import { obtenerUsuarioPorId, obtenerLaboratorioIdDeUsuario, esSuperAdmin } from "../db/repositories/usuariosRepo";
+import { obtenerFacturacionLaboratorio } from "../db/repositories/laboratoriosRepo";
 import { DenszError } from "../utils/errors";
 
 export interface SesionActual {
@@ -24,6 +25,19 @@ export interface SesionActual {
    * cargarSesionDesdeUsuario) solo para no obligar a cada sesión sintética
    * de test a declararlo — todo chequeo lo trata como `false` si falta. */
   superAdmin?: boolean;
+  /** Estado comercial del laboratorio (docs/PLAN_COMERCIAL_DENSZ.md §7) —
+   * `null` en los mismos casos que `laboratorioId` (todavía no resuelto).
+   * Lo arma `cargarSesionDesdeUsuario` leyendo `laboratorios` una sola vez
+   * por login, nunca se vuelve a pedir mientras dura la sesión en memoria
+   * — por eso un cambio de plan/estado por webhook recién se refleja la
+   * próxima vez que esa persona inicia sesión, nunca a mitad de una ya
+   * abierta (igual que `permisos`, que tampoco es "en vivo"). */
+  facturacion?: {
+    plan: string;
+    estadoSuscripcion: string;
+    trialTerminaEn: string | null;
+    exentoFacturacion: boolean;
+  } | null;
 }
 
 let sesionActual: SesionActual | null = null;
@@ -74,6 +88,7 @@ export async function cargarSesionDesdeUsuario(db: Queryable, usuarioId: number)
   if (!usuario) throw new Error("Usuario inexistente.");
   const laboratorioId = await obtenerLaboratorioIdDeUsuario(db, usuarioId);
   const superAdmin = await esSuperAdmin(db, usuarioId);
+  const infoFacturacion = laboratorioId ? await obtenerFacturacionLaboratorio(db, laboratorioId) : null;
   setUsuarioActual({
     usuarioId: usuario.id,
     nombreUsuario: usuario.nombreUsuario,
@@ -81,6 +96,14 @@ export async function cargarSesionDesdeUsuario(db: Queryable, usuarioId: number)
     rolNombre: usuario.rolNombre ?? "",
     permisos: usuario.permisos,
     laboratorioId,
-    superAdmin
+    superAdmin,
+    facturacion: infoFacturacion
+      ? {
+          plan: infoFacturacion.plan,
+          estadoSuscripcion: infoFacturacion.estadoSuscripcion,
+          trialTerminaEn: infoFacturacion.trialTerminaEn,
+          exentoFacturacion: infoFacturacion.exentoFacturacion
+        }
+      : null
   });
 }

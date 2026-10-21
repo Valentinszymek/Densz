@@ -40,6 +40,7 @@ describe("HTTP /precios", () => {
     app = construirApp(ctx.db as unknown as Pool);
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-precios",
       nombreCompleto: "Admin Test",
@@ -49,6 +50,7 @@ describe("HTTP /precios", () => {
     // Mismo conjunto real que tiene RECEPCION hoy en producción (sin
     // "precios.editar").
     sesionSinPermisoId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-precios",
       nombreCompleto: "Recepcion Test",

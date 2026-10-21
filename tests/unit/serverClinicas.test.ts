@@ -36,6 +36,7 @@ describe("HTTP /clinicas — uso y eliminación (Bloque 2)", () => {
     app = construirApp(ctx.db as unknown as Pool);
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-clinicas-bloque2",
       nombreCompleto: "Admin Test",

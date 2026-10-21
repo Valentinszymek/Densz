@@ -13,6 +13,7 @@ import {
 import { useLaboratorioNombre, useGuardarLaboratorioNombre } from "../../features/configuracion/hooks";
 import { ImpresoraSelectorModal } from "./ImpresoraSelectorModal";
 import { SeccionProteccion } from "./SeccionProteccion";
+import { SeccionSuscripcion } from "./SeccionSuscripcion";
 import { esAdministrador } from "../../store/authStore";
 
 export default function Configuracion() {
@@ -34,8 +35,8 @@ export default function Configuracion() {
       <div className="max-w-xl space-y-6">
         <SeccionIdentidadLaboratorio />
         {esEscritorio ? <SeccionImpresora /> : <SeccionDescargaEscritorio />}
-        {/* Solo el Administrador puede activar/desactivar/cambiar esta
-            protección (§16) — al resto ni se le muestra la sección. */}
+        {/* Suscripción y protección: ambas exclusivas de ADMINISTRADOR. */}
+        {esAdministrador() && <SeccionSuscripcion />}
         {esAdministrador() && <SeccionProteccion />}
       </div>
     </div>

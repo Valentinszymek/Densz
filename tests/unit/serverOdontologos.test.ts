@@ -40,6 +40,7 @@ describe("HTTP /odontologos — cobertura completa de los 9 endpoints", () => {
     app = construirApp(db as unknown as Pool);
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-odontologos",
       nombreCompleto: "Admin Test",

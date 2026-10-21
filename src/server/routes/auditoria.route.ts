@@ -4,6 +4,7 @@ import type { Pool } from "pg";
 import { listarAuditoriaFiltrada, obtenerOpcionesFiltroAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth } from "../middleware/requireAuth";
+import { requireActiveSubscription, requirePlan } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 
@@ -27,6 +28,8 @@ const esquemaFiltro = z.object({
 export function crearRouterAuditoria(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
+  router.use(requirePlan("professional"));
   router.use(attachTenantDb(db));
   router.use(requirePermission(PERMISOS.AUDITORIA_VER));
 

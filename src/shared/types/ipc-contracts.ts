@@ -55,7 +55,8 @@ import type {
   ResultadoAuditoriaDto,
   OpcionesFiltroAuditoriaDto,
   Moneda,
-  LaboratorioParaAdmin
+  LaboratorioParaAdmin,
+  InfoFacturacionLaboratorioDto
 } from "./entities";
 
 export const IPC_CHANNELS = {
@@ -214,6 +215,10 @@ export const IPC_CHANNELS = {
   EXPORT_GENERAR: "export:generar",
 
   LABORATORIOS_LISTAR: "laboratorios:listar",
+
+  BILLING_ESTADO: "billing:estado",
+  BILLING_CHECKOUT: "billing:checkout",
+  BILLING_CANCELAR: "billing:cancelar",
 
   IMPRESORA_LISTAR: "impresora:listar",
   IMPRESORA_OBTENER_SELECCIONADA: "impresora:obtenerSeleccionada",
@@ -492,6 +497,15 @@ export interface DenszApi {
    * (escritorio) si la sesión actual no es superAdmin. Nunca se muestra
    * el link en la UI para nadie más (ver router.tsx / Sidebar.tsx). */
   laboratoriosListar: () => Promise<LaboratorioParaAdmin[]>;
+
+  /** Suscripción del laboratorio actual — plan, estado, trial, moneda.
+   * `null` si la cuenta todavía no tiene laboratorio resuelto. */
+  billingEstado: () => Promise<InfoFacturacionLaboratorioDto | null>;
+  /** Arranca el checkout del proveedor correspondiente a la moneda. En la
+   * web devuelve la URL para redirigir la pestaña; en escritorio abre el
+   * navegador del sistema directamente y no devuelve nada útil. */
+  billingCheckout: (plan: "essential" | "professional", moneda: Moneda) => Promise<{ url: string } | void>;
+  billingCancelar: () => Promise<void>;
 
   exportGenerar: (
     tipo: "odontologos" | "clinicas" | "pacientes" | "trabajos" | "cuenta" | "pagos" | "estadisticas" | "auditoria",

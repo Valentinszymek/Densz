@@ -49,6 +49,7 @@ describe("HTTP /pagos", () => {
     medioPagoId = await crearMedioPago(db, "MEDIO TEST PAGOS");
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-pagos",
       nombreCompleto: "Admin Test",
@@ -60,6 +61,7 @@ describe("HTTP /pagos", () => {
     // (corrección pre-lanzamiento comercial, 2026-10-20: antes no exigían
     // ninguno, ver pagos.route.ts).
     sesionRecepcionId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-pagos",
       nombreCompleto: "Recepcion Test",
@@ -69,6 +71,7 @@ describe("HTTP /pagos", () => {
     // Caso real que motivó la corrección: alguien de RECEPCION con
     // permiso para ver/crear pagos pero NO para anularlos.
     sesionRecepcionConPagosId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-con-pagos-test",
       nombreCompleto: "Recepcion Con Pagos Test",

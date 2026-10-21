@@ -34,6 +34,7 @@ describe("HTTP /usuarios", () => {
     app = construirApp(ctx.db as unknown as Pool);
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-usuarios",
       nombreCompleto: "Admin Test",
@@ -43,6 +44,7 @@ describe("HTTP /usuarios", () => {
     // Mismo conjunto real que tiene RECEPCION hoy en producción (sin
     // "usuarios.gestionar") — para probar el permiso, no un set inventado.
     sesionSinPermisoId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-usuarios",
       nombreCompleto: "Recepcion Test",

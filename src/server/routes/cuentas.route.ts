@@ -16,6 +16,7 @@ import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 import { requireProteccion } from "../middleware/requireProteccion";
@@ -49,6 +50,7 @@ const esquemaPeriodo = z.object({
 export function crearRouterCuentas(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
 
   // Sin permiso ni protección — igual que CUENTAS_TIENE_PAGOS hoy.

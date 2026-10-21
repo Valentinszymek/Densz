@@ -5,6 +5,7 @@ import { obtenerComprobantePorOrden, listarComprobantes, type FiltroComprobantes
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
+import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { generarComprobanteWeb, descargarPdfComprobanteWeb } from "../comprobantesWeb";
 
@@ -34,6 +35,7 @@ const esquemaFiltro = z.object({
 export function crearRouterComprobantes(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
 
   router.get("/", async (req, res) => {

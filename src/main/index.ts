@@ -22,6 +22,7 @@ import { registrarHandlersUsuarios } from "./ipc/usuarios.ipc";
 import { registrarHandlersAuditoria } from "./ipc/auditoria.ipc";
 import { registrarHandlersExport } from "./ipc/export.ipc";
 import { registrarHandlersLaboratorios } from "./ipc/laboratorios.ipc";
+import { registrarHandlersBilling } from "./ipc/billing.ipc";
 import { registrarHandlersImpresora } from "./ipc/impresora.ipc";
 import { registrarHandlersProteccion } from "./ipc/proteccion.ipc";
 import { registrarHandlersActualizacion } from "./ipc/actualizacion.ipc";
@@ -91,6 +92,7 @@ if (!obtuvoElLock) {
     registrarHandlersAuditoria(pool);
     registrarHandlersExport(pool);
     registrarHandlersLaboratorios(pool);
+    registrarHandlersBilling(pool);
     registrarHandlersImpresora(pool);
     registrarHandlersProteccion(pool);
     registrarHandlersActualizacion();

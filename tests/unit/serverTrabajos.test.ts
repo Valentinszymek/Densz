@@ -60,6 +60,7 @@ describe("HTTP /trabajos", () => {
     await cambiarPrecioEnLista(db, listaId, coronaId, 1000000);
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-trabajos",
       nombreCompleto: "Admin Test",
@@ -69,6 +70,7 @@ describe("HTTP /trabajos", () => {
     // Mismo set de permisos que el rol RECEPCION real (ver seed de roles) —
     // a propósito SIN "ordenes.eliminar", para probar el permiso.
     sesionRecepcionId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-trabajos",
       nombreCompleto: "Recepcion Test",

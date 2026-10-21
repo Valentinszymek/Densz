@@ -104,6 +104,7 @@ describe("HTTP /cuentas", () => {
     await generarComprobante(db, ordenClinica.id, ctx.usuarioId, pdfFalso);
 
     sesionAdminId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "admin-test-cuentas",
       nombreCompleto: "Admin Test",
@@ -112,6 +113,7 @@ describe("HTTP /cuentas", () => {
     });
     // Sesión SIN "cuentas.ver" a propósito, para probar el permiso.
     sesionSinPermisoId = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
       usuarioId: ctx.usuarioId,
       nombreUsuario: "recepcion-test-cuentas",
       nombreCompleto: "Recepcion Test",
@@ -305,6 +307,7 @@ describe("HTTP /cuentas", () => {
       await setConfig(ctx.db, "proteccion.passwordHash", bcrypt.hashSync(PASSWORD_PROTECCION, 10));
 
       sesionA = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
         usuarioId: ctx.usuarioId,
         nombreUsuario: "sesion-a-test",
         nombreCompleto: "Sesion A",
@@ -312,6 +315,7 @@ describe("HTTP /cuentas", () => {
         permisos: ["*"]
       });
       sesionB = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
         usuarioId: ctx.usuarioId,
         nombreUsuario: "sesion-b-test",
         nombreCompleto: "Sesion B",
@@ -372,6 +376,7 @@ describe("HTTP /cuentas", () => {
       // sesión (ver session.ts) — se invoca la misma función acá.
       destruirSesionHttp(sesionA);
       sesionA = crearSesionHttp({
+      facturacion: { plan: "professional", estadoSuscripcion: "active", trialTerminaEn: null, exentoFacturacion: true },
         usuarioId: ctx.usuarioId,
         nombreUsuario: "sesion-a-test",
         nombreCompleto: "Sesion A",

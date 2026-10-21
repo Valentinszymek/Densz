@@ -16,6 +16,7 @@ import {
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth } from "../middleware/requireAuth";
+import { requireActiveSubscription, requirePlan } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { requirePermission } from "../middleware/requirePermission";
 import { requireProteccion } from "../middleware/requireProteccion";
@@ -43,6 +44,7 @@ const esquemaRango = z.object({
 export function crearRouterEstadisticas(db: Pool): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireActiveSubscription);
   router.use(attachTenantDb(db));
 
   // Sin permiso ni protección — igual que ESTADISTICAS_RESUMEN_OPERATIVO hoy.
@@ -57,7 +59,11 @@ export function crearRouterEstadisticas(db: Pool): Router {
     }
   });
 
-  const requiereEstadisticas = [requirePermission(PERMISOS.ESTADISTICAS_VER), requireProteccion(db)];
+  // El resumen operativo (arriba) queda disponible para cualquier plan —
+  // lo usa "Inicio" y nunca muestra importes. El resto de Estadísticas
+  // (gráficos/rankings con montos reales) es exclusivo de Professional
+  // (ver docs/PLAN_COMERCIAL_DENSZ.md §8).
+  const requiereEstadisticas = [requirePlan("professional"), requirePermission(PERMISOS.ESTADISTICAS_VER), requireProteccion(db)];
 
   router.get("/kpis", ...requiereEstadisticas, async (req, res) => {
     const db = (req as unknown as RequestConTenantDb).db;

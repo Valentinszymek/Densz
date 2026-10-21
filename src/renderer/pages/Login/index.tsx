@@ -6,11 +6,12 @@ import { Bienvenida } from "./Bienvenida";
 import { SeleccionUsuario } from "./SeleccionUsuario";
 import { IngresoPassword } from "./IngresoPassword";
 import { RegistroLaboratorio } from "./RegistroLaboratorio";
+import { OlvideContrasena } from "./OlvideContrasena";
 import type { UsuarioParaSeleccion } from "@shared/types/entities";
 
 const CLAVE_ULTIMO_USUARIO = "densz.login.ultimoUsuario";
 
-type Vista = "bienvenida" | "seleccion" | "password" | "registro";
+type Vista = "bienvenida" | "seleccion" | "password" | "registro" | "olvide";
 
 export default function Login() {
   const sesion = useAuthStore((s) => s.sesion);
@@ -62,6 +63,10 @@ export default function Login() {
     return <RegistroLaboratorio onVolver={() => setVista("bienvenida")} />;
   }
 
+  if (vista === "olvide") {
+    return <OlvideContrasena onVolver={() => setVista("seleccion")} />;
+  }
+
   if (vista === "password" && seleccionado) {
     return (
       <IngresoPassword
@@ -74,5 +79,5 @@ export default function Login() {
     );
   }
 
-  return <SeleccionUsuario onSeleccionar={seleccionar} />;
+  return <SeleccionUsuario onSeleccionar={seleccionar} onOlvideContrasena={() => setVista("olvide")} />;
 }

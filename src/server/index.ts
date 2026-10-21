@@ -32,6 +32,9 @@ import { crearRouterComprobantes } from "./routes/comprobantes.route";
 import { crearRouterEstadisticas } from "./routes/estadisticas.route";
 import { crearRouterExport } from "./routes/export.route";
 import { crearRouterLaboratorios } from "./routes/laboratorios.route";
+import { crearRouterBilling } from "./routes/billing.route";
+import { procesarWebhookStripe } from "../main/services/billingService";
+import { logger } from "../main/utils/logger";
 
 /**
  * Punto de entrada del backend web (Etapa 1 del plan de conversión a web:
@@ -58,6 +61,21 @@ async function main(): Promise<void> {
   }
 
   const app = express();
+
+  // Webhook de Stripe: tiene que ir ANTES de express.json() con el body
+  // CRUDO (express.raw) — stripe.webhooks.constructEvent necesita los
+  // bytes exactos tal como los mandó Stripe para validar la firma; una
+  // vez que express.json() ya parseó el body a objeto, esa verificación
+  // falla de forma intermitente (docs/PLAN_COMERCIAL_DENSZ.md §7).
+  app.post("/billing/webhook/stripe", express.raw({ type: "application/json" }), async (req, res) => {
+    try {
+      await procesarWebhookStripe(pool, req.body as Buffer, req.header("stripe-signature"));
+    } catch (err) {
+      logger.error("Error procesando webhook de Stripe:", err);
+    }
+    res.sendStatus(200);
+  });
+
   app.use(express.json());
   app.use(cookieParser());
 
@@ -101,6 +119,7 @@ async function main(): Promise<void> {
   app.use("/estadisticas", crearRouterEstadisticas(pool));
   app.use("/laboratorios", crearRouterLaboratorios(pool));
   app.use("/export", crearRouterExport(pool));
+  app.use("/billing", crearRouterBilling(pool));
 
   // Red de seguridad centralizada (corrección post-auditoría §23.7/§38.2):
   // debe ir DESPUÉS de montar todos los routers (Express la reconoce como
