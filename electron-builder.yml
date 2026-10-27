@@ -43,8 +43,14 @@ files:
   - "!node_modules/http-proxy-agent/**"
   - "!node_modules/https-proxy-agent/**"
   - "!node_modules/pac-proxy-agent/**"
-extraResources:
-  - .env
+# A propósito NO se empaqueta `.env` acá (ver incidente 2026-10-27: un
+# `extraResources: - .env` viejo metía el `.env` REAL de esta máquina de
+# build — DATABASE_URL de producción, service role key de Supabase, claves
+# de Stripe/Mercado Pago, etc. — dentro de CADA instalador, incluidos los
+# que se suben a GitHub Releases, público). El `.env` de cada máquina con
+# Densz instalado se coloca una sola vez a mano en la carpeta `resources`
+# del instalador (nunca viaja en el build, nunca queda commiteado) — un
+# instalador/actualización nuevo no la toca si no la declara acá.
 win:
   target: nsis
   icon: build/icon.ico
