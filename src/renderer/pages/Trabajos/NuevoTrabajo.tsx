@@ -83,10 +83,12 @@ function registroDesdeLinea(p: {
     nombreEditado: p.prestacionNombre,
     piezas: p.piezasFdi,
     cantidad: p.cantidad,
-    // Manual a propósito: si el usuario solo toca las piezas, la cantidad
-    // cargada originalmente (que puede no tener nada que ver con la
-    // cantidad de piezas — ej. "Modelo 3D" cantidad 2 sin piezas) no debe
-    // recalcularse sola.
+    // Manual a propósito mientras el usuario no toque nada: la cantidad
+    // cargada originalmente puede no tener nada que ver con la cantidad de
+    // piezas (ej. "Modelo 3D" cantidad 2 sin piezas) y no debe recalcularse
+    // sola con solo abrir la OT. Pero en cuanto el usuario interactúa con
+    // el odontograma (agrega/saca una pieza), eso sí vuelve a sincronizar
+    // la cantidad — ver onCambiarPiezasActual.
     cantidadManual: true,
     precioManual: p.precioUnitarioCentavos,
     editandoPrecio: true,
@@ -323,10 +325,14 @@ export default function NuevoTrabajo() {
   function onCambiarPiezasActual(piezas: number[]) {
     setActual((prev) => {
       if (!prev) return prev;
-      // La cantidad sigue automáticamente a las piezas seleccionadas,
-      // salvo que el usuario ya la haya tocado a mano en este registro.
-      const cantidad = prev.cantidadManual ? prev.cantidad : Math.max(1, piezas.length || 1);
-      return { ...prev, piezas, cantidad };
+      // Tocar el odontograma es en sí mismo una acción manual del usuario:
+      // a partir de acá la cantidad vuelve a seguir a las piezas
+      // seleccionadas, aunque el registro venga de una OT ya existente
+      // (cantidadManual=true al cargar — ver registroDesdeLinea) o el
+      // usuario haya escrito antes un número a mano. Si en cambio el
+      // usuario escribe la cantidad DESPUÉS de esto, eso vuelve a fijarla
+      // (ver el <input> de Cantidad, que sigue poniendo cantidadManual).
+      return { ...prev, piezas, cantidad: Math.max(1, piezas.length || 1), cantidadManual: false };
     });
   }
 
