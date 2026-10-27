@@ -278,14 +278,9 @@ export default function NuevoTrabajo() {
   // — una sola vez, para no pisar lo que el usuario ya esté escribiendo
   // si la consulta se refresca en segundo plano.
   const yaPrecargado = useRef(false);
-  // El cambio de odontólogo que dispara la precarga de arriba NO debe
-  // disparar el "reseteo de paciente al cambiar odontólogo" de abajo —
-  // ver el comentario en ese efecto.
-  const saltarResetPaciente = useRef(false);
   useEffect(() => {
     if (!esEdicion || !ordenOriginal || yaPrecargado.current) return;
     yaPrecargado.current = true;
-    saltarResetPaciente.current = true;
     setOdontologoId(ordenOriginal.odontologoId);
     setPacienteId(ordenOriginal.pacienteId);
     setPacienteTexto(ordenOriginal.pacienteNombreCompleto ?? "");
@@ -294,19 +289,17 @@ export default function NuevoTrabajo() {
     setActual(null);
   }, [esEdicion, ordenOriginal]);
 
-  // El paciente elegido (o el nombre que se estaba escribiendo) pertenece
-  // a un odontólogo puntual: si se cambia de odontólogo, deja de tener
-  // sentido y se limpia. (Salvo la primera vez que se fija el odontólogo
-  // al precargar una edición — ahí el paciente que se acaba de cargar es
-  // justamente el correcto, no hay que limpiarlo.)
-  useEffect(() => {
-    if (saltarResetPaciente.current) {
-      saltarResetPaciente.current = false;
-      return;
-    }
+  /** El paciente elegido (o el nombre que se estaba escribiendo) pertenece
+   * a un odontólogo puntual: si el USUARIO cambia de odontólogo, deja de
+   * tener sentido y se limpia. Se llama solo desde las acciones reales de
+   * cambio de odontólogo (nunca desde la precarga de edición de arriba,
+   * que fija `odontologoId` por su cuenta) — así se evita por construcción
+   * la carrera de efectos que antes borraba el paciente recién precargado. */
+  function cambiarOdontologo(id: number | null) {
+    setOdontologoId(id);
     setPacienteId(null);
     setPacienteTexto("");
-  }, [odontologoId]);
+  }
 
   function actualizarActual(cambios: Partial<RegistroPrestacion>) {
     setActual((prev) => (prev ? { ...prev, ...cambios } : prev));
@@ -496,7 +489,7 @@ export default function NuevoTrabajo() {
               <SelectBuscable
                 opciones={(odontologos ?? []).map((o) => ({ id: o.id, label: o.nombre, sublabel: o.listaPrecioNombre }))}
                 value={odontologoId}
-                onChange={setOdontologoId}
+                onChange={cambiarOdontologo}
                 placeholder="Buscar odontólogo…"
               />
               <div className="mt-1.5 flex items-center gap-2 flex-wrap">
@@ -796,7 +789,7 @@ export default function NuevoTrabajo() {
         <OdontologoForm
           open={nuevoOdontologoAbierto}
           onOpenChange={setNuevoOdontologoAbierto}
-          onCreated={(id) => setOdontologoId(id)}
+          onCreated={(id) => cambiarOdontologo(id)}
         />
 
         {esEdicion && ordenOriginal && (
