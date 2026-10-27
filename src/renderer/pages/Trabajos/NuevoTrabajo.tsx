@@ -264,6 +264,16 @@ export default function NuevoTrabajo() {
     return 0;
   }
 
+  /** Un precio de $0 es válido SOLO cuando el usuario lo puso a propósito
+   * (precio manual, ej. una repetición sin cargo) — nunca cuando viene
+   * "en blanco" porque la prestación no tiene precio cargado en la lista,
+   * que sigue siendo el caso real de "me olvidé de poner un precio" que
+   * el mensaje de abajo (§guardar) tiene que seguir avisando. */
+  function precioEsValido(r: RegistroPrestacion): boolean {
+    if (r.editandoPrecio) return r.precioManual !== null && r.precioManual >= 0;
+    return !!r.prestacionId && precioPorPrestacion.has(r.prestacionId);
+  }
+
   // En modo edición, precarga la ficha con los datos de la OT existente
   // — una sola vez, para no pisar lo que el usuario ya esté escribiendo
   // si la consulta se refresca en segundo plano.
@@ -327,7 +337,7 @@ export default function NuevoTrabajo() {
     });
   }
 
-  const actualEsValido = !!actual?.prestacionId && precioDeRegistro(actual) > 0 && cantidadNum(actual) > 0;
+  const actualEsValido = !!actual?.prestacionId && precioEsValido(actual) && cantidadNum(actual) > 0;
 
   function guardarRegistroActual() {
     if (!actual || !actualEsValido) return;
@@ -371,7 +381,7 @@ export default function NuevoTrabajo() {
       return setError("Ingresá el nombre del paciente.");
     }
     if (todos.length === 0) return setError("Agregá al menos un registro (prestación).");
-    if (todos.some((r) => precioDeRegistro(r) <= 0)) {
+    if (todos.some((r) => !precioEsValido(r))) {
       return setError("Hay una prestación sin precio. Definilo en Precios o ingresá uno manual.");
     }
     if (todos.some((r) => cantidadNum(r) <= 0)) {
