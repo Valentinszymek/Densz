@@ -91,8 +91,10 @@ describe("server/pdf (Puppeteer)", () => {
           moneda: "ARS",
           trabajos: [],
           pagosDelMes: [],
+          deudasManuales: [],
           saldoAnteriorCentavos: 0,
           totalTrabajosCentavos: 500000,
+          totalDeudasManualesCentavos: 0,
           totalPagosCentavos: 0,
           saldoPendienteCentavos: 500000
         }

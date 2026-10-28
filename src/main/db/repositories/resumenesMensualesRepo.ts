@@ -8,6 +8,7 @@ export interface DatosNuevoResumen {
   moneda: Moneda;
   saldoAnteriorCentavos: number;
   totalTrabajosCentavos: number;
+  totalDeudasManualesCentavos: number;
   totalPagosCentavos: number;
   saldoPendienteCentavos: number;
   cantidadTrabajos: number;
@@ -22,8 +23,9 @@ export async function crearResumenMensual(db: Queryable, titular: TitularCuenta,
   const { rows } = await db.query<{ id: number }>(
     `INSERT INTO resumenes_mensuales
       (odontologo_id, clinica_id, anio, mes, moneda, saldo_anterior_centavos, total_trabajos_centavos,
-       total_pagos_centavos, saldo_pendiente_centavos, cantidad_trabajos, pdf_path, generado_por)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+       total_deudas_manuales_centavos, total_pagos_centavos, saldo_pendiente_centavos, cantidad_trabajos,
+       pdf_path, generado_por)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
     [
       titular.odontologoId,
       titular.clinicaId,
@@ -32,6 +34,7 @@ export async function crearResumenMensual(db: Queryable, titular: TitularCuenta,
       data.moneda,
       data.saldoAnteriorCentavos,
       data.totalTrabajosCentavos,
+      data.totalDeudasManualesCentavos,
       data.totalPagosCentavos,
       data.saldoPendienteCentavos,
       data.cantidadTrabajos,
@@ -51,6 +54,7 @@ interface FilaResumen {
   moneda: Moneda;
   saldo_anterior_centavos: number;
   total_trabajos_centavos: number;
+  total_deudas_manuales_centavos: number;
   total_pagos_centavos: number;
   saldo_pendiente_centavos: number;
   cantidad_trabajos: number;
@@ -70,6 +74,7 @@ function mapear(f: FilaResumen): ResumenMensual {
     moneda: f.moneda,
     saldoAnteriorCentavos: f.saldo_anterior_centavos,
     totalTrabajosCentavos: f.total_trabajos_centavos,
+    totalDeudasManualesCentavos: f.total_deudas_manuales_centavos,
     totalPagosCentavos: f.total_pagos_centavos,
     saldoPendienteCentavos: f.saldo_pendiente_centavos,
     cantidadTrabajos: f.cantidad_trabajos,

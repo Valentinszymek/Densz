@@ -7,6 +7,7 @@ import { cambiarPrecioEnLista } from "../../src/main/db/repositories/listasPreci
 import { crearOrdenConPrestaciones, anularOrden } from "../../src/main/services/ordenService";
 import { generarComprobante } from "../../src/main/services/comprobanteService";
 import { registrarPago } from "../../src/main/services/pagoService";
+import { registrarDeuda } from "../../src/main/services/deudaService";
 import { listarMediosPago } from "../../src/main/db/repositories/pagosRepo";
 import { generarPdfEstadoCuenta, generarPdfEstadoCuentaClinica, calcularBloquesMes } from "../../src/main/services/cuentaService";
 import { listarResumenesMensuales } from "../../src/main/db/repositories/resumenesMensualesRepo";
@@ -187,6 +188,94 @@ describe("cuentaService", () => {
     expect(bloque.trabajos).toHaveLength(0); // nada facturado en el mes siguiente
     expect(bloque.totalPagosCentavos).toBe(0); // nada pagado en el mes siguiente
     expect(bloque.saldoPendienteCentavos).toBe(600000);
+  });
+
+  it("una deuda agregada a mano (saldo previo a Densz) fechada DENTRO del mes aparece aparte de los trabajos y suma al saldo pendiente", async () => {
+    ctx = await createTestDbConUsuario();
+    const { db, usuarioId } = ctx as TestDb & { usuarioId: number };
+    const listaId = await idListaGeneral(db);
+    const odontologoId = await crearOdontologo(db, { nombre: "Dra. Rinaldi", listaPrecioId: listaId });
+
+    const ahora = new Date();
+    const fechaHoy = ahora.toISOString().slice(0, 10);
+    await registrarDeuda(
+      db,
+      { odontologoId, clinicaId: null, importeCentavos: 500000, moneda: "ARS", fecha: fechaHoy, descripcion: "Deuda Previa a Densz" },
+      usuarioId
+    );
+
+    const bloques = await calcularBloquesMes(db, { odontologoId, clinicaId: null }, ahora.getFullYear(), ahora.getMonth() + 1);
+    const bloque = bloques.find((b) => b.moneda === "ARS")!;
+
+    expect(bloque.deudasManuales).toHaveLength(1);
+    expect(bloque.deudasManuales[0].descripcion).toBe("Deuda Previa a Densz");
+    expect(bloque.totalDeudasManualesCentavos).toBe(500000);
+    expect(bloque.trabajos).toHaveLength(0); // no es un trabajo facturado
+    expect(bloque.saldoAnteriorCentavos).toBe(0); // está DENTRO del mes, no es "anterior"
+    expect(bloque.saldoPendienteCentavos).toBe(500000);
+  });
+
+  it("una deuda agregada a mano fechada ANTES del período pedido suma al saldo anterior, sin listarse como deuda del mes", async () => {
+    ctx = await createTestDbConUsuario();
+    const { db, usuarioId } = ctx as TestDb & { usuarioId: number };
+    const listaId = await idListaGeneral(db);
+    const odontologoId = await crearOdontologo(db, { nombre: "Dra. Rinaldi", listaPrecioId: listaId });
+
+    const ahora = new Date();
+    await registrarDeuda(
+      db,
+      {
+        odontologoId,
+        clinicaId: null,
+        importeCentavos: 700000,
+        moneda: "ARS",
+        fecha: ahora.toISOString().slice(0, 10),
+        descripcion: "Deuda Previa a Densz"
+      },
+      usuarioId
+    );
+
+    const mesSiguienteIndice0 = (ahora.getMonth() + 1) % 12;
+    const anioMesSiguiente = ahora.getMonth() === 11 ? ahora.getFullYear() + 1 : ahora.getFullYear();
+    const bloques = await calcularBloquesMes(db, { odontologoId, clinicaId: null }, anioMesSiguiente, mesSiguienteIndice0 + 1);
+    const bloque = bloques.find((b) => b.moneda === "ARS")!;
+
+    expect(bloque.saldoAnteriorCentavos).toBe(700000);
+    expect(bloque.deudasManuales).toHaveLength(0); // ya quedó en "saldo anterior", no se repite acá
+    expect(bloque.saldoPendienteCentavos).toBe(700000);
+  });
+
+  it("el PDF muestra la sección 'Saldo previo a Densz' cuando hay una deuda agregada a mano este mes, y queda persistida en el resumen", async () => {
+    ctx = await createTestDbConUsuario();
+    const { db, usuarioId } = ctx as TestDb & { usuarioId: number };
+    const listaId = await idListaGeneral(db);
+    const odontologoId = await crearOdontologo(db, { nombre: "Dra. Rinaldi", listaPrecioId: listaId });
+
+    const ahora = new Date();
+    await registrarDeuda(
+      db,
+      {
+        odontologoId,
+        clinicaId: null,
+        importeCentavos: 1832000,
+        moneda: "ARS",
+        fecha: ahora.toISOString().slice(0, 10),
+        descripcion: "Deuda Previa a Densz"
+      },
+      usuarioId
+    );
+
+    let htmlCapturado = "";
+    const { resumenes } = await generarPdfEstadoCuenta(db, odontologoId, ahora.getFullYear(), ahora.getMonth() + 1, usuarioId, async (html) => {
+      htmlCapturado = html;
+    });
+
+    expect(htmlCapturado).toContain("Saldo previo a Densz");
+    expect(htmlCapturado).toContain("Deuda Previa a Densz");
+    expect(htmlCapturado).toContain("18.320,00");
+
+    expect(resumenes[0].totalDeudasManualesCentavos).toBe(1832000);
+    expect(resumenes[0].saldoPendienteCentavos).toBe(1832000);
   });
 
   it("generar el resumen del mismo período dos veces NO sobrescribe: queda una fila nueva por cada generación", async () => {

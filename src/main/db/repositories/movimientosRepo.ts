@@ -402,9 +402,17 @@ function primerDiaDelMes(anio: number, mes: number): string {
 /** Saldo (DEBE no anulado − HABER no anulado, agrupado por moneda) de
  * TODO lo anterior al primer día de `anio`/`mes` — el "saldo anterior" que
  * arrastra el resumen mensual. Usa el mismo criterio de fecha que el
- * detalle del mes (fecha de facturación del comprobante para el DEBE,
- * fecha del pago para el HABER), para que ningún movimiento quede contado
- * dos veces ni se pierda entre un período y el siguiente. */
+ * detalle del mes (fecha de facturación del comprobante para el DEBE de
+ * una OT real, fecha del pago para el HABER), para que ningún movimiento
+ * quede contado dos veces ni se pierda entre un período y el siguiente.
+ *
+ * El DEBE incluye, además de las OTs facturadas, las "deudas" agregadas a
+ * mano sin ninguna orden detrás (ver deudaService.ts — típicamente el
+ * saldo previo a empezar a usar Densz): usan su propia `fecha` como
+ * criterio, ya que no tienen comprobante. Antes de esto quedaban
+ * completamente afuera del resumen mensual (ni acá ni en el detalle del
+ * mes), así que el "saldo pendiente" del PDF podía dar de menos apenas
+ * existiera una deuda cargada a mano — 2026-10-28, hallazgo real. */
 export async function calcularSaldoAnteriorAlPeriodo(
   db: Queryable,
   titular: TitularCuenta,
@@ -417,12 +425,18 @@ export async function calcularSaldoAnteriorAlPeriodo(
 
   const [{ rows: debe }, { rows: haber }] = await Promise.all([
     db.query<{ moneda: Moneda; total: number }>(
-      `SELECT m.moneda, SUM(m.importe_centavos) AS total
-       FROM movimientos_cuenta m
-       JOIN ordenes o ON o.id = m.orden_id
-       LEFT JOIN comprobantes c ON c.orden_id = o.id
-       WHERE m.tipo = 'debe' AND m.anulado = 0 AND m.${columnaTitular} = $1 AND c.fecha_emision < $2
-       GROUP BY m.moneda`,
+      `SELECT moneda, SUM(importe_centavos) AS total FROM (
+         SELECT m.moneda, m.importe_centavos
+         FROM movimientos_cuenta m
+         JOIN ordenes o ON o.id = m.orden_id
+         LEFT JOIN comprobantes c ON c.orden_id = o.id
+         WHERE m.tipo = 'debe' AND m.anulado = 0 AND m.${columnaTitular} = $1 AND c.fecha_emision < $2
+         UNION ALL
+         SELECT m.moneda, m.importe_centavos
+         FROM movimientos_cuenta m
+         WHERE m.tipo = 'debe' AND m.anulado = 0 AND m.orden_id IS NULL AND m.${columnaTitular} = $1 AND m.fecha < $2
+       ) debe_total
+       GROUP BY moneda`,
       [idTitular, limite]
     ),
     db.query<{ moneda: Moneda; total: number }>(
@@ -438,4 +452,31 @@ export async function calcularSaldoAnteriorAlPeriodo(
   for (const d of debe) saldos.set(d.moneda, (saldos.get(d.moneda) ?? 0) + Number(d.total));
   for (const h of haber) saldos.set(h.moneda, (saldos.get(h.moneda) ?? 0) - Number(h.total));
   return saldos;
+}
+
+/** Deudas agregadas a mano (sin ninguna orden detrás — ver deudaService.ts)
+ * fechadas DENTRO del período pedido — el complemento de
+ * `calcularSaldoAnteriorAlPeriodo` (que ya suma las de ANTES del período).
+ * Usado para mostrarlas en su propia sección del resumen mensual
+ * ("Saldo previo a Densz"), separadas de los trabajos facturados reales. */
+export async function listarDeudasManualesDelPeriodo(
+  db: Queryable,
+  titular: TitularCuenta,
+  anio: number,
+  mes: number
+): Promise<MovimientoCuenta[]> {
+  const desde = primerDiaDelMes(anio, mes);
+  const hasta = mes === 12 ? `${anio + 1}-01-01` : `${anio}-${String(mes + 1).padStart(2, "0")}-01`;
+  const columnaTitular = titular.clinicaId != null ? "clinica_id" : "odontologo_id";
+  const idTitular = titular.clinicaId ?? titular.odontologoId;
+
+  const { rows } = await db.query<FilaMovimiento>(
+    `SELECT m.*, NULL::text AS orden_numero
+     FROM movimientos_cuenta m
+     WHERE m.tipo = 'debe' AND m.anulado = 0 AND m.orden_id IS NULL
+       AND m.${columnaTitular} = $1 AND m.fecha >= $2 AND m.fecha < $3
+     ORDER BY m.fecha, m.id`,
+    [idTitular, desde, hasta]
+  );
+  return rows.map(mapearMovimiento);
 }

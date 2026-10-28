@@ -5,6 +5,7 @@ import {
   listarTrabajosFacturadosPorMesOdontologo,
   listarTrabajosFacturadosPorMesClinica,
   calcularSaldoAnteriorAlPeriodo,
+  listarDeudasManualesDelPeriodo,
   type TitularCuenta
 } from "../db/repositories/movimientosRepo";
 import { listarPagos, listarPagosClinica } from "../db/repositories/pagosRepo";
@@ -16,7 +17,14 @@ import { generarHtmlEstadoCuenta } from "./estadoCuentaHtmlTemplate";
 import { generarPdfDesdeHtml } from "./pdfService";
 import { getUserDataDir } from "../utils/appPaths";
 import { DenszError } from "../utils/errors";
-import type { Pago, TrabajoFacturadoMes, Moneda, BloqueCuentaMoneda, ResumenMensual } from "../../shared/types/entities";
+import type {
+  Pago,
+  TrabajoFacturadoMes,
+  Moneda,
+  BloqueCuentaMoneda,
+  ResumenMensual,
+  MovimientoCuenta
+} from "../../shared/types/entities";
 
 type GenerarPdf = (html: string, outputPath: string) => Promise<void>;
 
@@ -40,12 +48,18 @@ function esDelPeriodo(fechaIso: string, anio: number, mes: number): boolean {
 export async function calcularBloquesMes(db: Queryable, titular: TitularCuenta, anio: number, mes: number): Promise<BloqueCuentaMoneda[]> {
   validarMes(mes);
 
-  const [trabajos, todosLosPagos, saldoAnteriorPorMoneda]: [TrabajoFacturadoMes[], Pago[], Map<Moneda, number>] = await Promise.all([
+  const [trabajos, todosLosPagos, saldoAnteriorPorMoneda, deudasManuales]: [
+    TrabajoFacturadoMes[],
+    Pago[],
+    Map<Moneda, number>,
+    MovimientoCuenta[]
+  ] = await Promise.all([
     titular.clinicaId
       ? listarTrabajosFacturadosPorMesClinica(db, titular.clinicaId, anio, mes)
       : listarTrabajosFacturadosPorMesOdontologo(db, titular.odontologoId!, anio, mes),
     titular.clinicaId ? listarPagosClinica(db, titular.clinicaId) : listarPagos(db, titular.odontologoId!),
-    calcularSaldoAnteriorAlPeriodo(db, titular, anio, mes)
+    calcularSaldoAnteriorAlPeriodo(db, titular, anio, mes),
+    listarDeudasManualesDelPeriodo(db, titular, anio, mes)
   ]);
 
   const pagosDelMes = todosLosPagos.filter((p) => esDelPeriodo(p.fecha, anio, mes));
@@ -53,24 +67,29 @@ export async function calcularBloquesMes(db: Queryable, titular: TitularCuenta, 
   const monedas = new Set<Moneda>([
     ...saldoAnteriorPorMoneda.keys(),
     ...trabajos.map((t) => t.moneda),
-    ...pagosDelMes.map((p) => p.moneda)
+    ...pagosDelMes.map((p) => p.moneda),
+    ...deudasManuales.map((d) => d.moneda)
   ]);
   if (monedas.size === 0) monedas.add("ARS");
 
   return Array.from(monedas).map((moneda) => {
     const trabajosMoneda = trabajos.filter((t) => t.moneda === moneda);
     const pagosMoneda = pagosDelMes.filter((p) => p.moneda === moneda);
+    const deudasManualesMoneda = deudasManuales.filter((d) => d.moneda === moneda);
     const totalTrabajos = trabajosMoneda.filter((t) => !t.anulado).reduce((acc, t) => acc + t.importeCentavos, 0);
     const totalPagos = pagosMoneda.filter((p) => !p.anulado).reduce((acc, p) => acc + p.importeCentavos, 0);
+    const totalDeudasManuales = deudasManualesMoneda.reduce((acc, d) => acc + d.importeCentavos, 0);
     const saldoAnterior = saldoAnteriorPorMoneda.get(moneda) ?? 0;
     return {
       moneda,
       trabajos: trabajosMoneda,
       pagosDelMes: pagosMoneda,
+      deudasManuales: deudasManualesMoneda,
       saldoAnteriorCentavos: saldoAnterior,
       totalTrabajosCentavos: totalTrabajos,
+      totalDeudasManualesCentavos: totalDeudasManuales,
       totalPagosCentavos: totalPagos,
-      saldoPendienteCentavos: saldoAnterior + totalTrabajos - totalPagos
+      saldoPendienteCentavos: saldoAnterior + totalTrabajos + totalDeudasManuales - totalPagos
     };
   });
 }
@@ -119,6 +138,7 @@ async function generarResumen(
         moneda: b.moneda,
         saldoAnteriorCentavos: b.saldoAnteriorCentavos,
         totalTrabajosCentavos: b.totalTrabajosCentavos,
+        totalDeudasManualesCentavos: b.totalDeudasManualesCentavos,
         totalPagosCentavos: b.totalPagosCentavos,
         saldoPendienteCentavos: b.saldoPendienteCentavos,
         cantidadTrabajos: b.trabajos.filter((t) => !t.anulado).length,

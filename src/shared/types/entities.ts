@@ -390,8 +390,14 @@ export interface BloqueCuentaMoneda {
   moneda: Moneda;
   trabajos: TrabajoFacturadoMes[];
   pagosDelMes: Pago[];
+  /** Deudas agregadas a mano (sin ninguna orden detrás — ver
+   * deudaService.ts) fechadas DENTRO de este período — típicamente el
+   * saldo previo a empezar a usar Densz, cargado una sola vez. Se
+   * muestran aparte de `trabajos` (no son un trabajo facturado real). */
+  deudasManuales: MovimientoCuenta[];
   saldoAnteriorCentavos: number;
   totalTrabajosCentavos: number;
+  totalDeudasManualesCentavos: number;
   totalPagosCentavos: number;
   saldoPendienteCentavos: number;
 }
@@ -408,6 +414,9 @@ export interface ResumenMensual {
   moneda: Moneda;
   saldoAnteriorCentavos: number;
   totalTrabajosCentavos: number;
+  /** Ver BloqueCuentaMoneda.totalDeudasManualesCentavos — 0 en cualquier
+   * resumen generado antes de que existiera este desglose (2026-10-28). */
+  totalDeudasManualesCentavos: number;
   totalPagosCentavos: number;
   saldoPendienteCentavos: number;
   cantidadTrabajos: number;

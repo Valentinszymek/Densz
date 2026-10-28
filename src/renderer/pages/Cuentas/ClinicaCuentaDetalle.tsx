@@ -160,6 +160,12 @@ export default function ClinicaCuentaDetalle() {
                 <p className="text-[10px] uppercase tracking-wide text-carbon/40">Trabajos del mes</p>
                 <p className="text-base font-semibold mt-0.5">{formatearMoneda(b.totalTrabajosCentavos, b.moneda)}</p>
               </div>
+              {b.deudasManuales.length > 0 && (
+                <div className="rounded-lg border border-carbon/10 px-3 py-2.5">
+                  <p className="text-[10px] uppercase tracking-wide text-carbon/40">Saldo previo a Densz</p>
+                  <p className="text-base font-semibold mt-0.5">{formatearMoneda(b.totalDeudasManualesCentavos, b.moneda)}</p>
+                </div>
+              )}
               <div className="rounded-lg border border-carbon/10 px-3 py-2.5">
                 <p className="text-[10px] uppercase tracking-wide text-carbon/40">Pagos del mes</p>
                 <p className="text-base font-semibold mt-0.5 text-emerald-700">{formatearMoneda(b.totalPagosCentavos, b.moneda)}</p>
@@ -169,6 +175,30 @@ export default function ClinicaCuentaDetalle() {
                 <p className="text-base font-semibold mt-0.5 text-gold-dim">{formatearMoneda(b.saldoPendienteCentavos, b.moneda)}</p>
               </div>
             </div>
+
+            {b.deudasManuales.length > 0 && (
+              <div className="overflow-x-auto mb-6">
+                <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2">Saldo previo a Densz</p>
+                <Table>
+                  <Thead>
+                    <Tr>
+                      <Th>Fecha</Th>
+                      <Th>Descripción</Th>
+                      <Th>Importe</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {b.deudasManuales.map((m) => (
+                      <Tr key={m.id}>
+                        <Td className="text-carbon/60">{formatearFecha(m.fecha)}</Td>
+                        <Td>{m.descripcion}</Td>
+                        <Td className="font-medium">{formatearMoneda(m.importeCentavos, m.moneda)}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              </div>
+            )}
 
             {b.trabajos.length === 0 ? (
               <p className="text-sm text-carbon/40">Sin trabajos facturados en este período.</p>

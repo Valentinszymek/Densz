@@ -1,5 +1,5 @@
 import { formatearMoneda, formatearFecha } from "../utils/formatShared";
-import type { TrabajoFacturadoMes, Pago, BloqueCuentaMoneda } from "../../shared/types/entities";
+import type { TrabajoFacturadoMes, Pago, MovimientoCuenta, BloqueCuentaMoneda } from "../../shared/types/entities";
 
 const NOMBRES_MES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -59,10 +59,27 @@ function filaPago(p: Pago): string {
     </tr>`;
 }
 
+function filaDeudaManual(m: MovimientoCuenta): string {
+  return `
+    <tr>
+      <td>${formatearFecha(m.fecha)}</td>
+      <td>${m.descripcion}</td>
+      <td class="num">${formatearMoneda(m.importeCentavos, m.moneda)}</td>
+    </tr>`;
+}
+
 function bloqueHtml(b: BloqueCuentaMoneda, mostrarProfesional: boolean): string {
   const colspanTrabajos = mostrarProfesional ? 6 : 5;
   const filasTrabajos = b.trabajos.map((t) => filaTrabajo(t, mostrarProfesional)).join("");
   const filasPagos = b.pagosDelMes.map(filaPago).join("");
+  // "Saldo previo a Densz" (ver deudaService.ts): deuda cargada a mano,
+  // sin ninguna OT detrás, típicamente el saldo que el odontólogo/clínica
+  // ya arrastraba de ANTES de empezar a usar Densz. Se muestra aparte de
+  // "Trabajos del mes" (no es un trabajo real) y SOLO cuando existe algo
+  // que mostrar — a diferencia de Trabajos/Pagos, que son recurrentes mes
+  // a mes, esto es excepcional (se carga normalmente una única vez).
+  const hayDeudasManuales = b.deudasManuales.length > 0;
+  const filasDeudasManuales = b.deudasManuales.map(filaDeudaManual).join("");
 
   return `
   <div class="bloque-moneda">
@@ -70,6 +87,7 @@ function bloqueHtml(b: BloqueCuentaMoneda, mostrarProfesional: boolean): string 
     <div class="resumen">
       <div class="item"><div class="etq">Saldo anterior</div><div class="val">${formatearMoneda(b.saldoAnteriorCentavos, b.moneda)}</div></div>
       <div class="item"><div class="etq">Trabajos del mes</div><div class="val">${formatearMoneda(b.totalTrabajosCentavos, b.moneda)}</div><div class="detalle">${b.trabajos.filter((t) => !t.anulado).length} trabajo(s)</div></div>
+      ${hayDeudasManuales ? `<div class="item"><div class="etq">Saldo previo a Densz</div><div class="val">${formatearMoneda(b.totalDeudasManualesCentavos, b.moneda)}</div></div>` : ""}
       <div class="item"><div class="etq">Pagos del mes</div><div class="val pos">${formatearMoneda(b.totalPagosCentavos, b.moneda)}</div></div>
       <div class="item destacado"><div class="etq">Saldo pendiente</div><div class="val">${formatearMoneda(b.saldoPendienteCentavos, b.moneda)}</div></div>
     </div>
@@ -81,6 +99,16 @@ function bloqueHtml(b: BloqueCuentaMoneda, mostrarProfesional: boolean): string 
       </tr></thead>
       <tbody>${filasTrabajos || `<tr><td colspan="${colspanTrabajos}" class="vacio">Sin trabajos facturados este mes.</td></tr>`}</tbody>
     </table>
+
+    ${
+      hayDeudasManuales
+        ? `<h3>Saldo previo a Densz</h3>
+    <table>
+      <thead><tr><th>Fecha</th><th>Descripción</th><th class="num">Importe</th></tr></thead>
+      <tbody>${filasDeudasManuales}</tbody>
+    </table>`
+        : ""
+    }
 
     <h3>Pagos del mes</h3>
     <table>
