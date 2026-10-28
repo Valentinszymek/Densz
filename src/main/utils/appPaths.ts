@@ -38,15 +38,23 @@ export function getComprobantesDir(): string {
 
 /**
  * Ubicación del archivo `.env` con `DATABASE_URL`: en desarrollo, la raíz
- * del proyecto; en la app empaquetada, la carpeta `resources` (ver
- * `extraResources` en electron-builder.yml) — nunca dentro del asar, para
- * poder reemplazarlo sin recompilar y para que nunca quede commiteado.
- */
+ * del proyecto; en la app empaquetada, la carpeta de datos de usuario de
+ * Windows (`getUserDataDir()`, p. ej. `%APPDATA%\Densz`) — NUNCA la
+ * carpeta de instalación (`resources`, al lado del .exe).
+ *
+ * Historial (2026-10-27/28): antes vivía en `resources/.env`. Eso se
+ * rompía SOLO con que se instalara o actualizara Densz: el instalador
+ * NSIS reemplaza el contenido entero de `resources` en cada instalación,
+ * así que cualquier `.env` puesto a mano ahí desaparecía con la próxima
+ * actualización — confirmado en vivo, dos veces, en dos máquinas
+ * distintas ("no me abre la app" después de actualizar). La carpeta de
+ * datos de usuario, en cambio, el instalador NUNCA la toca: poner el
+ * `.env` ahí una sola vez, en una máquina, sobrevive a TODAS las
+ * actualizaciones futuras de esa máquina para siempre — ya no hay que
+ * volver a copiarlo después de cada release. */
 function getEnvFilePath(): string {
   if (isElectronRuntime() && process.env.NODE_ENV !== "development") {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { app } = require("electron");
-    return path.join(process.resourcesPath ?? path.dirname(app.getPath("exe")), ".env");
+    return path.join(getUserDataDir(), ".env");
   }
   return path.join(process.cwd(), ".env");
 }

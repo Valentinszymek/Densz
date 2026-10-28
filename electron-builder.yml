@@ -48,9 +48,14 @@ files:
 # build — DATABASE_URL de producción, service role key de Supabase, claves
 # de Stripe/Mercado Pago, etc. — dentro de CADA instalador, incluidos los
 # que se suben a GitHub Releases, público). El `.env` de cada máquina con
-# Densz instalado se coloca una sola vez a mano en la carpeta `resources`
-# del instalador (nunca viaja en el build, nunca queda commiteado) — un
-# instalador/actualización nuevo no la toca si no la declara acá.
+# Densz instalado se coloca una sola vez a mano en la carpeta de datos de
+# usuario de Windows (`%APPDATA%\Densz\.env` — ver getEnvFilePath() en
+# src/main/utils/appPaths.ts), NUNCA en `resources`: esa carpeta la pisa
+# entera cada instalación/actualización, así que cualquier cosa puesta ahí
+# a mano se pierde con el siguiente release (bug real, confirmado dos
+# veces en dos máquinas — ver appPaths.ts para el historial completo).
+# `%APPDATA%` en cambio nunca lo toca el instalador: una sola vez por
+# máquina, para siempre.
 win:
   target: nsis
   icon: build/icon.ico
