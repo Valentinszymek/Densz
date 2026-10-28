@@ -102,11 +102,15 @@ export async function construirHtmlComprobante(
 export async function regenerarPdfComprobante(
   db: Queryable,
   comprobanteId: number,
-  generarPdf: GenerarPdf = generarPdfDesdeHtml
+  generarPdf: GenerarPdf = generarPdfDesdeHtml,
+  // Permite a un llamador (hoy solo comprobantesWeb.ts) pedir un tamaño de
+  // página distinto al A4 por defecto — ver el comentario largo sobre esto
+  // en comprobantesWeb.ts. El escritorio nunca pasa este parámetro.
+  pageSize: Electron.PrintToPDFOptions["pageSize"] = TAMANO_PAGINA_COMPROBANTE
 ): Promise<string> {
   const { html, comprobante } = await construirHtmlComprobante(db, comprobanteId);
   const pdfPath = comprobante.pdfPath ?? path.join(getComprobantesDir(), `${comprobante.numero}.pdf`);
-  await generarPdf(html, pdfPath, TAMANO_PAGINA_COMPROBANTE);
+  await generarPdf(html, pdfPath, pageSize);
   await setPdfPath(db, comprobanteId, pdfPath);
   return pdfPath;
 }
@@ -141,7 +145,10 @@ export async function generarComprobante(
   // Inyectable para tests: evita depender de una BrowserWindow real de
   // Electron (no disponible fuera de la app) para probar la lógica de
   // negocio (numeración, estado, ledger).
-  generarPdf: GenerarPdf = generarPdfDesdeHtml
+  generarPdf: GenerarPdf = generarPdfDesdeHtml,
+  // Ver el mismo parámetro en regenerarPdfComprobante — solo lo pasa
+  // comprobantesWeb.ts.
+  pageSize: Electron.PrintToPDFOptions["pageSize"] = TAMANO_PAGINA_COMPROBANTE
 ): Promise<Comprobante> {
   const orden = await obtenerOrden(pool, ordenId);
   if (!orden) throw new DenszError("La orden no existe.");
@@ -184,7 +191,7 @@ export async function generarComprobante(
   });
 
   try {
-    await regenerarPdfComprobante(pool, comprobanteId, generarPdf);
+    await regenerarPdfComprobante(pool, comprobanteId, generarPdf, pageSize);
   } catch (errorPdf) {
     logger.error(
       `No se pudo generar el PDF del comprobante ${comprobanteId} (orden ${ordenId}) — el comprobante ya quedó guardado y facturado igual, se puede reintentar el PDF desde "Ver PDF".`,

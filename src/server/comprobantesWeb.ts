@@ -5,13 +5,42 @@ import { setPdfPath, obtenerComprobante } from "../main/db/repositories/comproba
 import type { Comprobante } from "../shared/types/entities";
 import { generarPdfDesdeHtmlWeb } from "./pdf";
 import { subirDocumento, descargarDocumento, eliminarDocumento } from "./storage";
+import { ANCHO_PAGINA_COMPROBANTE_MM, ALTO_PAGINA_COMPROBANTE_MM } from "../main/services/comprobanteHtmlTemplate";
+
+const MM_POR_PULGADA = 25.4;
+
+/**
+ * Tamaño de página SOLO para el PDF que se imprime desde la Web (2026-10-28):
+ * a diferencia del escritorio (que imprime la hoja A4 completa con el ticket
+ * dibujado en su esquina — ver el comentario largo en
+ * comprobanteHtmlTemplate.ts — porque esa ruta se confirmó que funciona
+ * bien ahí), la Web siempre termina en el diálogo de impresión NATIVO del
+ * navegador, sin forma de que Densz le fuerce un tamaño de hoja (al
+ * revés de impresoraService.ts, que sí se lo dice directo a Windows). Se
+ * confirmó en vivo (fotos reales) que el papel que realmente se carga en
+ * la impresora para estos comprobantes YA viene precortado al tamaño del
+ * ticket (105×148.5mm, un cuarto de A4) — nunca una hoja A4 entera — así
+ * que pedirle al navegador un PDF de hoja A4 completa (con el ticket
+ * dibujado en una esquina) hacía que, apenas el usuario elegía "Escala:
+ * Tamaño real" en el diálogo de Chrome (en vez de dejar que el driver
+ * ajustara solo, que es lo que "salvaba" por accidente al escritorio), el
+ * comprobante saliera recortado/corrido en ese papel chico. Generar
+ * directamente un PDF del tamaño real del ticket evita depender de que el
+ * navegador adivine nada. Mismo HTML/diseño que el escritorio (§13, nunca
+ * se duplica la plantilla) — solo cambia a qué tamaño de página se renderiza.
+ */
+const TAMANO_PAGINA_TICKET_WEB = {
+  width: ANCHO_PAGINA_COMPROBANTE_MM / MM_POR_PULGADA,
+  height: ALTO_PAGINA_COMPROBANTE_MM / MM_POR_PULGADA
+};
 
 /**
  * Capa de orquestación EXCLUSIVA del servidor web: conecta
- * comprobanteService.ts (sin modificarlo) con Supabase Storage. No
- * duplica ninguna regla de facturación — solo agrega, después de que la
- * transacción de comprobanteService.ts ya confirmó, la subida del PDF ya
- * generado al bucket privado "documentos".
+ * comprobanteService.ts (sin tocar su lógica de negocio — solo le pasa un
+ * tamaño de página distinto, ver TAMANO_PAGINA_TICKET_WEB arriba) con
+ * Supabase Storage. No duplica ninguna regla de facturación — solo agrega,
+ * después de que la transacción de comprobanteService.ts ya confirmó, la
+ * subida del PDF ya generado al bucket privado "documentos".
  *
  * Por diseño (sin tocar comprobanteService.ts): regenerarPdfComprobante()
  * SIEMPRE escribe primero el PDF en disco local del servidor
@@ -95,7 +124,7 @@ async function subirPdfLocalAStorage(db: Pool | PoolClient, comprobante: Comprob
  * archivo local hasta que se reintente con regenerarComprobanteWeb().
  */
 export async function generarComprobanteWeb(db: Pool | PoolClient, ordenId: number, usuarioId: number): Promise<Comprobante> {
-  const comprobante = await generarComprobante(db, ordenId, usuarioId, generarPdfDesdeHtmlWeb);
+  const comprobante = await generarComprobante(db, ordenId, usuarioId, generarPdfDesdeHtmlWeb, TAMANO_PAGINA_TICKET_WEB);
   try {
     return await subirPdfLocalAStorage(db, comprobante);
   } catch {
@@ -112,7 +141,7 @@ export async function generarComprobanteWeb(db: Pool | PoolClient, ordenId: numb
  */
 export async function regenerarComprobanteWeb(db: Pool | PoolClient, comprobanteId: number): Promise<string> {
   await limpiarPdfPathSiEsDeStorage(db, comprobanteId);
-  await regenerarPdfComprobante(db, comprobanteId, generarPdfDesdeHtmlWeb);
+  await regenerarPdfComprobante(db, comprobanteId, generarPdfDesdeHtmlWeb, TAMANO_PAGINA_TICKET_WEB);
   const comprobante = (await obtenerComprobante(db, comprobanteId))!;
   const actualizado = await subirPdfLocalAStorage(db, comprobante);
   if (!actualizado.pdfPath) throw new Error("No se pudo generar ni subir el PDF del comprobante.");
