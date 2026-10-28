@@ -29,8 +29,10 @@ function leerMediaBoxPdfMm(buffer: Buffer): { anchoMm: number; altoMm: number } 
  * reales del laboratorio. Verifica que:
  * - el archivo resultante es un PDF real y no está vacío;
  * - el /MediaBox real del PDF (no solo el parámetro pedido) coincide con el
- *   tamaño de página esperado: ~109.982×150.114mm para el comprobante, A4
- *   (210×297mm) para el estado de cuenta.
+ *   tamaño de página esperado: 105×148.5mm (tamaño del ticket en sí, pedido
+ *   acá directo sin pasar por comprobanteService.ts — el PDF real que
+ *   genera la app es A4 completa, ver serverComprobantes.test.ts) para el
+ *   comprobante, A4 (210×297mm) para el estado de cuenta.
  */
 describe("server/pdf (Puppeteer)", () => {
   const dirTemporal = fs.mkdtempSync(path.join(os.tmpdir(), "densz-pdf-test-"));
@@ -40,7 +42,7 @@ describe("server/pdf (Puppeteer)", () => {
     fs.rmSync(dirTemporal, { recursive: true, force: true });
   });
 
-  it("genera un PDF real de comprobante (tamaño ~110x150mm) a partir de la plantilla real de Densz", async () => {
+  it("genera un PDF real del ticket del comprobante (105x148.5mm) a partir de la plantilla real de Densz", async () => {
     const html = generarHtmlComprobante({
       laboratorioNombre: "Laboratorio de Prueba",
       direccion: "Calle Falsa 123",

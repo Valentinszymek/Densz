@@ -15,20 +15,25 @@ import {
   anularComprobanteDb
 } from "../db/repositories/comprobantesRepo";
 import { registrarMovimientoDebe, anularMovimientoDeOrden } from "../db/repositories/movimientosRepo";
-import { generarHtmlComprobante, ANCHO_PAGINA_COMPROBANTE_MM, ALTO_PAGINA_COMPROBANTE_MM } from "./comprobanteHtmlTemplate";
+import { generarHtmlComprobante, ANCHO_HOJA_MM, ALTO_HOJA_MM } from "./comprobanteHtmlTemplate";
 import { generarPdfDesdeHtml } from "./pdfService";
 import { getComprobantesDir } from "../utils/appPaths";
 import { DenszError } from "../utils/errors";
 import type { Comprobante } from "../../shared/types/entities";
 
 const MM_POR_PULGADA = 25.4;
-/** Tamaño de página EXACTO de la hoja física "DENSZ" (110×150mm), en
- * pulgadas — la unidad que espera `printToPDF` para un tamaño a medida
- * (ver comentario en pdfService.ts). Mismo tamaño para "Ver PDF" y para
- * "Imprimir" (§13): una sola fuente de verdad para el documento. */
+/** Tamaño de página A4 completa, en pulgadas — la unidad que espera
+ * `printToPDF` para un tamaño a medida (ver comentario en pdfService.ts).
+ * El ticket en sí es más chico (ver ANCHO/ALTO_PAGINA_COMPROBANTE_MM en
+ * comprobanteHtmlTemplate.ts) pero la HOJA es A4 siempre — mismo tamaño
+ * para "Ver PDF" y para "Imprimir" (§13): una sola fuente de verdad para
+ * el documento, y A4 es el único tamaño que cualquier impresora soporta
+ * sin configuración manual por máquina (ver el comentario largo en
+ * comprobanteHtmlTemplate.ts sobre por qué se abandonó el formulario de
+ * papel a medida). */
 const TAMANO_PAGINA_COMPROBANTE = {
-  width: ANCHO_PAGINA_COMPROBANTE_MM / MM_POR_PULGADA,
-  height: ALTO_PAGINA_COMPROBANTE_MM / MM_POR_PULGADA
+  width: ANCHO_HOJA_MM / MM_POR_PULGADA,
+  height: ALTO_HOJA_MM / MM_POR_PULGADA
 };
 
 type GenerarPdf = (html: string, outputPath: string, pageSize?: Electron.PrintToPDFOptions["pageSize"]) => Promise<void>;

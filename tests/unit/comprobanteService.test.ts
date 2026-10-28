@@ -110,14 +110,18 @@ describe("comprobanteService", () => {
   });
 
   // "Ver PDF" e "Imprimir" comparten una sola plantilla y un solo tamaño
-  // físico de página: la hoja "DENSZ" de 110×150mm (109.982×150.114mm
-  // exactos, el mismo tamaño que ya usa la impresión física en
-  // impresoraService.ts). Regresión importante: printToPDF espera ese
-  // tamaño a medida en PULGADAS ({width, height}), no en micrones (a
-  // diferencia de webContents.print(), que sí usa micrones) — pasar el
-  // valor en micrones por error generaría una página de ~2700 km y el
-  // PDF saldría en blanco.
-  it("genera el PDF del comprobante con el tamaño físico de 110×150mm, en pulgadas", async () => {
+  // físico de página: hoja A4 completa (210×297mm) — el único tamaño que
+  // cualquier impresora soporta sin configuración manual por máquina (se
+  // abandonó el formulario de papel a medida "DENSZ" de 110×150mm, que
+  // dependía de una configuración de Windows por impresora puntual — ver
+  // historial largo en comprobanteHtmlTemplate.ts e impresoraService.ts).
+  // El ticket en sí sigue siendo chico (105×148.5mm), dibujado dentro de
+  // esa hoja A4. Regresión importante: printToPDF espera ese tamaño a
+  // medida en PULGADAS ({width, height}), no en micrones (a diferencia de
+  // webContents.print(), que sí usa micrones) — pasar el valor en
+  // micrones por error generaría una página de ~2700 km y el PDF saldría
+  // en blanco.
+  it("genera el PDF del comprobante en hoja A4 completa, en pulgadas", async () => {
     const { db, usuarioId } = ctx;
     const orden = await crearOrdenDePrueba([{ prestacionId: coronaId, cantidad: 1, piezasFdi: [11] }]);
     await generarComprobante(db, orden.id, usuarioId, pdfFalso);
@@ -125,8 +129,8 @@ describe("comprobanteService", () => {
     expect(pdfFalso).toHaveBeenCalledTimes(1);
     const [, , pageSize] = pdfFalso.mock.calls[0];
     expect(pageSize).toEqual({
-      width: 109.982 / 25.4,
-      height: 150.114 / 25.4
+      width: 210 / 25.4,
+      height: 297 / 25.4
     });
   });
 });

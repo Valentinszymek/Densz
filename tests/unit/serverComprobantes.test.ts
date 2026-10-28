@@ -10,7 +10,7 @@ import { crearCategoria, crearPrestacion } from "../../src/main/db/repositories/
 import { cambiarPrecioEnLista } from "../../src/main/db/repositories/listasPrecioRepo";
 import { crearOrdenConPrestaciones } from "../../src/main/services/ordenService";
 import { obtenerOrden } from "../../src/main/db/repositories/ordenesRepo";
-import { ANCHO_PAGINA_COMPROBANTE_MM, ALTO_PAGINA_COMPROBANTE_MM } from "../../src/main/services/comprobanteHtmlTemplate";
+import { ANCHO_HOJA_MM, ALTO_HOJA_MM } from "../../src/main/services/comprobanteHtmlTemplate";
 import { crearRouterComprobantes } from "../../src/server/routes/comprobantes.route";
 import { generarComprobanteWeb, regenerarComprobanteWeb } from "../../src/server/comprobantesWeb";
 import * as storageModule from "../../src/server/storage";
@@ -217,14 +217,14 @@ describe("HTTP /comprobantes", () => {
     });
 
     // --- 12, 13, 14, 15, 16, 17, 18, 19. PDF real + Storage + descarga ---
-    it("el PDF quedó subido a Storage con las dimensiones reales del comprobante", async () => {
+    it("el PDF quedó subido a Storage en hoja A4 completa (ticket posicionado adentro)", async () => {
       const rutaEsperada = `comprobantes/${numero}.pdf`;
       const buffer = await storageModule.descargarDocumento(rutaEsperada); // 14.
       expect(buffer.subarray(0, 4).toString("ascii")).toBe("%PDF"); // 12.
 
       const { anchoMm, altoMm } = leerMediaBoxPdfMm(buffer);
-      expect(anchoMm).toBeCloseTo(ANCHO_PAGINA_COMPROBANTE_MM, 0); // 13.
-      expect(altoMm).toBeCloseTo(ALTO_PAGINA_COMPROBANTE_MM, 0);
+      expect(anchoMm).toBeCloseTo(ANCHO_HOJA_MM, 0); // 13.
+      expect(altoMm).toBeCloseTo(ALTO_HOJA_MM, 0);
     });
 
     it("pdf_path guarda únicamente la ruta del objeto, nunca una URL", async () => {

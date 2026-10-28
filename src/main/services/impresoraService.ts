@@ -108,22 +108,26 @@ export async function imprimirPdf(db: Queryable, pdfPath: string): Promise<void>
  * directamente evita por completo ese visor de PDF y su carrera de
  * renderizado.
  *
- * Tamaño de página: el formulario de papel "DENSZ" (110×150mm) que ya
- * está registrado en el driver de la Xerox Phaser 3020 en Windows —
- * confirmado con `System.Drawing.Printing.PrinterSettings.PaperSizes`:
- * Windows lo reporta con RawKind=20480 y dimensiones exactas de 433×591
- * centésimas de pulgada (109.982 × 150.114mm — de ahí la constante de
- * abajo, no un redondeo). Antes se probó con el string con nombre `"A6"`
- * y con tamaños personalizados sin registrar (105×148mm, 110×150mm
- * "a mano"): ninguno de esos existía en la lista real de tamaños que el
- * driver reporta soportar, así que en todos los casos Windows caía en
- * silencio a su tamaño por defecto (A4) — eso era la causa real del
- * desplazamiento/espacio en blanco en la impresión física (nunca en
- * "Ver PDF", que es 100% software y no depende de ningún driver). Al
- * pedir exactamente el tamaño que el driver SÍ tiene registrado, deja
- * de haber margen para que sustituya nada. */
-const ANCHO_PAGINA_DENSZ_MICRONES = 109982;
-const ALTO_PAGINA_DENSZ_MICRONES = 150114;
+ * Tamaño de página (historial 2026-10-27/28): se probó primero con un
+ * formulario de papel a medida (110×150mm) registrado a mano en el
+ * driver de UNA impresora puntual (Xerox Phaser 3020,
+ * `System.Drawing.Printing.PrinterSettings.PaperSizes` con RawKind=20480,
+ * 433×591 centésimas de pulgada). Funcionaba en esa máquina — pero es una
+ * configuración de Windows por MÁQUINA, no algo que viaje con Densz ni
+ * algo que la app pueda garantizar. En uso real, la bandeja de la
+ * impresora tiene cargada hoja A4 común (no hojas precortadas), así que
+ * Windows terminaba imprimiendo esa "hoja chica virtual" en un lugar
+ * impredecible de la hoja A4 física — comprobante corrido, con media
+ * hoja en blanco arriba.
+ *
+ * Arreglo definitivo: se imprime siempre en "A4" (el único tamaño
+ * universal, soportado por cualquier impresora/driver sin ninguna
+ * configuración manual previa — nunca más depende de un formulario que
+ * alguien tuvo que registrar a mano en esa compu puntual) y el
+ * documento en sí (`comprobanteHtmlTemplate.ts`) ya dibuja el ticket a
+ * un tamaño fijo y predecible (un cuarto de A4, con guías de corte)
+ * dentro de esa hoja — la posición y el tamaño quedan controlados
+ * 100% por el documento, nunca por lo que el driver decida. */
 export async function imprimirComprobanteHtml(db: Queryable, html: string): Promise<void> {
   const impresora = await obtenerImpresoraSeleccionada(db);
   if (!impresora) {
@@ -138,7 +142,7 @@ export async function imprimirComprobanteHtml(db: Queryable, html: string): Prom
           silent: true,
           deviceName: impresora.nombreDispositivo,
           printBackground: true,
-          pageSize: { width: ANCHO_PAGINA_DENSZ_MICRONES, height: ALTO_PAGINA_DENSZ_MICRONES },
+          pageSize: "A4",
           // `color` no default es `true` (modo color) — Electron nunca lo
           // aclara solo, y enviar un trabajo a color a una impresora
           // monocromática (Xerox Phaser 3020) fuerza una conversión

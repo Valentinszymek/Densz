@@ -33,14 +33,33 @@ export interface DatosComprobanteHtml {
   pacienteNombreCompleto: string;
 }
 
-/** Ancho/alto exactos del formulario de papel "DENSZ" registrado en el
- * driver de la Xerox Phaser 3020 — los valores en mm de acá son los
- * EXACTOS que Windows reporta para ese formulario (109.982 × 150.114mm —
- * vienen de 433×591 centésimas de pulgada), no un redondeo. Es la MISMA
- * hoja física tanto para "Ver PDF" como para "Imprimir": una sola
- * plantilla, un solo tamaño de página (§13). */
-export const ANCHO_PAGINA_COMPROBANTE_MM = 109.982;
-export const ALTO_PAGINA_COMPROBANTE_MM = 150.114;
+/** Historial (2026-10-27/28): antes se imprimía en una hoja chica a
+ * medida (110×150mm) registrada como formulario de papel custom
+ * "DENSZ" en el driver de UNA impresora puntual. Eso resultó frágil de
+ * verdad: ese formulario es una configuración de Windows por MÁQUINA (no
+ * algo que Densz pueda llevar consigo ni configurar desde la app), y la
+ * bandeja de la impresora real tiene cargada hoja A4 común — no hojas
+ * precortadas de 110×150mm. El resultado en la práctica: Windows
+ * imprimía esa "hoja chica virtual" en algún lugar impredecible de la
+ * hoja A4 física (confirmado con una impresión real: el comprobante
+ * salió corrido hacia abajo, con la mitad de arriba en blanco).
+ *
+ * Arreglo definitivo: dejar de depender de cualquier formulario de papel
+ * a medida (nunca más una configuración manual por máquina que se pueda
+ * romper o perderse). El comprobante ahora se imprime SIEMPRE en una
+ * hoja A4 estándar — el único tamaño que cualquier impresora/driver
+ * soporta sin configuración extra — con el ticket dibujado a un tamaño
+ * fijo y predecible (un cuarto exacto de A4, 105×148.5mm — lo mismo que
+ * el tamaño ISO A6) posicionado en la esquina superior izquierda. Así la
+ * posición y el tamaño quedan 100% controlados por este documento, nunca
+ * por lo que el driver de turno decida. Misma hoja, mismo tamaño, tanto
+ * para "Ver PDF" como para "Imprimir" (§13): una sola fuente de verdad. */
+export const ANCHO_HOJA_MM = 210;
+export const ALTO_HOJA_MM = 297;
+
+/** Tamaño del ticket en sí (un cuarto exacto de la hoja A4 de arriba). */
+export const ANCHO_PAGINA_COMPROBANTE_MM = 105;
+export const ALTO_PAGINA_COMPROBANTE_MM = 148.5;
 
 /** Íconos de línea minimalistas (no son el logo — son pictogramas chicos
  * de apoyo, mismo criterio que la imagen de referencia). Trazo grueso (2)
@@ -95,19 +114,27 @@ export function generarHtmlComprobante(d: DatosComprobanteHtml): string {
      el motor de paginación de impresión de Chromium puede terminar
      usando otro alto de página por defecto (el de la impresora/driver
      seleccionada) aunque el tamaño se pase también al llamar a print()
-     desde el proceso main. */
-  @page { size: ${ANCHO_PAGINA_COMPROBANTE_MM}mm ${ALTO_PAGINA_COMPROBANTE_MM}mm; margin: 0; }
-  html, body { width: ${ANCHO_PAGINA_COMPROBANTE_MM}mm; }
-  body {
+     desde el proceso main. Hoja A4 completa a propósito (ver comentario
+     arriba de ANCHO_HOJA_MM) — el ticket en sí queda adentro, en
+     ".ticket", con su propio tamaño fijo. */
+  @page { size: ${ANCHO_HOJA_MM}mm ${ALTO_HOJA_MM}mm; margin: 0; }
+  html, body { width: ${ANCHO_HOJA_MM}mm; height: ${ALTO_HOJA_MM}mm; }
+  body { margin: 0; }
+  .ticket {
     font-family: "Helvetica Neue", Arial, sans-serif;
     color: #111113;
-    margin: 0;
+    width: ${ANCHO_PAGINA_COMPROBANTE_MM}mm;
+    min-height: ${ALTO_PAGINA_COMPROBANTE_MM}mm;
     padding: 5.5mm 5.5mm 4mm;
     font-size: 11px;
     line-height: 1.25;
     display: flex;
     flex-direction: column;
-    min-height: ${ALTO_PAGINA_COMPROBANTE_MM}mm;
+    /* Guía de corte: el ticket es un cuarto de la hoja A4, pensado para
+       recortarse — estos dos bordes marcan dónde (los otros dos ya
+       coinciden con el borde físico de la hoja). */
+    border-right: 1px dashed #C9C6BC;
+    border-bottom: 1px dashed #C9C6BC;
   }
   /* Un ".relleno" flexible entre cada bloque reparte el espacio sobrante
      cuando el comprobante es corto (para que ocupe toda la hoja) y se
@@ -179,6 +206,7 @@ export function generarHtmlComprobante(d: DatosComprobanteHtml): string {
 </style>
 </head>
 <body>
+<div class="ticket">
   <div class="cabecera">
     <div class="cab-izq">
       ${
@@ -272,6 +300,7 @@ export function generarHtmlComprobante(d: DatosComprobanteHtml): string {
     ${ICONO_DOCUMENTO}
     <div class="pie-texto">Documento no válido como factura.<br/>Comprobante de entrega interno del laboratorio.</div>
   </div>
+</div>
 </body>
 </html>`;
 }
