@@ -162,19 +162,24 @@ export async function generarComprobante(
     const laboratorioNombre = nombreConfigurado && nombreConfigurado.trim() !== "Densz" ? nombreConfigurado.trim() : null;
     const id = await insertarComprobante(db, { numero, ordenId, creadoPor: usuarioId, laboratorioNombre });
     await marcarFacturada(db, ordenId);
-    // La deuda es de la clínica cuando la OT quedó congelada con una
-    // (§6) — el profesional que la realizó sigue disponible en
-    // orden.odontologoId (siempre se guarda), aunque el titular del
-    // movimiento sea la clínica.
-    await registrarMovimientoDebe(db, {
-      odontologoId: orden.clinicaId ? null : orden.odontologoId,
-      clinicaId: orden.clinicaId,
-      ordenId,
-      importeCentavos: orden.totalCentavos,
-      moneda: orden.moneda,
-      fecha: orden.fechaTrabajo,
-      descripcion: `Orden ${orden.numero}${orden.clinicaId ? ` — ${orden.odontologoNombre}` : ""}`
-    });
+    // Un total en $0 (ej. una repetición sin cargo) no genera deuda: la
+    // tabla prohíbe movimientos de $0 a propósito. El comprobante se
+    // genera igual, solo que sin impacto en la cuenta corriente.
+    if (orden.totalCentavos > 0) {
+      // La deuda es de la clínica cuando la OT quedó congelada con una
+      // (§6) — el profesional que la realizó sigue disponible en
+      // orden.odontologoId (siempre se guarda), aunque el titular del
+      // movimiento sea la clínica.
+      await registrarMovimientoDebe(db, {
+        odontologoId: orden.clinicaId ? null : orden.odontologoId,
+        clinicaId: orden.clinicaId,
+        ordenId,
+        importeCentavos: orden.totalCentavos,
+        moneda: orden.moneda,
+        fecha: orden.fechaTrabajo,
+        descripcion: `Orden ${orden.numero}${orden.clinicaId ? ` — ${orden.odontologoNombre}` : ""}`
+      });
+    }
     return id;
   });
 

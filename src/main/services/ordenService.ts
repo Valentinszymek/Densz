@@ -382,14 +382,21 @@ export async function editarOrdenConPrestaciones(pool: Queryable, ordenId: numbe
         // Cuentas sí depende de esta fecha).
         const fechaMovimiento = movimientoActual?.fecha ?? anterior.fechaTrabajo;
         await anularMovimientoDeOrden(db, ordenId);
-        await registrarMovimientoDebe(db, {
-          ...nuevoTitular,
-          ordenId,
-          importeCentavos: totalCentavos,
-          moneda: lista.moneda,
-          fecha: fechaMovimiento,
-          descripcion: `Orden ${anterior.numero}${odontologo.clinicaId ? ` — ${odontologo.nombre}` : ""} (editada)`
-        });
+        // Un total en $0 (ej. una repetición sin cargo) no genera deuda:
+        // la tabla prohíbe movimientos de $0 a propósito (nunca ensuciar
+        // la cuenta corriente con una "deuda" inexistente), así que acá
+        // alcanza con haber anulado la deuda anterior arriba — no hay
+        // nada nuevo que registrar.
+        if (totalCentavos > 0) {
+          await registrarMovimientoDebe(db, {
+            ...nuevoTitular,
+            ordenId,
+            importeCentavos: totalCentavos,
+            moneda: lista.moneda,
+            fecha: fechaMovimiento,
+            descripcion: `Orden ${anterior.numero}${odontologo.clinicaId ? ` — ${odontologo.nombre}` : ""} (editada)`
+          });
+        }
       }
     }
 

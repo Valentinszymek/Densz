@@ -134,6 +134,43 @@ describe("editarOrdenConPrestaciones", () => {
     expect(saldos[0].saldoCentavos).toBe(2500000);
   });
 
+  it("CASO 2b — OT facturada: bajar el importe a $0 (repetición sin cargo) anula la deuda SIN intentar registrar una deuda de $0", async () => {
+    const { db, usuarioId } = ctx;
+    const orden = await crearYFacturar([{ prestacionId: coronaId, cantidad: 2, piezasFdi: [13, 14] }]);
+    expect((await obtenerSaldos(db, odontologoId))[0].saldoCentavos).toBe(1800000);
+
+    const editada = await editarOrdenConPrestaciones(db, orden.id, {
+      odontologoId,
+      pacienteId: orden.pacienteId,
+      fechaTrabajo: orden.fechaTrabajo,
+      prestaciones: [
+        { prestacionId: coronaId, cantidad: 2, piezasFdi: [13, 14], precioManualCentavos: 0, nombre: "Repetición Corona de Zirconio" }
+      ],
+      editadoPor: usuarioId
+    });
+
+    expect(editada.estado).toBe("facturado"); // sigue facturada: la factura/comprobante queda intacta
+    expect(editada.totalCentavos).toBe(0);
+    expect(editada.prestaciones[0].prestacionNombre).toBe("Repetición Corona de Zirconio");
+
+    // Saldo en $0: la vista sigue agrupando por moneda (hay historial ahí),
+    // pero sin ningún movimiento activo el neto da cero — no queda deuda.
+    const saldos = await obtenerSaldos(db, odontologoId);
+    expect(saldos).toHaveLength(1);
+    expect(saldos[0].saldoCentavos).toBe(0);
+
+    // El movimiento original queda anulado (historial auditable), y no se
+    // creó ningún movimiento nuevo en su lugar.
+    const movimientos = await listarMovimientos(db, odontologoId);
+    expect(movimientos.filter((m) => !m.anulado)).toHaveLength(0);
+    expect(movimientos.filter((m) => m.anulado)).toHaveLength(1);
+    expect(movimientos.find((m) => m.anulado)?.importeCentavos).toBe(1800000);
+
+    // El comprobante sigue existiendo, reimprimible, con el total en $0.
+    const comprobante = await obtenerComprobantePorOrden(db, orden.id);
+    expect(comprobante).not.toBeNull();
+  });
+
   it("CASO 3 — cambiar solamente la prestación (misma cantidad/piezas) recalcula el precio y el subtotal", async () => {
     const { db, usuarioId } = ctx;
     const orden = await crearYFacturar([{ prestacionId: coronaId, cantidad: 2, piezasFdi: [13, 14] }]);

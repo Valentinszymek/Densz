@@ -63,6 +63,31 @@ describe("comprobanteService", () => {
     expect(saldos[0].saldoCentavos).toBe(2200000);
   });
 
+  it("una OT que nace en $0 (repetición sin cargo) genera el comprobante igual, sin movimiento de cuenta", async () => {
+    const { db, usuarioId } = ctx;
+    const orden = await crearOrdenConPrestaciones(db, {
+      odontologoId,
+      pacienteNombreCompleto: "Juan Pérez",
+      fechaTrabajo: "2026-01-01",
+      prestaciones: [
+        { prestacionId: coronaId, cantidad: 1, piezasFdi: [16], precioManualCentavos: 0, nombre: "Repetición Corona" }
+      ],
+      creadoPor: usuarioId
+    });
+    expect(orden.totalCentavos).toBe(0);
+
+    const comprobante = await generarComprobante(db, orden.id, usuarioId, pdfFalso);
+
+    expect(comprobante.numero).toMatch(/^CB-\d{8}$/);
+    const ordenActualizada = (await obtenerOrden(db, orden.id))!;
+    expect(ordenActualizada.estado).toBe("facturado");
+
+    // Sin deuda: un movimiento de $0 no existe por diseño.
+    expect(await obtenerSaldos(db, odontologoId)).toHaveLength(0);
+    const { rows: movimientos } = await db.query("SELECT * FROM movimientos_cuenta WHERE orden_id = $1", [orden.id]);
+    expect(movimientos).toHaveLength(0);
+  });
+
   it("una OT con varias prestaciones genera UN SOLO comprobante y UN SOLO movimiento por el total combinado", async () => {
     const { db, usuarioId } = ctx;
     const orden = await crearOrdenDePrueba([
