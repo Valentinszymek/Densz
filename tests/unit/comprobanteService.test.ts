@@ -4,7 +4,7 @@ import { crearOdontologo } from "../../src/main/db/repositories/odontologosRepo"
 import { crearCategoria, crearPrestacion } from "../../src/main/db/repositories/preciosRepo";
 import { cambiarPrecioEnLista } from "../../src/main/db/repositories/listasPrecioRepo";
 import { crearOrdenConPrestaciones, anularOrden } from "../../src/main/services/ordenService";
-import { generarComprobante } from "../../src/main/services/comprobanteService";
+import { generarComprobante, guardarTamanoImpresionComprobante } from "../../src/main/services/comprobanteService";
 import { obtenerOrden } from "../../src/main/db/repositories/ordenesRepo";
 import { obtenerSaldos } from "../../src/main/db/repositories/movimientosRepo";
 
@@ -146,8 +146,22 @@ describe("comprobanteService", () => {
   // webContents.print(), que sí usa micrones) — pasar el valor en
   // micrones por error generaría una página de ~2700 km y el PDF saldría
   // en blanco.
-  it("genera el PDF del comprobante en hoja A4 completa, en pulgadas", async () => {
+  it("por defecto (sin configurar nada) genera el PDF al tamaño real del ticket, en pulgadas", async () => {
     const { db, usuarioId } = ctx;
+    const orden = await crearOrdenDePrueba([{ prestacionId: coronaId, cantidad: 1, piezasFdi: [11] }]);
+    await generarComprobante(db, orden.id, usuarioId, pdfFalso);
+
+    expect(pdfFalso).toHaveBeenCalledTimes(1);
+    const [, , pageSize] = pdfFalso.mock.calls[0];
+    expect(pageSize).toEqual({
+      width: 105 / 25.4,
+      height: 148.5 / 25.4
+    });
+  });
+
+  it("si el laboratorio eligió 'a4' (Configuración → Tamaño de impresión), genera el PDF en hoja A4 completa", async () => {
+    const { db, usuarioId } = ctx;
+    await guardarTamanoImpresionComprobante(db, "a4");
     const orden = await crearOrdenDePrueba([{ prestacionId: coronaId, cantidad: 1, piezasFdi: [11] }]);
     await generarComprobante(db, orden.id, usuarioId, pdfFalso);
 
@@ -157,5 +171,15 @@ describe("comprobanteService", () => {
       width: 210 / 25.4,
       height: 297 / 25.4
     });
+  });
+
+  it("un pageSize explícito pasado a generarComprobante siempre gana, sin mirar la configuración", async () => {
+    const { db, usuarioId } = ctx;
+    await guardarTamanoImpresionComprobante(db, "a4");
+    const orden = await crearOrdenDePrueba([{ prestacionId: coronaId, cantidad: 1, piezasFdi: [11] }]);
+    await generarComprobante(db, orden.id, usuarioId, pdfFalso, "A5");
+
+    const [, , pageSize] = pdfFalso.mock.calls[0];
+    expect(pageSize).toBe("A5");
   });
 });

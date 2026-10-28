@@ -354,6 +354,9 @@ export const webApi: DenszApi = {
   configLaboratorioObtener: () => get("/config/laboratorio"),
   configLaboratorioGuardar: (nombre) => put("/config/laboratorio", { nombre }).then(() => undefined),
 
+  configTamanoImpresionObtener: () => get("/config/tamano-impresion"),
+  configTamanoImpresionGuardar: (valor) => put("/config/tamano-impresion", { valor }).then(() => undefined),
+
   // --- Odontólogos: solo lectura conectada en esta etapa (Fase 4A) ---
   odontologosListar: (filtro) => get(`/odontologos${buildQuery(filtro ?? {})}`),
   odontologosObtener: (id) => get(`/odontologos/${id}`),

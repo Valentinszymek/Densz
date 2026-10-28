@@ -2,6 +2,7 @@ import { BrowserWindow } from "electron";
 import fs from "node:fs";
 import type { Queryable } from "../db/types";
 import { getConfig, setConfig } from "../db/repositories/configRepo";
+import { obtenerTamanoImpresionComprobante } from "./comprobanteService";
 import { DenszError } from "../utils/errors";
 import type { ImpresoraInfo } from "../../shared/types/entities";
 
@@ -112,27 +113,32 @@ export async function imprimirPdf(db: Queryable, pdfPath: string): Promise<void>
  * formulario de papel a medida (110×150mm) registrado a mano en el
  * driver de UNA impresora puntual (Xerox Phaser 3020,
  * `System.Drawing.Printing.PrinterSettings.PaperSizes` con RawKind=20480,
- * 433×591 centésimas de pulgada). Funcionaba en esa máquina — pero es una
- * configuración de Windows por MÁQUINA, no algo que viaje con Densz ni
- * algo que la app pueda garantizar. En uso real, la bandeja de la
- * impresora tiene cargada hoja A4 común (no hojas precortadas), así que
- * Windows terminaba imprimiendo esa "hoja chica virtual" en un lugar
- * impredecible de la hoja A4 física — comprobante corrido, con media
- * hoja en blanco arriba.
+ * 433×591 centésimas de pulgada). Fue el primer intento de arreglo y
+ * resultó frágil: una configuración de Windows por MÁQUINA, que además
+ * terminaba imprimiéndose en un lugar impredecible de la hoja (comprobante
+ * corrido). Pasó por una segunda etapa forzando siempre "A4" — pero eso
+ * asumía que la bandeja de la impresora tiene cargada hoja A4 entera, y
+ * se confirmó en vivo (fotos reales, 2026-10-28) que en uso real el papel
+ * YA viene precortado al tamaño del ticket.
  *
- * Arreglo definitivo: se imprime siempre en "A4" (el único tamaño
- * universal, soportado por cualquier impresora/driver sin ninguna
- * configuración manual previa — nunca más depende de un formulario que
- * alguien tuvo que registrar a mano en esa compu puntual) y el
- * documento en sí (`comprobanteHtmlTemplate.ts`) ya dibuja el ticket a
- * un tamaño fijo y predecible (un cuarto de A4, con guías de corte)
- * dentro de esa hoja — la posición y el tamaño quedan controlados
- * 100% por el documento, nunca por lo que el driver decida. */
+ * Arreglo definitivo: el tamaño de página sigue la preferencia guardada
+ * del laboratorio (obtenerTamanoImpresionComprobante, Configuración →
+ * Tamaño de impresión) — "ticket" (el default) pide directamente el
+ * tamaño real del ticket ("A6", el tamaño estándar más cercano a
+ * 105×148.5mm — Electron no acepta un tamaño a medida en micrómetros acá
+ * sin volver al problema del formulario de papel, pero si soporta
+ * nombres estándar sin configuración previa en ningún driver, igual que
+ * "A4" ya probado), para quien imprime en papel precortado; "a4" sigue
+ * pidiendo la hoja A4 completa (con el ticket dibujado en la esquina y
+ * guía de corte — comprobanteHtmlTemplate.ts) para quien corta después.
+ * Nunca más depende de un formulario que alguien tuvo que registrar a
+ * mano en una compu puntual. */
 export async function imprimirComprobanteHtml(db: Queryable, html: string): Promise<void> {
   const impresora = await obtenerImpresoraSeleccionada(db);
   if (!impresora) {
     throw new DenszError("No hay una impresora predeterminada configurada. Configurala en Configuración → Impresora.");
   }
+  const preferenciaTamano = await obtenerTamanoImpresionComprobante(db);
   const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
@@ -142,7 +148,7 @@ export async function imprimirComprobanteHtml(db: Queryable, html: string): Prom
           silent: true,
           deviceName: impresora.nombreDispositivo,
           printBackground: true,
-          pageSize: "A4",
+          pageSize: preferenciaTamano === "a4" ? "A4" : "A6",
           // `color` no default es `true` (modo color) — Electron nunca lo
           // aclara solo, y enviar un trabajo a color a una impresora
           // monocromática (Xerox Phaser 3020) fuerza una conversión

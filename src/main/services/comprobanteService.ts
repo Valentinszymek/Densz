@@ -3,7 +3,7 @@ import path from "node:path";
 import { withTransaction } from "../db/withTransaction";
 import { siguienteNumero } from "../utils/numbering";
 import { obtenerOrden, marcarFacturada } from "../db/repositories/ordenesRepo";
-import { getConfig } from "../db/repositories/configRepo";
+import { getConfig, setConfig } from "../db/repositories/configRepo";
 import { obtenerOdontologo } from "../db/repositories/odontologosRepo";
 import { logger } from "../utils/logger";
 import { obtenerClinica } from "../db/repositories/clinicasRepo";
@@ -15,26 +15,60 @@ import {
   anularComprobanteDb
 } from "../db/repositories/comprobantesRepo";
 import { registrarMovimientoDebe, anularMovimientoDeOrden } from "../db/repositories/movimientosRepo";
-import { generarHtmlComprobante, ANCHO_HOJA_MM, ALTO_HOJA_MM } from "./comprobanteHtmlTemplate";
+import {
+  generarHtmlComprobante,
+  ANCHO_HOJA_MM,
+  ALTO_HOJA_MM,
+  ANCHO_PAGINA_COMPROBANTE_MM,
+  ALTO_PAGINA_COMPROBANTE_MM
+} from "./comprobanteHtmlTemplate";
 import { generarPdfDesdeHtml } from "./pdfService";
 import { getComprobantesDir } from "../utils/appPaths";
 import { DenszError } from "../utils/errors";
-import type { Comprobante } from "../../shared/types/entities";
+import type { Comprobante, TamanoImpresionComprobante } from "../../shared/types/entities";
 
 const MM_POR_PULGADA = 25.4;
-/** Tamaño de página A4 completa, en pulgadas — la unidad que espera
- * `printToPDF` para un tamaño a medida (ver comentario en pdfService.ts).
- * El ticket en sí es más chico (ver ANCHO/ALTO_PAGINA_COMPROBANTE_MM en
- * comprobanteHtmlTemplate.ts) pero la HOJA es A4 siempre — mismo tamaño
- * para "Ver PDF" y para "Imprimir" (§13): una sola fuente de verdad para
- * el documento, y A4 es el único tamaño que cualquier impresora soporta
- * sin configuración manual por máquina (ver el comentario largo en
- * comprobanteHtmlTemplate.ts sobre por qué se abandonó el formulario de
- * papel a medida). */
-const TAMANO_PAGINA_COMPROBANTE = {
+/** Hoja A4 completa, en pulgadas (unidad que espera `printToPDF` para un
+ * tamaño a medida — ver comentario en pdfService.ts): con el ticket
+ * dibujado en la esquina y guía de corte, para quien imprime en A4 y
+ * corta DESPUÉS (ver TamanoImpresionComprobante). */
+const TAMANO_PAGINA_A4 = {
   width: ANCHO_HOJA_MM / MM_POR_PULGADA,
   height: ALTO_HOJA_MM / MM_POR_PULGADA
 };
+/** Tamaño real del ticket (105×148.5mm, un cuarto de A4), en pulgadas —
+ * para quien ya imprime en papel precortado a ese tamaño. Es el valor por
+ * defecto (ver obtenerTamanoImpresionComprobante). */
+const TAMANO_PAGINA_TICKET = {
+  width: ANCHO_PAGINA_COMPROBANTE_MM / MM_POR_PULGADA,
+  height: ALTO_PAGINA_COMPROBANTE_MM / MM_POR_PULGADA
+};
+
+const CLAVE_TAMANO_IMPRESION_COMPROBANTE = "comprobante.tamanoImpresion";
+
+/**
+ * Preferencia del laboratorio (Configuración → Tamaño de impresión) sobre
+ * a qué tamaño de papel se genera/imprime el comprobante — compartida por
+ * escritorio y Web, y por los dos caminos de impresión (PDF e impresión
+ * física directa, ver impresoraService.ts). "ticket" es el default cuando
+ * no se configuró nada todavía (2026-10-28: se confirmó que el papel real
+ * que se carga en la impresora ya viene precortado al tamaño del ticket,
+ * nunca una hoja A4 entera — ver el historial largo en
+ * comprobanteHtmlTemplate.ts). "a4" queda disponible para el laboratorio
+ * que prefiera imprimir en A4 entera y cortar después con la guía punteada.
+ */
+export async function obtenerTamanoImpresionComprobante(db: Queryable): Promise<TamanoImpresionComprobante> {
+  const valor = await getConfig(db, CLAVE_TAMANO_IMPRESION_COMPROBANTE);
+  return valor === "a4" ? "a4" : "ticket";
+}
+
+export async function guardarTamanoImpresionComprobante(db: Queryable, valor: TamanoImpresionComprobante): Promise<void> {
+  await setConfig(db, CLAVE_TAMANO_IMPRESION_COMPROBANTE, valor);
+}
+
+function paginaPdfSegunPreferencia(pref: TamanoImpresionComprobante): Electron.PrintToPDFOptions["pageSize"] {
+  return pref === "a4" ? TAMANO_PAGINA_A4 : TAMANO_PAGINA_TICKET;
+}
 
 type GenerarPdf = (html: string, outputPath: string, pageSize?: Electron.PrintToPDFOptions["pageSize"]) => Promise<void>;
 
@@ -103,14 +137,15 @@ export async function regenerarPdfComprobante(
   db: Queryable,
   comprobanteId: number,
   generarPdf: GenerarPdf = generarPdfDesdeHtml,
-  // Permite a un llamador (hoy solo comprobantesWeb.ts) pedir un tamaño de
-  // página distinto al A4 por defecto — ver el comentario largo sobre esto
-  // en comprobantesWeb.ts. El escritorio nunca pasa este parámetro.
-  pageSize: Electron.PrintToPDFOptions["pageSize"] = TAMANO_PAGINA_COMPROBANTE
+  // Si no se pasa, se resuelve según la preferencia guardada del
+  // laboratorio (obtenerTamanoImpresionComprobante) — mismo criterio para
+  // escritorio y Web, ninguno de los dos necesita pasar esto a mano.
+  pageSize?: Electron.PrintToPDFOptions["pageSize"]
 ): Promise<string> {
   const { html, comprobante } = await construirHtmlComprobante(db, comprobanteId);
   const pdfPath = comprobante.pdfPath ?? path.join(getComprobantesDir(), `${comprobante.numero}.pdf`);
-  await generarPdf(html, pdfPath, pageSize);
+  const tamano = pageSize ?? paginaPdfSegunPreferencia(await obtenerTamanoImpresionComprobante(db));
+  await generarPdf(html, pdfPath, tamano);
   await setPdfPath(db, comprobanteId, pdfPath);
   return pdfPath;
 }
@@ -146,9 +181,8 @@ export async function generarComprobante(
   // Electron (no disponible fuera de la app) para probar la lógica de
   // negocio (numeración, estado, ledger).
   generarPdf: GenerarPdf = generarPdfDesdeHtml,
-  // Ver el mismo parámetro en regenerarPdfComprobante — solo lo pasa
-  // comprobantesWeb.ts.
-  pageSize: Electron.PrintToPDFOptions["pageSize"] = TAMANO_PAGINA_COMPROBANTE
+  // Ver el mismo parámetro en regenerarPdfComprobante.
+  pageSize?: Electron.PrintToPDFOptions["pageSize"]
 ): Promise<Comprobante> {
   const orden = await obtenerOrden(pool, ordenId);
   if (!orden) throw new DenszError("La orden no existe.");

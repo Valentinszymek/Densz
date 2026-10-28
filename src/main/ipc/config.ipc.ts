@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import { getConfig, setConfig } from "../db/repositories/configRepo";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
+import { obtenerTamanoImpresionComprobante, guardarTamanoImpresionComprobante } from "../services/comprobanteService";
 import { getUsuarioActualId, requerirPermiso } from "../services/sessionService";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { traducirErrorPostgres } from "../utils/errors";
@@ -31,6 +32,27 @@ export function registrarHandlersConfig(db: Pool): void {
         accion: "modificar",
         entidad: "configuracion",
         detalle: { clave: CLAVE_LABORATORIO_NOMBRE, valor: validado }
+      });
+    } catch (err) {
+      throw traducirErrorPostgres(err);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.CONFIG_TAMANO_IMPRESION_OBTENER, async () => {
+    requerirPermiso(PERMISOS.CONFIGURACION_EDITAR);
+    return obtenerTamanoImpresionComprobante(db);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.CONFIG_TAMANO_IMPRESION_GUARDAR, async (_e, valor: "ticket" | "a4") => {
+    try {
+      requerirPermiso(PERMISOS.CONFIGURACION_EDITAR);
+      const validado = z.enum(["ticket", "a4"]).parse(valor);
+      await guardarTamanoImpresionComprobante(db, validado);
+      await registrarAuditoria(db, {
+        usuarioId: getUsuarioActualId(),
+        accion: "modificar",
+        entidad: "configuracion",
+        detalle: { clave: "comprobante.tamanoImpresion", valor: validado }
       });
     } catch (err) {
       throw traducirErrorPostgres(err);

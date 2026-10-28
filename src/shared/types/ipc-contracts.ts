@@ -56,7 +56,8 @@ import type {
   OpcionesFiltroAuditoriaDto,
   Moneda,
   LaboratorioParaAdmin,
-  InfoFacturacionLaboratorioDto
+  InfoFacturacionLaboratorioDto,
+  TamanoImpresionComprobante
 } from "./entities";
 
 export const IPC_CHANNELS = {
@@ -66,6 +67,9 @@ export const IPC_CHANNELS = {
 
   CONFIG_LABORATORIO_OBTENER: "config:laboratorioObtener",
   CONFIG_LABORATORIO_GUARDAR: "config:laboratorioGuardar",
+
+  CONFIG_TAMANO_IMPRESION_OBTENER: "config:tamanoImpresionObtener",
+  CONFIG_TAMANO_IMPRESION_GUARDAR: "config:tamanoImpresionGuardar",
 
   ODONTOLOGOS_LISTAR: "odontologos:listar",
   ODONTOLOGOS_OBTENER: "odontologos:obtener",
@@ -346,6 +350,13 @@ export interface DenszApi {
    * `null` = todavía no configurado. */
   configLaboratorioObtener: () => Promise<string | null>;
   configLaboratorioGuardar: (nombre: string) => Promise<void>;
+
+  /** Tamaño de impresión del comprobante (Configuración → Tamaño de
+   * impresión) — "ticket" (default) o "a4". Ver
+   * TamanoImpresionComprobante/obtenerTamanoImpresionComprobante en
+   * comprobanteService.ts. */
+  configTamanoImpresionObtener: () => Promise<TamanoImpresionComprobante>;
+  configTamanoImpresionGuardar: (valor: TamanoImpresionComprobante) => Promise<void>;
 
   odontologosListar: (filtro?: FiltroOdontologosDto) => Promise<Odontologo[]>;
   odontologosObtener: (id: number) => Promise<Odontologo | null>;

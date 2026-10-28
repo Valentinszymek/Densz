@@ -86,10 +86,12 @@ describe("HTTP /config", () => {
     }
   });
 
-  it("rechaza sin sesión (401) en ambas rutas", async () => {
+  it("rechaza sin sesión (401) en todas las rutas", async () => {
     const resultados = await Promise.all([
       request(app).get("/config/laboratorio"),
-      request(app).put("/config/laboratorio").send({ nombre: "x" })
+      request(app).put("/config/laboratorio").send({ nombre: "x" }),
+      request(app).get("/config/tamano-impresion"),
+      request(app).put("/config/tamano-impresion").send({ valor: "a4" })
     ]);
     for (const r of resultados) expect(r.status).toBe(401);
   });
@@ -97,7 +99,9 @@ describe("HTTP /config", () => {
   it("rechaza (403) a una sesión sin el permiso CONFIGURACION_EDITAR (mismo set real que RECEPCION)", async () => {
     const resultados = await Promise.all([
       request(app).get("/config/laboratorio").set("Cookie", cookieSinPermiso),
-      request(app).put("/config/laboratorio").set("Cookie", cookieSinPermiso).send({ nombre: "x" })
+      request(app).put("/config/laboratorio").set("Cookie", cookieSinPermiso).send({ nombre: "x" }),
+      request(app).get("/config/tamano-impresion").set("Cookie", cookieSinPermiso),
+      request(app).put("/config/tamano-impresion").set("Cookie", cookieSinPermiso).send({ valor: "a4" })
     ]);
     for (const r of resultados) expect(r.status).toBe(403);
   });
@@ -143,5 +147,49 @@ describe("HTTP /config", () => {
     const res = await request(app).get("/config/laboratorio").set("Cookie", cookieAdmin);
     const crudo = JSON.stringify(res.body);
     expect(crudo.toLowerCase()).not.toMatch(/password|contraseñ|service_role|token/);
+  });
+
+  describe("GET/PUT /config/tamano-impresion", () => {
+    it("GET devuelve 'ticket' cuando nunca se configuró nada (default)", async () => {
+      const res = await request(app).get("/config/tamano-impresion").set("Cookie", cookieAdmin);
+      expect(res.status).toBe(200);
+      expect(res.body).toBe("ticket");
+    });
+
+    it("PUT guarda 'a4' y GET lo devuelve — ida y vuelta completa", async () => {
+      const put = await request(app).put("/config/tamano-impresion").set("Cookie", cookieAdmin).send({ valor: "a4" });
+      expect(put.status).toBe(200);
+      expect(put.body).toEqual({ ok: true });
+
+      const get = await request(app).get("/config/tamano-impresion").set("Cookie", cookieAdmin);
+      expect(get.body).toBe("a4");
+    });
+
+    it("PUT se puede volver a 'ticket' explícitamente", async () => {
+      await request(app).put("/config/tamano-impresion").set("Cookie", cookieAdmin).send({ valor: "a4" });
+      await request(app).put("/config/tamano-impresion").set("Cookie", cookieAdmin).send({ valor: "ticket" });
+
+      const get = await request(app).get("/config/tamano-impresion").set("Cookie", cookieAdmin);
+      expect(get.body).toBe("ticket");
+    });
+
+    it("PUT rechaza un valor que no sea 'ticket'/'a4' (400) y no modifica lo guardado", async () => {
+      await request(app).put("/config/tamano-impresion").set("Cookie", cookieAdmin).send({ valor: "a4" });
+      const res = await request(app).put("/config/tamano-impresion").set("Cookie", cookieAdmin).send({ valor: "carta" });
+      expect(res.status).toBe(400);
+
+      const get = await request(app).get("/config/tamano-impresion").set("Cookie", cookieAdmin);
+      expect(get.body).toBe("a4"); // no se tocó
+    });
+
+    it("PUT registra auditoría de la modificación", async () => {
+      await request(app).put("/config/tamano-impresion").set("Cookie", cookieAdmin).send({ valor: "a4" });
+      const { rows } = await ctx.db.query<{ accion: string; entidad: string; detalle: unknown }>(
+        "SELECT accion, entidad, detalle FROM auditoria WHERE entidad = 'configuracion' ORDER BY id DESC LIMIT 1"
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].accion).toBe("modificar");
+      expect(JSON.stringify(rows[0].detalle)).toContain("comprobante.tamanoImpresion");
+    });
   });
 });

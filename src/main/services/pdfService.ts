@@ -17,8 +17,10 @@ function getVentanaOculta(): BrowserWindow {
 
 /** Renderiza un HTML autocontenido (sin recursos externos) a un archivo PDF
  * real. `pageSize` por defecto A4 (estados de cuenta, resúmenes); los
- * comprobantes pasan `"A6"` para no gastar una hoja A4 entera en un
- * documento chico (§11 del pedido).
+ * comprobantes pasan su propio tamaño en pulgadas (ver
+ * obtenerTamanoImpresionComprobante en comprobanteService.ts: el tamaño
+ * real del ticket por defecto, o la hoja A4 completa si el laboratorio
+ * eligió esa preferencia).
  *
  * OJO — trampa real que ya nos mordió una vez: `printToPDF` espera un
  * tamaño a medida en PULGADAS (`{width, height}`), NO en micrones. El

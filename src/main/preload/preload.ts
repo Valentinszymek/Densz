@@ -18,6 +18,9 @@ const api: DenszApi = {
   configLaboratorioObtener: () => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_LABORATORIO_OBTENER),
   configLaboratorioGuardar: (nombre) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_LABORATORIO_GUARDAR, nombre),
 
+  configTamanoImpresionObtener: () => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_TAMANO_IMPRESION_OBTENER),
+  configTamanoImpresionGuardar: (valor) => ipcRenderer.invoke(IPC_CHANNELS.CONFIG_TAMANO_IMPRESION_GUARDAR, valor),
+
   odontologosListar: (filtro) => ipcRenderer.invoke(IPC_CHANNELS.ODONTOLOGOS_LISTAR, filtro),
   odontologosObtener: (id) => ipcRenderer.invoke(IPC_CHANNELS.ODONTOLOGOS_OBTENER, id),
   odontologosEstadisticas: (id) => ipcRenderer.invoke(IPC_CHANNELS.ODONTOLOGOS_ESTADISTICAS, id),

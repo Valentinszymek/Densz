@@ -9,6 +9,15 @@ export type TipoBackup = "manual" | "automatico" | "pre_restauracion";
 export type EstadoBackup = "ok" | "error";
 export type Moneda = "ARS" | "USD";
 
+/** A qué tamaño de papel se imprime/genera el comprobante (Configuración →
+ * Tamaño de impresión) — "ticket": directo al tamaño real del ticket
+ * (105×148.5mm, pensado para papel YA precortado a ese tamaño — ver el
+ * comentario largo en comprobanteHtmlTemplate.ts). "a4": hoja A4 completa
+ * con el ticket dibujado en la esquina y guía de corte punteada, pensado
+ * para cortar DESPUÉS de imprimir. Config por laboratorio; "ticket" es el
+ * valor por defecto cuando no se configuró nada todavía. */
+export type TamanoImpresionComprobante = "ticket" | "a4";
+
 export interface SesionActualDto {
   usuarioId: number;
   nombreUsuario: string;

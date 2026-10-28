@@ -3,6 +3,10 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import { getConfig, setConfig } from "../../main/db/repositories/configRepo";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
+import {
+  obtenerTamanoImpresionComprobante,
+  guardarTamanoImpresionComprobante
+} from "../../main/services/comprobanteService";
 import { PERMISOS } from "../../shared/constants/permisos";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
 import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
@@ -43,6 +47,28 @@ export function crearRouterConfig(db: Pool): Router {
       res.json({ ok: true });
     } catch {
       res.status(400).json({ error: "Ingresá un nombre válido (máximo 100 caracteres)." });
+    }
+  });
+
+  router.get("/tamano-impresion", requirePermission(PERMISOS.CONFIGURACION_EDITAR), async (_req, res) => {
+    const db = (_req as unknown as RequestConTenantDb).db;
+    res.json(await obtenerTamanoImpresionComprobante(db));
+  });
+
+  router.put("/tamano-impresion", requirePermission(PERMISOS.CONFIGURACION_EDITAR), async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
+    try {
+      const valor = z.enum(["ticket", "a4"]).parse(req.body.valor);
+      await guardarTamanoImpresionComprobante(db, valor);
+      await registrarAuditoria(db, {
+        usuarioId: (req as unknown as RequestConSesion).sesion.usuarioId,
+        accion: "modificar",
+        entidad: "configuracion",
+        detalle: { clave: "comprobante.tamanoImpresion", valor }
+      });
+      res.json({ ok: true });
+    } catch {
+      res.status(400).json({ error: "Valor inválido." });
     }
   });
 

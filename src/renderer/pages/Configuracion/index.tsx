@@ -5,12 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Ca
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Input, FormField } from "../../components/ui/Input";
+import { Toggle } from "../../components/ui/Toggle";
 import {
   useImpresoraSeleccionada,
   useImpresorasDisponibles,
   useImprimirPaginaDePrueba
 } from "../../features/impresora/hooks";
-import { useLaboratorioNombre, useGuardarLaboratorioNombre } from "../../features/configuracion/hooks";
+import {
+  useLaboratorioNombre,
+  useGuardarLaboratorioNombre,
+  useTamanoImpresionComprobante,
+  useGuardarTamanoImpresionComprobante
+} from "../../features/configuracion/hooks";
 import { ImpresoraSelectorModal } from "./ImpresoraSelectorModal";
 import { SeccionProteccion } from "./SeccionProteccion";
 import { SeccionSuscripcion } from "./SeccionSuscripcion";
@@ -34,6 +40,7 @@ export default function Configuracion() {
 
       <div className="max-w-xl space-y-6">
         <SeccionIdentidadLaboratorio />
+        <SeccionTamanoImpresion />
         {esEscritorio ? <SeccionImpresora /> : <SeccionDescargaEscritorio />}
         {/* Suscripción y protección: ambas exclusivas de ADMINISTRADOR. */}
         {esAdministrador() && <SeccionSuscripcion />}
@@ -113,6 +120,42 @@ function SeccionIdentidadLaboratorio() {
         >
           {guardar.isPending ? "Guardando…" : "Guardar"}
         </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SeccionTamanoImpresion() {
+  const { data: tamano, isLoading } = useTamanoImpresionComprobante();
+  const guardar = useGuardarTamanoImpresionComprobante();
+  const esA4 = tamano === "a4";
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Tamaño de impresión del comprobante</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-carbon/50">
+          Por defecto, Densz genera el comprobante directo al tamaño del ticket (10,5 × 14,8 cm) — ideal si imprimís
+          en papel ya precortado a ese tamaño. Activá esto si en cambio imprimís en hoja A4 entera y recortás el
+          ticket vos mismo después, siguiendo la guía punteada.
+        </p>
+
+        <div className="flex items-center justify-between rounded-lg border border-carbon/10 bg-cream px-4 py-3">
+          <div>
+            <p className="font-medium text-sm">Imprimir en hoja A4 completa</p>
+            <p className="text-xs text-carbon/50 mt-0.5">
+              {esA4 ? "Hoja A4 con el ticket en la esquina y guía de corte." : "Directo al tamaño del ticket, sin hoja A4 de por medio."}
+            </p>
+          </div>
+          <Toggle
+            activo={esA4}
+            disabled={isLoading || guardar.isPending}
+            onChange={(activo) => guardar.mutate(activo ? "a4" : "ticket")}
+            label="Imprimir en hoja A4 completa"
+          />
+        </div>
       </CardContent>
     </Card>
   );
