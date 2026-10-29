@@ -69,14 +69,33 @@ Corregido en TEST y en producción (con tu confirmación explícita) con `ALTER 
 
 ## 7. Lo que falta — por qué todavía no digo "Densz está listo para vender"
 
-1. **Pagos reales sin verificar de punta a punta.** Sigo esperando el Access Token de prueba de Mercado Pago y la clave secreta de prueba de Stripe (pedidos antes, en tu `.env`, nunca en el chat). Hasta no correr un checkout real en modo sandbox y confirmar que el webhook activa la suscripción, esto no está probado — solo escrito y revisado contra la documentación oficial.
-2. **Confirmación de onboarding de Stripe desde Argentina**: seguía sin confirmar en la auditoría de Fase 1; lo vamos a saber recién cuando crees la cuenta de Stripe.
-3. **Webhooks sin registrar todavía** en los paneles de Mercado Pago/Stripe (necesitan la URL real del backend, que ya existe: `https://TU-BACKEND/billing/webhook/mercadopago` y `/stripe`) — paso que hacemos juntos apenas tengamos las cuentas.
+1. ~~Pagos reales sin verificar de punta a punta.~~ **Resuelto el 2026-10-29** — ver addendum abajo.
+2. **Confirmación de onboarding de Stripe desde Argentina**: la cuenta de Stripe ya existe ("Nueva empresa", modo test verificado), pero el dashboard real todavía muestra el banner "Verifica tu empresa" — la verificación de negocio para poder cobrar en modo LIVE sigue sin completarse.
+3. **Webhooks sin registrar todavía** en los paneles de Mercado Pago/Stripe apuntando al backend real de producción (`https://TU-BACKEND/billing/webhook/mercadopago` y `/stripe`) — esto es un cambio de configuración en cuentas live, así que lo hacemos juntos con tu confirmación explícita cuando quieras dar ese paso (no lo hice unilateralmente el 2026-10-29, ver addendum).
 4. **Recuperación de contraseña usa el envío de email por defecto de Supabase** — funciona, pero tiene límites de volumen bajos pensados para desarrollo; para un volumen de ventas real conviene configurar un SMTP propio en el panel de Supabase (no urgente para arrancar).
 5. **Email + contraseña es web-only** — el escritorio sigue solo con Google o con usuario/contraseña interno (empleados cargados por un admin). No bloquea la venta (la web es la puerta de entrada), pero es una limitación real.
 6. **Exportación de datos** (Professional) está bloqueada en el servidor para Essential, pero el botón de exportar sigue visible en la interfaz (no oculto) — un Essential que lo toque va a ver un error claro en vez de que el botón desaparezca. Auditoría y Estadísticas sí se ocultan del menú correctamente.
 7. **Cambio de plan** (Essential↔Professional) hoy se resuelve cancelando la suscripción vieja y generando un checkout nuevo — no hay prorrateo a mitad de ciclo.
 
+## Addendum — 2026-10-29: pagos reales verificados de punta a punta en sandbox
+
+Llegaron las credenciales (son las **live** de los dos proveedores — me lo confirmaste explícitamente). Como ejecutar un cobro real con claves live está fuera de lo que puedo hacer yo mismo (nunca ejecuto una transacción financiera real, ni con autorización), conseguí las credenciales de **modo prueba** de cada proveedor directamente desde sus paneles (ya tenías ambas cuentas de desarrollador creadas desde el 27/10) y las guardé en tu `.env` local sin mostrarlas en el chat.
+
+**Qué se probó, con llamadas reales (nunca mockeadas) contra las cuentas de test de Stripe y Mercado Pago:**
+
+- Se agregó `tests/unit/billingService.test.ts` — **no existía ningún test de este módulo hasta hoy**, pese a que ya estaba en producción desde el 21/10. 16 tests nuevos, todos verdes:
+  - **Stripe**: crea una sesión de checkout real; `checkout.session.completed` activa la suscripción; `customer.subscription.updated/deleted` reflejan el estado; firma inválida se rechaza; **se creó y canceló una suscripción real de Stripe en modo test** (ciclo completo, no solo creación).
+  - **Mercado Pago**: crea una preapproval real; firma inválida se rechaza (HMAC real, no simulado); tipo de evento desconocido se ignora; **se canceló una preapproval real**.
+  - Aislamiento cruzado: un webhook de un laboratorio nunca toca el de otro.
+- **Checkout completo de verdad en el navegador, en sandbox**: usé la cuenta "Buyer Test User" que ya tenías creada en el panel de Mercado Pago (sin tocar ni cerrar tu sesión real de "VALEN" — se loguea como una cuenta aparte vía "Cambiar de cuenta", confirmé que tu sesión real seguía intacta después) para autorizar de punta a punta una suscripción real con una tarjeta de prueba guardada. Mercado Pago confirmó "¡Listo! Ya te suscribiste — Pagaste $19.900". Con esa preapproval ya `authorized` de verdad (no simulada), agregué un test más que confirma que el webhook la mapea a `estado_suscripcion = 'active'` contra el estado REAL que devuelve la API — no contra un mock. Al terminar, cancelé esa preapproval de prueba (quedó en `cancelled`, no te va a cobrar el 29/11).
+- **Hallazgo real en el camino** (ya corregido, no en producción — solo en el test): Mercado Pago rechaza cualquier `back_url` con host `localhost` ("Invalid value for back_url, must be a valid URL"), incluso en cuentas sandbox. No es un bug de Densz — el código real en producción usa `densz.vercel.app`, nunca localhost — pero sí es una limitación real de probar el checkout ARS desde una máquina de desarrollo sin un dominio público.
+
+**Lo que sigue sin tocarse, a propósito:**
+
+- Nunca usé las claves **live** para nada — ni para crear un checkout, ni para ningún llamado a la API. El `.env` local ahora tiene las claves de **test** de ambos proveedores; las live que me pasaste no se tocaron.
+- No registré ningún webhook en los paneles de producción de Stripe/Mercado Pago (punto 3 arriba sigue abierto) — es un cambio de configuración de cuenta real, lo hacemos con tu confirmación explícita cuando decidas dar ese paso.
+- La cuenta de Stripe sigue sin completar la verificación de negocio (punto 2 arriba) — necesario antes de poder cobrar en modo live, independientemente de que el código ya esté probado.
+
 ## Próximo paso
 
-Pasame el Access Token de prueba de Mercado Pago y la clave secreta de prueba de Stripe (en tu `.env` local, nunca en el chat) y, si ya la tenés, contame si Stripe te dejó completar el alta como empresa argentina. Con eso hago el checkout real de prueba, registro los webhooks, y recién ahí Densz queda realmente listo para cobrar.
+Con el código de pagos ya probado de punta a punta (no solo escrito), lo que falta para poder cobrar de verdad es: (a) que completes la verificación de tu empresa en el dashboard de Stripe, y (b) que registremos juntos los webhooks reales apuntando a tu backend de producción en los paneles de Mercado Pago y Stripe — avisame cuando quieras dar ese paso y lo hacemos con tu confirmación en cada uno.
