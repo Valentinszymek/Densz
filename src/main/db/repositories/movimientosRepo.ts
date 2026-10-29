@@ -83,6 +83,26 @@ export async function anularMovimientoManual(db: Queryable, id: number): Promise
   );
 }
 
+/** Corrige una deuda agregada a mano YA cargada (ej. un importe mal
+ * tipeado) — a diferencia de una OT, acá no hay "recongelar y emitir un
+ * movimiento nuevo": es el mismo movimiento suelto que se edita in-place,
+ * auditado por deudaService.ts (con el valor anterior y el nuevo). El
+ * WHERE repite las mismas condiciones que anularMovimientoManual, en
+ * defensa: nunca toca un movimiento de una OT real, de un pago, ni uno ya
+ * anulado, aunque algo llame a esto sin pasar por deudaService.ts. */
+export async function editarMovimientoManual(
+  db: Queryable,
+  id: number,
+  data: { importeCentavos: number; moneda: Moneda; fecha: string; descripcion: string }
+): Promise<void> {
+  await db.query(
+    `UPDATE movimientos_cuenta
+     SET importe_centavos = $1, moneda = $2, fecha = $3, descripcion = $4
+     WHERE id = $5 AND anulado = 0 AND tipo = 'debe' AND orden_id IS NULL AND pago_id IS NULL`,
+    [data.importeCentavos, data.moneda, data.fecha, data.descripcion, id]
+  );
+}
+
 /** Borra en forma definitiva los movimientos asociados a una OT eliminada (§27). */
 export async function eliminarMovimientosDeOrden(db: Queryable, ordenId: number): Promise<void> {
   await db.query("DELETE FROM movimientos_cuenta WHERE orden_id = $1", [ordenId]);
@@ -129,14 +149,23 @@ interface FilaSaldoOdontologo {
   saldo_centavos: number;
 }
 
-/** Saldo de todos los odontólogos activos con movimientos propios (no de clínica), agrupado por moneda. */
+/** Saldo de todos los odontólogos activos con movimientos propios (no de clínica), agrupado por moneda.
+ *
+ * `v.total_debe_centavos != 0 OR v.total_haber_centavos != 0`: la vista
+ * agrupa por moneda cualquier movimiento que haya existido alguna vez,
+ * incluso uno ya anulado — si una OT se editó y cambió de moneda (ej.
+ * porque la lista de precios del odontólogo pasó de ARS a USD), el
+ * movimiento ARS viejo queda anulado (nunca se borra, por historial) y
+ * sin este filtro la moneda ARS seguía apareciendo para siempre con
+ * $0,00 en todo, como si debiera algo en dos monedas (2026-10-29,
+ * hallazgo real con un caso así). */
 export async function listarSaldosTodos(db: Queryable): Promise<SaldoOdontologoConNombre[]> {
   const { rows } = await db.query<FilaSaldoOdontologo>(
     `SELECT o.id AS odontologo_id, o.nombre AS odontologo_nombre, v.moneda,
             v.total_debe_centavos, v.total_haber_centavos, v.saldo_centavos
      FROM odontologos o
      JOIN v_saldo_odontologo_moneda v ON v.odontologo_id = o.id
-     WHERE o.activo = 1
+     WHERE o.activo = 1 AND (v.total_debe_centavos != 0 OR v.total_haber_centavos != 0)
      ORDER BY lower(o.nombre), v.moneda`
   );
 
@@ -152,9 +181,12 @@ export async function listarSaldosTodos(db: Queryable): Promise<SaldoOdontologoC
   return Array.from(porOdontologo.values());
 }
 
+/** Ver el comentario de listarSaldosTodos sobre por qué se filtran las
+ * monedas en $0,00 (actividad vieja, ya toda anulada). */
 export async function obtenerSaldos(db: Queryable, odontologoId: number): Promise<SaldoPorMoneda[]> {
   const { rows } = await db.query<{ moneda: Moneda; total_debe_centavos: number; total_haber_centavos: number; saldo_centavos: number }>(
-    "SELECT moneda, total_debe_centavos, total_haber_centavos, saldo_centavos FROM v_saldo_odontologo_moneda WHERE odontologo_id = $1",
+    `SELECT moneda, total_debe_centavos, total_haber_centavos, saldo_centavos FROM v_saldo_odontologo_moneda
+     WHERE odontologo_id = $1 AND (total_debe_centavos != 0 OR total_haber_centavos != 0)`,
     [odontologoId]
   );
   return rows.map(mapearSaldo);
@@ -173,14 +205,15 @@ interface FilaSaldoClinica {
   saldo_centavos: number;
 }
 
-/** Saldo de todas las clínicas activas con movimientos, agrupado por moneda. */
+/** Saldo de todas las clínicas activas con movimientos, agrupado por moneda.
+ * Ver el comentario de listarSaldosTodos sobre el filtro de monedas en $0,00. */
 export async function listarSaldosClinicasTodas(db: Queryable): Promise<SaldoClinicaConNombre[]> {
   const { rows } = await db.query<FilaSaldoClinica>(
     `SELECT c.id AS clinica_id, c.nombre AS clinica_nombre, v.moneda,
             v.total_debe_centavos, v.total_haber_centavos, v.saldo_centavos
      FROM clinicas c
      JOIN v_saldo_clinica_moneda v ON v.clinica_id = c.id
-     WHERE c.activo = 1
+     WHERE c.activo = 1 AND (v.total_debe_centavos != 0 OR v.total_haber_centavos != 0)
      ORDER BY lower(c.nombre), v.moneda`
   );
 
@@ -196,9 +229,11 @@ export async function listarSaldosClinicasTodas(db: Queryable): Promise<SaldoCli
   return Array.from(porClinica.values());
 }
 
+/** Ver el comentario de listarSaldosTodos sobre el filtro de monedas en $0,00. */
 export async function obtenerSaldosClinica(db: Queryable, clinicaId: number): Promise<SaldoPorMoneda[]> {
   const { rows } = await db.query<{ moneda: Moneda; total_debe_centavos: number; total_haber_centavos: number; saldo_centavos: number }>(
-    "SELECT moneda, total_debe_centavos, total_haber_centavos, saldo_centavos FROM v_saldo_clinica_moneda WHERE clinica_id = $1",
+    `SELECT moneda, total_debe_centavos, total_haber_centavos, saldo_centavos FROM v_saldo_clinica_moneda
+     WHERE clinica_id = $1 AND (total_debe_centavos != 0 OR total_haber_centavos != 0)`,
     [clinicaId]
   );
   return rows.map(mapearSaldo);
@@ -221,7 +256,22 @@ interface FilaMovimiento {
   fecha: string;
   descripcion: string;
   anulado: number;
+  medio_pago_nombre: string | null;
+  referencia: string | null;
 }
+
+/** JOIN compartido por todas las lecturas de movimientos: además de la OT
+ * (si es un "debe" real), trae el medio de pago y la referencia cuando el
+ * movimiento es un "haber" (pago) — esos dos datos se cargan al registrar
+ * el pago (ver pagoService.ts) pero vivían solo en la tabla `pagos`, nunca
+ * visibles en la propia lista de movimientos de Cuentas (2026-10-29,
+ * hallazgo real: la persona los cargaba y no los volvía a ver en ningún
+ * lado salvo Auditoría). */
+const JOIN_DETALLE_MOVIMIENTO = `
+     LEFT JOIN ordenes o ON o.id = m.orden_id
+     LEFT JOIN pagos p ON p.id = m.pago_id
+     LEFT JOIN medios_pago mp ON mp.id = p.medio_pago_id`;
+const SELECT_DETALLE_MOVIMIENTO = `m.*, o.numero AS orden_numero, mp.nombre AS medio_pago_nombre, p.referencia`;
 
 function mapearMovimiento(f: FilaMovimiento): MovimientoCuenta {
   return {
@@ -236,13 +286,15 @@ function mapearMovimiento(f: FilaMovimiento): MovimientoCuenta {
     moneda: f.moneda,
     fecha: f.fecha,
     descripcion: f.descripcion,
-    anulado: f.anulado === 1
+    anulado: f.anulado === 1,
+    medioPagoNombre: f.medio_pago_nombre,
+    referencia: f.referencia
   };
 }
 
 export async function obtenerMovimiento(db: Queryable, id: number): Promise<MovimientoCuenta | null> {
   const { rows } = await db.query<FilaMovimiento>(
-    `SELECT m.*, o.numero AS orden_numero FROM movimientos_cuenta m LEFT JOIN ordenes o ON o.id = m.orden_id WHERE m.id = $1`,
+    `SELECT ${SELECT_DETALLE_MOVIMIENTO} FROM movimientos_cuenta m ${JOIN_DETALLE_MOVIMIENTO} WHERE m.id = $1`,
     [id]
   );
   return rows[0] ? mapearMovimiento(rows[0]) : null;
@@ -250,9 +302,9 @@ export async function obtenerMovimiento(db: Queryable, id: number): Promise<Movi
 
 export async function listarMovimientos(db: Queryable, odontologoId: number, limite = 500): Promise<MovimientoCuenta[]> {
   const { rows } = await db.query<FilaMovimiento>(
-    `SELECT m.*, o.numero AS orden_numero
+    `SELECT ${SELECT_DETALLE_MOVIMIENTO}
      FROM movimientos_cuenta m
-     LEFT JOIN ordenes o ON o.id = m.orden_id
+     ${JOIN_DETALLE_MOVIMIENTO}
      WHERE m.odontologo_id = $1
      ORDER BY m.fecha DESC, m.id DESC LIMIT $2`,
     [odontologoId, limite]
@@ -262,9 +314,9 @@ export async function listarMovimientos(db: Queryable, odontologoId: number, lim
 
 export async function listarMovimientosClinica(db: Queryable, clinicaId: number, limite = 500): Promise<MovimientoCuenta[]> {
   const { rows } = await db.query<FilaMovimiento>(
-    `SELECT m.*, o.numero AS orden_numero
+    `SELECT ${SELECT_DETALLE_MOVIMIENTO}
      FROM movimientos_cuenta m
-     LEFT JOIN ordenes o ON o.id = m.orden_id
+     ${JOIN_DETALLE_MOVIMIENTO}
      WHERE m.clinica_id = $1
      ORDER BY m.fecha DESC, m.id DESC LIMIT $2`,
     [clinicaId, limite]
@@ -471,8 +523,9 @@ export async function listarDeudasManualesDelPeriodo(
   const idTitular = titular.clinicaId ?? titular.odontologoId;
 
   const { rows } = await db.query<FilaMovimiento>(
-    `SELECT m.*, NULL::text AS orden_numero
+    `SELECT ${SELECT_DETALLE_MOVIMIENTO}
      FROM movimientos_cuenta m
+     ${JOIN_DETALLE_MOVIMIENTO}
      WHERE m.tipo = 'debe' AND m.anulado = 0 AND m.orden_id IS NULL
        AND m.${columnaTitular} = $1 AND m.fecha >= $2 AND m.fecha < $3
      ORDER BY m.fecha, m.id`,

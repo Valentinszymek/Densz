@@ -76,7 +76,10 @@ describe("pagoService", () => {
     if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
 
     await anularPago(db, resultado.pago.id, "Cheque rechazado", usuarioId);
-    expect((await saldoArs())?.saldoCentavos).toBe(0);
+    // Sin nada real pendiente (el único movimiento quedó anulado),
+    // obtenerSaldos ya ni devuelve una fila ARS — ver el filtro de monedas
+    // en $0,00 (2026-10-29).
+    expect(await saldoArs()).toBeUndefined();
   });
 
   it("no permite anular un pago ya anulado", async () => {

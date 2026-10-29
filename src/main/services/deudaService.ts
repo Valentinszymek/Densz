@@ -1,6 +1,11 @@
 import type { Queryable } from "../db/types";
 import { withTransaction } from "../db/withTransaction";
-import { registrarMovimientoDebe, anularMovimientoManual, obtenerMovimiento } from "../db/repositories/movimientosRepo";
+import {
+  registrarMovimientoDebe,
+  anularMovimientoManual,
+  editarMovimientoManual,
+  obtenerMovimiento
+} from "../db/repositories/movimientosRepo";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
 import { DenszError } from "../utils/errors";
 import type { Moneda, MovimientoCuenta } from "../../shared/types/entities";
@@ -60,6 +65,50 @@ export async function registrarDeuda(pool: Queryable, data: DatosNuevaDeuda, usu
   });
 
   return (await obtenerMovimiento(pool, movimientoId))!;
+}
+
+export interface DatosEditarDeuda {
+  importeCentavos: number;
+  moneda: Moneda;
+  fecha: string;
+  descripcion: string;
+}
+
+/**
+ * Corrige una deuda agregada a mano YA cargada (ej. un importe mal
+ * tipeado al registrarla) — nunca una OT real, nunca un pago. Edita el
+ * mismo movimiento in-place (no crea uno nuevo ni anula el viejo): queda
+ * auditado con el valor anterior y el nuevo de cada campo, igual criterio
+ * que editarOrdenConPrestaciones (ordenService.ts).
+ */
+export async function editarDeuda(pool: Queryable, id: number, data: DatosEditarDeuda, usuarioId: number): Promise<MovimientoCuenta> {
+  const anterior = await obtenerMovimiento(pool, id);
+  if (!anterior) throw new DenszError("La deuda no existe.");
+  if (anterior.tipo !== "debe" || anterior.ordenId !== null || anterior.pagoId !== null) {
+    throw new DenszError("Este movimiento no es una deuda agregada a mano.");
+  }
+  if (anterior.anulado) throw new DenszError("Una deuda anulada no se puede editar: agregá una deuda nueva si corresponde.");
+
+  await withTransaction(pool, async (db) => {
+    await editarMovimientoManual(db, id, data);
+    await registrarAuditoria(db, {
+      usuarioId,
+      accion: "editar",
+      entidad: "deudas",
+      entidadId: id,
+      detalle: {
+        anterior: {
+          importeCentavos: anterior.importeCentavos,
+          moneda: anterior.moneda,
+          fecha: anterior.fecha,
+          descripcion: anterior.descripcion
+        },
+        nuevo: data
+      }
+    });
+  });
+
+  return (await obtenerMovimiento(pool, id))!;
 }
 
 export async function anularDeuda(pool: Queryable, id: number, motivo: string, usuarioId: number): Promise<void> {

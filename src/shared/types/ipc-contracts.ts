@@ -171,6 +171,7 @@ export const IPC_CHANNELS = {
   /** Deuda agregada a mano, sin ninguna orden detrás (ej. saldo previo a
    * Densz) — ver src/main/services/deudaService.ts. */
   DEUDAS_REGISTRAR: "deudas:registrar",
+  DEUDAS_EDITAR: "deudas:editar",
   DEUDAS_ANULAR: "deudas:anular",
 
   ESTADISTICAS_KPIS: "estadisticas:kpis",
@@ -452,6 +453,7 @@ export interface DenszApi {
   pagosListarUltimos: (limite?: number) => Promise<PagoConOdontologo[]>;
 
   deudasRegistrar: (data: DatosNuevaDeudaDto) => Promise<MovimientoCuenta>;
+  deudasEditar: (id: number, data: DatosEditarDeudaDto) => Promise<MovimientoCuenta>;
   deudasAnular: (id: number, motivo: string) => Promise<void>;
 
   estadisticasKpis: (rango: RangoFechas) => Promise<KpisPeriodo>;
@@ -596,6 +598,13 @@ export interface DatosNuevaDeudaDto {
   /** Exactamente uno de los dos. */
   odontologoId?: number | null;
   clinicaId?: number | null;
+  importeCentavos: number;
+  moneda: Moneda;
+  fecha: string;
+  descripcion: string;
+}
+
+export interface DatosEditarDeudaDto {
   importeCentavos: number;
   moneda: Moneda;
   fecha: string;

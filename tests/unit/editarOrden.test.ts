@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createTestDbConUsuario, idListaGeneral, type TestDb } from "../helpers/testDb";
-import { crearOdontologo } from "../../src/main/db/repositories/odontologosRepo";
+import { crearOdontologo, asignarListaPrecio } from "../../src/main/db/repositories/odontologosRepo";
 import { crearCategoria, crearPrestacion } from "../../src/main/db/repositories/preciosRepo";
 import { cambiarPrecioEnLista, crearLista } from "../../src/main/db/repositories/listasPrecioRepo";
 import { crearOrdenConPrestaciones, editarOrdenConPrestaciones, anularOrden } from "../../src/main/services/ordenService";
@@ -153,11 +153,11 @@ describe("editarOrdenConPrestaciones", () => {
     expect(editada.totalCentavos).toBe(0);
     expect(editada.prestaciones[0].prestacionNombre).toBe("Repetición Corona de Zirconio");
 
-    // Saldo en $0: la vista sigue agrupando por moneda (hay historial ahí),
-    // pero sin ningún movimiento activo el neto da cero — no queda deuda.
+    // Sin ningún movimiento ARS activo (el viejo quedó anulado y no se creó
+    // uno nuevo), obtenerSaldos ya ni devuelve una fila "ARS" — no queda
+    // deuda real en ninguna moneda (ver el filtro de monedas en $0,00).
     const saldos = await obtenerSaldos(db, odontologoId);
-    expect(saldos).toHaveLength(1);
-    expect(saldos[0].saldoCentavos).toBe(0);
+    expect(saldos.find((s) => s.moneda === "ARS")).toBeUndefined();
 
     // El movimiento original queda anulado (historial auditable), y no se
     // creó ningún movimiento nuevo en su lugar.
@@ -318,9 +318,9 @@ describe("editarOrdenConPrestaciones", () => {
     });
 
     // El odontólogo original ya no tiene nada ACTIVO: su movimiento viejo
-    // quedó anulado (visible en el historial), así que su saldo da 0 —
-    // pero la fila sigue existiendo porque alguna vez tuvo un movimiento.
-    expect((await obtenerSaldos(db, odontologoId))[0].saldoCentavos).toBe(0);
+    // quedó anulado (visible en el historial, vía listarMovimientos), pero
+    // sin nada real pendiente obtenerSaldos ya ni devuelve una fila para él.
+    expect(await obtenerSaldos(db, odontologoId)).toHaveLength(0);
     expect((await obtenerSaldos(db, otroOdontologoId))[0].saldoCentavos).toBe(1800000);
   });
 
@@ -441,6 +441,41 @@ describe("editarOrdenConPrestaciones", () => {
     expect(editada.totalCentavos).toBe(6000);
     const saldos = await obtenerSaldos(db, odontologoUsd);
     expect(saldos.find((s) => s.moneda === "USD")?.saldoCentavos).toBe(6000);
+  });
+
+  it("CASO 13b — si la lista del odontólogo cambia de moneda entre la factura y la edición, obtenerSaldos NO deja una moneda vieja en $0 (2026-10-29, hallazgo real)", async () => {
+    const { db, usuarioId } = ctx;
+    const orden = await crearOrdenConPrestaciones(db, {
+      odontologoId,
+      pacienteNombreCompleto: "Mara",
+      fechaTrabajo: "2026-01-01",
+      prestaciones: [{ prestacionId: coronaId, cantidad: 2, piezasFdi: [13, 14] }],
+      creadoPor: usuarioId
+    });
+    await generarComprobante(db, orden.id, usuarioId, pdfFalso);
+    expect((await obtenerSaldos(db, odontologoId)).find((s) => s.moneda === "ARS")?.saldoCentavos).toBe(1800000);
+
+    // La lista del odontólogo pasa de ARS a USD (ej. se reasignó por error
+    // o a propósito) — el precio congelado de la OT vieja sigue en ARS
+    // hasta que alguien la edite.
+    const listaDolares = await crearLista(db, { nombre: "Dólares", moneda: "USD" });
+    await cambiarPrecioEnLista(db, listaDolares, coronaId, 300);
+    await asignarListaPrecio(db, odontologoId, listaDolares);
+
+    await editarOrdenConPrestaciones(db, orden.id, {
+      odontologoId,
+      pacienteId: orden.pacienteId,
+      fechaTrabajo: "2026-01-01",
+      prestaciones: [{ prestacionId: coronaId, cantidad: 2, piezasFdi: [13, 14] }],
+      editadoPor: usuarioId
+    });
+
+    // El movimiento ARS viejo queda anulado (nunca se borra) y uno USD
+    // nuevo activo — obtenerSaldos no debe devolver la moneda ARS, aunque
+    // haya existido, porque neto da $0,00 en todo.
+    const saldos = await obtenerSaldos(db, odontologoId);
+    expect(saldos.find((s) => s.moneda === "ARS")).toBeUndefined();
+    expect(saldos.find((s) => s.moneda === "USD")?.saldoCentavos).toBe(600);
   });
 
   it("CASO 14 — OT con múltiples registros: se pueden editar varias líneas a la vez, coherentes entre sí", async () => {

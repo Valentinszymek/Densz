@@ -87,7 +87,7 @@ function bloqueHtml(b: BloqueCuentaMoneda, mostrarProfesional: boolean): string 
     <div class="resumen">
       <div class="item"><div class="etq">Saldo anterior</div><div class="val">${formatearMoneda(b.saldoAnteriorCentavos, b.moneda)}</div></div>
       <div class="item"><div class="etq">Trabajos del mes</div><div class="val">${formatearMoneda(b.totalTrabajosCentavos, b.moneda)}</div><div class="detalle">${b.trabajos.filter((t) => !t.anulado).length} trabajo(s)</div></div>
-      ${hayDeudasManuales ? `<div class="item"><div class="etq">Saldo previo a Densz</div><div class="val">${formatearMoneda(b.totalDeudasManualesCentavos, b.moneda)}</div></div>` : ""}
+      ${hayDeudasManuales ? `<div class="item"><div class="etq">Saldo previo</div><div class="val">${formatearMoneda(b.totalDeudasManualesCentavos, b.moneda)}</div></div>` : ""}
       <div class="item"><div class="etq">Pagos del mes</div><div class="val pos">${formatearMoneda(b.totalPagosCentavos, b.moneda)}</div></div>
       <div class="item destacado"><div class="etq">Saldo pendiente</div><div class="val">${formatearMoneda(b.saldoPendienteCentavos, b.moneda)}</div></div>
     </div>
@@ -102,7 +102,7 @@ function bloqueHtml(b: BloqueCuentaMoneda, mostrarProfesional: boolean): string 
 
     ${
       hayDeudasManuales
-        ? `<h3>Saldo previo a Densz</h3>
+        ? `<h3>Saldo previo</h3>
     <table>
       <thead><tr><th>Fecha</th><th>Descripción</th><th class="num">Importe</th></tr></thead>
       <tbody>${filasDeudasManuales}</tbody>

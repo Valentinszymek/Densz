@@ -131,7 +131,10 @@ describe("comprobanteService", () => {
 
     await anularOrden(db, orden.id, "Trabajo cancelado", usuarioId);
 
-    expect((await obtenerSaldos(db, odontologoId))[0].saldoCentavos).toBe(0);
+    // Sin nada real pendiente (el único movimiento quedó anulado),
+    // obtenerSaldos ya ni devuelve una fila — ver el filtro de monedas en
+    // $0,00 (2026-10-29).
+    expect(await obtenerSaldos(db, odontologoId)).toHaveLength(0);
   });
 
   // "Ver PDF" e "Imprimir" comparten una sola plantilla y un solo tamaño

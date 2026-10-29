@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { DatosNuevaDeudaDto } from "@shared/types/ipc-contracts";
+import type { DatosNuevaDeudaDto, DatosEditarDeudaDto } from "@shared/types/ipc-contracts";
 import { toast } from "../../store/toastStore";
 
 // Una deuda agregada a mano (o su anulación) afecta el saldo de un
@@ -20,6 +20,18 @@ export function useRegistrarDeuda() {
       toast({ titulo: "Deuda agregada", tono: "exito" });
     },
     onError: (e: unknown) => toast({ titulo: "No se pudo agregar la deuda", descripcion: String(e), tono: "error" })
+  });
+}
+
+export function useEditarDeuda() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: DatosEditarDeudaDto }) => window.densz.deudasEditar(id, data),
+    onSuccess: () => {
+      invalidarCuenta(qc);
+      toast({ titulo: "Deuda actualizada", tono: "exito" });
+    },
+    onError: (e: unknown) => toast({ titulo: "No se pudo editar", descripcion: String(e), tono: "error" })
   });
 }
 

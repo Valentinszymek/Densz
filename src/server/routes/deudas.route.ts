@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { Pool } from "pg";
-import { registrarDeuda, anularDeuda } from "../../main/services/deudaService";
+import { registrarDeuda, editarDeuda, anularDeuda } from "../../main/services/deudaService";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
 import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
@@ -20,6 +20,14 @@ const esquemaDeuda = z
     descripcion: z.string().trim().min(1, "Ingresá una descripción.").max(200)
   })
   .transform((d) => ({ ...d, odontologoId: d.odontologoId ?? null, clinicaId: d.clinicaId ?? null }));
+
+// Mismo esquema que src/main/ipc/deudas.ipc.ts (esquemaEditarDeuda, DEUDAS_EDITAR).
+const esquemaEditarDeuda = z.object({
+  fecha: z.string().min(1),
+  importeCentavos: z.number().int().positive("El importe debe ser mayor a cero."),
+  moneda: z.enum(["ARS", "USD"]),
+  descripcion: z.string().trim().min(1, "Ingresá una descripción.").max(200)
+});
 
 const esquemaMotivo = z.string().trim().min(3, "Ingresá un motivo de al menos 3 caracteres.");
 
@@ -45,6 +53,21 @@ export function crearRouterDeudas(db: Pool): Router {
     } catch (err) {
       const error = traducirErrorPostgres(err);
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  router.patch("/:id", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
+    try {
+      const id = esquemaId.parse(req.params.id);
+      const validado = esquemaEditarDeuda.parse(req.body);
+      const usuarioId = (req as unknown as RequestConSesion).sesion.usuarioId;
+      const movimiento = await editarDeuda(db, id, validado, usuarioId);
+      res.json(movimiento);
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      const status = error.message === "La deuda no existe." ? 404 : 400;
+      res.status(status).json({ error: error.message });
     }
   });
 

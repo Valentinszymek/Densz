@@ -245,7 +245,7 @@ describe("cuentaService", () => {
     expect(bloque.saldoPendienteCentavos).toBe(700000);
   });
 
-  it("el PDF muestra la sección 'Saldo previo a Densz' cuando hay una deuda agregada a mano este mes, y queda persistida en el resumen", async () => {
+  it("el PDF muestra la sección 'Saldo previo' cuando hay una deuda agregada a mano este mes, y queda persistida en el resumen", async () => {
     ctx = await createTestDbConUsuario();
     const { db, usuarioId } = ctx as TestDb & { usuarioId: number };
     const listaId = await idListaGeneral(db);
@@ -270,7 +270,7 @@ describe("cuentaService", () => {
       htmlCapturado = html;
     });
 
-    expect(htmlCapturado).toContain("Saldo previo a Densz");
+    expect(htmlCapturado).toContain("Saldo previo");
     expect(htmlCapturado).toContain("Deuda Previa a Densz");
     expect(htmlCapturado).toContain("18.320,00");
 

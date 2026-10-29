@@ -129,6 +129,37 @@ describe("HTTP /deudas", () => {
     expect(res.status).toBe(201);
   });
 
+  it("200 PATCH /deudas/:id edita el importe/fecha/descripción, sin duplicar el movimiento", async () => {
+    const creada = await request(app).post("/deudas").set("Cookie", cookieAdmin).send(datosDeudaValida());
+    expect(creada.status).toBe(201);
+
+    const editada = await request(app)
+      .patch(`/deudas/${creada.body.id}`)
+      .set("Cookie", cookieAdmin)
+      .send({ fecha: "2026-01-02", importeCentavos: 555000, moneda: "ARS", descripcion: "Deuda corregida" });
+    expect(editada.status).toBe(200);
+    expect(editada.body.id).toBe(creada.body.id);
+    expect(editada.body.importeCentavos).toBe(555000);
+    expect(editada.body.descripcion).toBe("Deuda corregida");
+  });
+
+  it("400 PATCH /deudas/:id con un importe inválido, sin modificar lo guardado", async () => {
+    const creada = await request(app).post("/deudas").set("Cookie", cookieAdmin).send(datosDeudaValida());
+    const res = await request(app)
+      .patch(`/deudas/${creada.body.id}`)
+      .set("Cookie", cookieAdmin)
+      .send({ fecha: "2026-01-01", importeCentavos: -100, moneda: "ARS", descripcion: "x" });
+    expect(res.status).toBe(400);
+  });
+
+  it("404 PATCH /deudas/:id sobre una deuda inexistente", async () => {
+    const res = await request(app)
+      .patch("/deudas/999999999")
+      .set("Cookie", cookieAdmin)
+      .send({ fecha: "2026-01-01", importeCentavos: 1000, moneda: "ARS", descripcion: "x" });
+    expect(res.status).toBe(404);
+  });
+
   it("una deuda de clínica se puede anular, y después ya no se puede anular de nuevo", async () => {
     const creada = await request(app)
       .post("/deudas")

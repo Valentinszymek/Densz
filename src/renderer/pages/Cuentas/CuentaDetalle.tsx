@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Wallet, FileBarChart, Ban, FileText, CircleDollarSign } from "lucide-react";
+import { ArrowLeft, Wallet, FileBarChart, Ban, FileText, CircleDollarSign, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Table, Thead, Tbody, Tr, Th, Td } from "../../components/ui/Table";
@@ -20,8 +20,9 @@ import { formatearMoneda, formatearFecha, formatearFechaHora } from "../../lib/f
 import { RegistrarPagoModal } from "./RegistrarPagoModal";
 import { AnularPagoModal } from "./AnularPagoModal";
 import { AgregarDeudaModal } from "./AgregarDeudaModal";
+import { EditarDeudaModal } from "./EditarDeudaModal";
 import { AnularDeudaModal } from "./AnularDeudaModal";
-import type { TrabajoFacturadoMes } from "@shared/types/entities";
+import type { TrabajoFacturadoMes, MovimientoCuenta } from "@shared/types/entities";
 
 const NOMBRES_MES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -69,6 +70,7 @@ export default function CuentaDetalle() {
   const [pagoAbierto, setPagoAbierto] = useState(false);
   const [pagoAAnular, setPagoAAnular] = useState<number | null>(null);
   const [deudaAbierta, setDeudaAbierta] = useState(false);
+  const [deudaAEditar, setDeudaAEditar] = useState<MovimientoCuenta | null>(null);
   const [deudaAAnular, setDeudaAAnular] = useState<number | null>(null);
 
   return (
@@ -180,7 +182,7 @@ export default function CuentaDetalle() {
               </div>
               {b.deudasManuales.length > 0 && (
                 <div className="rounded-lg border border-carbon/10 px-3 py-2.5">
-                  <p className="text-[10px] uppercase tracking-wide text-carbon/40">Saldo previo a Densz</p>
+                  <p className="text-[10px] uppercase tracking-wide text-carbon/40">Saldo previo</p>
                   <p className="text-base font-semibold mt-0.5">{formatearMoneda(b.totalDeudasManualesCentavos, b.moneda)}</p>
                 </div>
               )}
@@ -196,7 +198,7 @@ export default function CuentaDetalle() {
 
             {b.deudasManuales.length > 0 && (
               <>
-                <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2">Saldo previo a Densz</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2">Saldo previo</p>
                 <Table className="mb-6">
                   <Thead>
                     <Tr>
@@ -292,7 +294,8 @@ export default function CuentaDetalle() {
           <Thead>
             <Tr>
               <Th>Fecha</Th>
-              <Th>Descripción</Th>
+              <Th>Medio de pago</Th>
+              <Th>Referencia</Th>
               <Th>Importe</Th>
               <Th></Th>
             </Tr>
@@ -302,10 +305,11 @@ export default function CuentaDetalle() {
               <Tr key={m.id} className={m.anulado ? "opacity-40" : ""}>
                 <Td className="text-carbon/60">{formatearFecha(m.fecha)}</Td>
                 <Td>
-                  {m.descripcion}
+                  {m.medioPagoNombre ?? m.descripcion}
                   <Badge tono="neutral" className="ml-2">{m.moneda}</Badge>
                   {m.anulado && <Badge tono="error" className="ml-2">Anulado</Badge>}
                 </Td>
+                <Td className="text-carbon/60">{m.referencia || "—"}</Td>
                 <Td className="text-emerald-700 font-medium">{formatearMoneda(m.importeCentavos, m.moneda)}</Td>
                 <Td>
                   {m.pagoId && !m.anulado && (
@@ -344,9 +348,14 @@ export default function CuentaDetalle() {
                 <Td className="font-medium">{formatearMoneda(m.importeCentavos, m.moneda)}</Td>
                 <Td>
                   {!m.anulado && (
-                    <Button variant="ghost" size="sm" onClick={() => setDeudaAAnular(m.id)} title="Anular deuda">
-                      <Ban size={13} />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => setDeudaAEditar(m)} title="Editar deuda">
+                        <Pencil size={13} />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setDeudaAAnular(m.id)} title="Anular deuda">
+                        <Ban size={13} />
+                      </Button>
+                    </div>
                   )}
                 </Td>
               </Tr>
@@ -360,6 +369,7 @@ export default function CuentaDetalle() {
         <AnularPagoModal open onOpenChange={(o) => !o && setPagoAAnular(null)} pagoId={pagoAAnular} />
       )}
       <AgregarDeudaModal open={deudaAbierta} onOpenChange={setDeudaAbierta} titular={{ odontologoId }} />
+      <EditarDeudaModal open={deudaAEditar !== null} onOpenChange={(o) => !o && setDeudaAEditar(null)} deuda={deudaAEditar} />
       {deudaAAnular !== null && (
         <AnularDeudaModal open onOpenChange={(o) => !o && setDeudaAAnular(null)} deudaId={deudaAAnular} />
       )}

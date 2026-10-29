@@ -324,6 +324,12 @@ export interface MovimientoCuenta {
   fecha: string;
   descripcion: string;
   anulado: boolean;
+  /** Solo cuando `pagoId` no es null (un "haber" real) — medio de pago y
+   * referencia tal como se cargaron al registrar el pago (ver
+   * RegistrarPagoModal/pagoService.ts). `null` en cualquier otro
+   * movimiento (OT facturada, deuda agregada a mano). */
+  medioPagoNombre?: string | null;
+  referencia?: string | null;
 }
 
 /** Una OT facturada en un mes concreto, para el detalle de la cuenta y el

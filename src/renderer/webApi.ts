@@ -515,6 +515,7 @@ export const webApi: DenszApi = {
   mediosPagoCrear: (nombre) => post<number>("/pagos/medios", { nombre }),
   pagosListarUltimos: (limite) => get(`/pagos/ultimos${buildQuery({ limite })}`),
   deudasRegistrar: (data) => post<MovimientoCuenta>("/deudas", data),
+  deudasEditar: (id, data) => patch<MovimientoCuenta>(`/deudas/${id}`, data),
   deudasAnular: (id, motivo) => patch<{ ok: true }>(`/deudas/${id}/anular`, { motivo }).then(() => undefined),
 
   // --- Estadísticas: solo lectura conectada en esta etapa (Fase 9A) ---

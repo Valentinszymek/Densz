@@ -285,8 +285,10 @@ describe("cuentaService — edición de OT facturada en el mismo mes (bug de dob
     const filasDeEstaOt = bloque.trabajos.filter((t) => t.ordenId === orden.id);
     expect(filasDeEstaOt.every((t) => t.anulado)).toBe(true);
 
+    // Todo anulado (ni el movimiento viejo ni el editado quedaron activos):
+    // sin nada real pendiente, obtenerSaldos ya ni devuelve una fila — ver
+    // el filtro de monedas en $0,00 (2026-10-29).
     const saldos = await obtenerSaldos(db, odontologoId);
-    expect(saldos).toHaveLength(1);
-    expect(saldos[0].saldoCentavos).toBe(0); // todo anulado → saldo neto cero, nunca negativo ni duplicado
+    expect(saldos).toHaveLength(0);
   });
 });
