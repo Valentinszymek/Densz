@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { Request } from "express";
 import type { SesionActual } from "../main/services/sessionService";
 
 /**
@@ -23,6 +24,21 @@ const sesiones = new Map<string, SesionActual>();
 const desbloqueosProteccion = new Set<string>();
 
 export const COOKIE_SESION = "densz_session";
+
+/**
+ * Id de sesión de un pedido, por cookie (navegador, web) o por header
+ * `Authorization: Bearer <id>` (escritorio — un proceso de Node no tiene
+ * el cookie-jar implícito de un navegador, así que manda el mismo id
+ * explícito en un header en vez de replicar la cookie). La cookie tiene
+ * prioridad si por algún motivo llegaran las dos — nunca debería pasar en
+ * la práctica, cada plataforma usa solo una de las dos.
+ */
+export function obtenerIdSesionDeRequest(req: Request): string | undefined {
+  const deCookie = req.cookies?.[COOKIE_SESION] as string | undefined;
+  if (deCookie) return deCookie;
+  const header = req.header("authorization");
+  return header?.startsWith("Bearer ") ? header.slice(7).trim() || undefined : undefined;
+}
 
 export function crearSesionHttp(sesion: SesionActual): string {
   const id = crypto.randomUUID();

@@ -91,7 +91,9 @@ describe("HTTP /config", () => {
       request(app).get("/config/laboratorio"),
       request(app).put("/config/laboratorio").send({ nombre: "x" }),
       request(app).get("/config/tamano-impresion"),
-      request(app).put("/config/tamano-impresion").send({ valor: "a4" })
+      request(app).put("/config/tamano-impresion").send({ valor: "a4" }),
+      request(app).get("/config/impresora"),
+      request(app).put("/config/impresora").send({ nombreDispositivo: "x", nombreVisible: "x" })
     ]);
     for (const r of resultados) expect(r.status).toBe(401);
   });
@@ -101,7 +103,9 @@ describe("HTTP /config", () => {
       request(app).get("/config/laboratorio").set("Cookie", cookieSinPermiso),
       request(app).put("/config/laboratorio").set("Cookie", cookieSinPermiso).send({ nombre: "x" }),
       request(app).get("/config/tamano-impresion").set("Cookie", cookieSinPermiso),
-      request(app).put("/config/tamano-impresion").set("Cookie", cookieSinPermiso).send({ valor: "a4" })
+      request(app).put("/config/tamano-impresion").set("Cookie", cookieSinPermiso).send({ valor: "a4" }),
+      request(app).get("/config/impresora").set("Cookie", cookieSinPermiso),
+      request(app).put("/config/impresora").set("Cookie", cookieSinPermiso).send({ nombreDispositivo: "x", nombreVisible: "x" })
     ]);
     for (const r of resultados) expect(r.status).toBe(403);
   });
@@ -190,6 +194,57 @@ describe("HTTP /config", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0].accion).toBe("modificar");
       expect(JSON.stringify(rows[0].detalle)).toContain("comprobante.tamanoImpresion");
+    });
+  });
+
+  // Rutas nuevas (plan de seguridad del escritorio): único dato que el
+  // escritorio persiste en Postgres hoy (el nombre de la impresora
+  // elegida) — antes vía una conexión directa, ahora vía esta ruta, mismo
+  // patrón exacto que /tamano-impresion de arriba.
+  describe("GET/PUT /config/impresora", () => {
+    it("GET devuelve null cuando nunca se configuró ninguna impresora", async () => {
+      const res = await request(app).get("/config/impresora").set("Cookie", cookieAdmin);
+      expect(res.status).toBe(200);
+      expect(res.body).toBeNull();
+    });
+
+    it("PUT guarda el dispositivo elegido y GET lo devuelve — ida y vuelta completa", async () => {
+      const put = await request(app)
+        .put("/config/impresora")
+        .set("Cookie", cookieAdmin)
+        .send({ nombreDispositivo: "EPSON_TM_T20", nombreVisible: "Epson TM-T20 (mostrador)" });
+      expect(put.status).toBe(200);
+      expect(put.body).toEqual({ ok: true });
+
+      const get = await request(app).get("/config/impresora").set("Cookie", cookieAdmin);
+      expect(get.status).toBe(200);
+      expect(get.body).toEqual({ nombreDispositivo: "EPSON_TM_T20", nombreVisible: "Epson TM-T20 (mostrador)" });
+    });
+
+    it("PUT rechaza un cuerpo sin nombreDispositivo/nombreVisible (400) y no modifica lo guardado", async () => {
+      await request(app)
+        .put("/config/impresora")
+        .set("Cookie", cookieAdmin)
+        .send({ nombreDispositivo: "IMPRESORA_PREVIA", nombreVisible: "Previa" });
+
+      const res = await request(app).put("/config/impresora").set("Cookie", cookieAdmin).send({ nombreDispositivo: "" });
+      expect(res.status).toBe(400);
+
+      const get = await request(app).get("/config/impresora").set("Cookie", cookieAdmin);
+      expect(get.body).toEqual({ nombreDispositivo: "IMPRESORA_PREVIA", nombreVisible: "Previa" });
+    });
+
+    it("PUT registra auditoría de la selección", async () => {
+      await request(app)
+        .put("/config/impresora")
+        .set("Cookie", cookieAdmin)
+        .send({ nombreDispositivo: "EPSON_TM_T20", nombreVisible: "Epson TM-T20" });
+      const { rows } = await ctx.db.query<{ accion: string; entidad: string; detalle: unknown }>(
+        "SELECT accion, entidad, detalle FROM auditoria WHERE entidad = 'configuracion' ORDER BY id DESC LIMIT 1"
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].accion).toBe("seleccionar_impresora");
+      expect(JSON.stringify(rows[0].detalle)).toContain("EPSON_TM_T20");
     });
   });
 });

@@ -172,6 +172,58 @@ describe("HTTP /auth/login", () => {
     expect(otroFallo.status).toBe(401); // no 429 — sigue lejos del límite
   });
 
+  // --- Token Bearer (escritorio) — ver docs/REPORTE_LANZAMIENTO_COMERCIAL_DENSZ.md,
+  // plan de seguridad del escritorio: un proceso de Node no tiene el
+  // cookie-jar implícito de un navegador, así que el escritorio manda el
+  // mismo id de sesión como `Authorization: Bearer <id>` en vez de la
+  // cookie. Cambio puramente aditivo: la web nunca manda ese header y
+  // sigue dependiendo solo de la cookie (ver los tests de arriba).
+
+  it("el login devuelve sesionId en el cuerpo, además de la cookie", async () => {
+    const res = await request(app).post("/auth/login").send({ nombreUsuario: "usuario-login-test", password: PASSWORD_CORRECTA });
+    expect(res.status).toBe(200);
+    expect(typeof res.body.sesionId).toBe("string");
+    expect(res.body.sesionId.length).toBeGreaterThan(0);
+  });
+
+  it("un pedido con SOLO el header Authorization: Bearer (sin ninguna cookie) pasa requireAuth igual que con cookie", async () => {
+    const login = await request(app).post("/auth/login").send({ nombreUsuario: "usuario-login-test", password: PASSWORD_CORRECTA });
+    const { sesionId } = login.body;
+
+    const sesionRes = await request(app).get("/auth/session").set("Authorization", `Bearer ${sesionId}`);
+    expect(sesionRes.status).toBe(200);
+    expect(sesionRes.body.usuarioId).toBe(usuarioActivoId);
+  });
+
+  it("un Bearer inválido no cuela: GET /auth/session devuelve null, no la sesión de otro", async () => {
+    const sesionRes = await request(app).get("/auth/session").set("Authorization", "Bearer id-inventado-que-no-existe");
+    expect(sesionRes.status).toBe(200);
+    expect(sesionRes.body).toBeNull();
+  });
+
+  it("logout con SOLO el Bearer (sin cookie) también destruye la sesión", async () => {
+    const login = await request(app).post("/auth/login").send({ nombreUsuario: "usuario-login-test", password: PASSWORD_CORRECTA });
+    const { sesionId } = login.body;
+
+    const logout = await request(app).post("/auth/logout").set("Authorization", `Bearer ${sesionId}`);
+    expect(logout.status).toBe(200);
+
+    const sesionRes = await request(app).get("/auth/session").set("Authorization", `Bearer ${sesionId}`);
+    expect(sesionRes.body).toBeNull();
+  });
+
+  it("si llegan los dos (cookie Y header), la cookie gana — nunca debería pasar en la práctica, pero el comportamiento queda definido", async () => {
+    const login = await request(app).post("/auth/login").send({ nombreUsuario: "usuario-login-test", password: PASSWORD_CORRECTA });
+    const cookie = login.headers["set-cookie"][0];
+
+    const sesionRes = await request(app)
+      .get("/auth/session")
+      .set("Cookie", cookie)
+      .set("Authorization", "Bearer id-inventado-que-no-existe");
+    expect(sesionRes.status).toBe(200);
+    expect(sesionRes.body.usuarioId).toBe(usuarioActivoId);
+  });
+
   it("el límite es POR USUARIO: bloquear a uno no afecta el login normal de otro", async () => {
     const usuarioA = "usuario-bloqueado-a";
     const usuarioB = "usuario-libre-b";

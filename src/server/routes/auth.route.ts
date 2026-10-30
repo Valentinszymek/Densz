@@ -5,7 +5,7 @@ import { login, logout } from "../../main/services/authService";
 import { loginConGoogle, registrarseConGoogle } from "../../main/services/googleAuthService";
 import { listarUsuariosActivosParaSeleccion } from "../../main/db/repositories/usuariosRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
-import { crearSesionHttp, obtenerSesionHttp, destruirSesionHttp, COOKIE_SESION } from "../session";
+import { crearSesionHttp, obtenerSesionHttp, destruirSesionHttp, obtenerIdSesionDeRequest, COOKIE_SESION } from "../session";
 import { verificarTokenGoogle } from "../googleAuth";
 import {
   estaBloqueadoPorIntentos,
@@ -67,7 +67,11 @@ export function crearRouterAuth(db: Pool): Router {
         limpiarIntentos(datos.nombreUsuario); // login correcto: nunca queda penalizado por errores previos
         const idSesion = crearSesionHttp(sesion);
         res.cookie(COOKIE_SESION, idSesion, opcionesCookie);
-        res.json(sesion);
+        // `sesionId` en el cuerpo, además de la cookie: la web lo ignora
+        // (sigue usando solo la cookie); el escritorio no tiene cookie-jar
+        // en su proceso principal de Node, así que lo guarda y lo manda
+        // como `Authorization: Bearer <sesionId>` de ahí en más.
+        res.json({ ...sesion, sesionId: idSesion });
       } catch (errLogin) {
         registrarIntentoFallido(datos.nombreUsuario);
         throw errLogin;
@@ -94,7 +98,9 @@ export function crearRouterAuth(db: Pool): Router {
       const sesion = await loginConGoogle(db, identidad);
       const idSesion = crearSesionHttp(sesion);
       res.cookie(COOKIE_SESION, idSesion, opcionesCookie);
-      res.json(sesion);
+      // Ver comentario de /login: sesionId también en el cuerpo, para el
+      // escritorio (bearer token) — la web sigue usando solo la cookie.
+      res.json({ ...sesion, sesionId: idSesion });
     } catch (err) {
       // Este catch responde con su propio 401 (nunca pasa por el
       // errorHandler global, que ya loguea) — sin esto, un fallo real acá
@@ -118,7 +124,9 @@ export function crearRouterAuth(db: Pool): Router {
       const sesion = await registrarseConGoogle(db, identidad, nombreLaboratorio);
       const idSesion = crearSesionHttp(sesion);
       res.cookie(COOKIE_SESION, idSesion, opcionesCookie);
-      res.json(sesion);
+      // Ver comentario de /login: sesionId también en el cuerpo, para el
+      // escritorio (bearer token) — la web sigue usando solo la cookie.
+      res.json({ ...sesion, sesionId: idSesion });
     } catch (err) {
       logger.error("Error en POST /auth/google-register:", err);
       const error = traducirErrorPostgres(err);
@@ -127,20 +135,22 @@ export function crearRouterAuth(db: Pool): Router {
   });
 
   router.post("/logout", async (req, res) => {
-    const idSesion = req.cookies?.[COOKIE_SESION] as string | undefined;
+    const idSesion = obtenerIdSesionDeRequest(req);
     const sesion = obtenerSesionHttp(idSesion);
     if (sesion) {
       await logout(db, sesion.usuarioId);
       destruirSesionHttp(idSesion);
     }
     // Mismos atributos que al crearla (sameSite/secure) — si no coinciden,
-    // algunos navegadores no la reconocen como la misma cookie y no la borran.
+    // algunos navegadores no la reconocen como la misma cookie y no la
+    // borran. Inofensivo para el escritorio (que no tiene esa cookie):
+    // "borrar una cookie que no existe" no hace nada.
     res.clearCookie(COOKIE_SESION, opcionesCookie);
     res.json({ ok: true });
   });
 
   router.get("/session", (req, res) => {
-    const idSesion = req.cookies?.[COOKIE_SESION] as string | undefined;
+    const idSesion = obtenerIdSesionDeRequest(req);
     res.json(obtenerSesionHttp(idSesion));
   });
 

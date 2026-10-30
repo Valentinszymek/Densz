@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { obtenerSesionHttp, COOKIE_SESION } from "../session";
+import { obtenerSesionHttp, obtenerIdSesionDeRequest } from "../session";
 import type { SesionActual } from "../../main/services/sessionService";
 
 export interface RequestConSesion extends Request {
@@ -11,13 +11,15 @@ export interface RequestConSesion extends Request {
 }
 
 /**
- * Exige una sesión válida (por cookie, ver session.ts) antes de dejar pasar
- * a una ruta. Nunca lee la variable global de sessionService.ts — cada
- * pedido HTTP resuelve su propio usuario a partir de su propia cookie, para
- * soportar varios navegadores conectados a la vez.
+ * Exige una sesión válida (por cookie en la web, por header
+ * `Authorization: Bearer` en el escritorio — ver session.ts) antes de
+ * dejar pasar a una ruta. Nunca lee la variable global de
+ * sessionService.ts — cada pedido HTTP resuelve su propio usuario a
+ * partir de su propio id de sesión, para soportar varias sesiones
+ * conectadas a la vez.
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  const idSesion = req.cookies?.[COOKIE_SESION] as string | undefined;
+  const idSesion = obtenerIdSesionDeRequest(req);
   const sesion = obtenerSesionHttp(idSesion);
   if (!sesion || !idSesion) {
     res.status(401).json({ error: "No hay una sesión activa. Iniciá sesión para continuar." });
