@@ -1,13 +1,8 @@
 import { BrowserWindow } from "electron";
 import fs from "node:fs";
-import type { Queryable } from "../db/types";
-import { getConfig, setConfig } from "../db/repositories/configRepo";
-import { obtenerTamanoImpresionComprobante } from "./comprobanteService";
+import { apiClient } from "./apiClient";
 import { DenszError } from "../utils/errors";
 import type { ImpresoraInfo } from "../../shared/types/entities";
-
-const CLAVE_IMPRESORA = "impresora.nombreDispositivo";
-const CLAVE_IMPRESORA_VISIBLE = "impresora.nombreVisible";
 
 let ventanaAuxiliar: BrowserWindow | null = null;
 function getVentanaAuxiliar(): BrowserWindow {
@@ -33,16 +28,16 @@ export interface ImpresoraSeleccionada {
   nombreVisible: string;
 }
 
-export async function obtenerImpresoraSeleccionada(db: Queryable): Promise<ImpresoraSeleccionada | null> {
-  const nombreDispositivo = await getConfig(db, CLAVE_IMPRESORA);
-  if (!nombreDispositivo) return null;
-  const nombreVisible = (await getConfig(db, CLAVE_IMPRESORA_VISIBLE)) ?? nombreDispositivo;
-  return { nombreDispositivo, nombreVisible };
+// Plan de seguridad del escritorio: antes se leía/escribía con una
+// conexión local directa (getConfig/setConfig); ahora va por HTTP
+// (GET/PUT /config/impresora, ver config.route.ts — Etapa 1), único dato
+// que el escritorio persistía en Postgres fuera de apiClient.ts.
+export async function obtenerImpresoraSeleccionada(): Promise<ImpresoraSeleccionada | null> {
+  return apiClient.get<ImpresoraSeleccionada | null>("/config/impresora");
 }
 
-export async function seleccionarImpresora(db: Queryable, nombreDispositivo: string, nombreVisible: string): Promise<void> {
-  await setConfig(db, CLAVE_IMPRESORA, nombreDispositivo);
-  await setConfig(db, CLAVE_IMPRESORA_VISIBLE, nombreVisible);
+export async function seleccionarImpresora(nombreDispositivo: string, nombreVisible: string): Promise<void> {
+  await apiClient.put("/config/impresora", { nombreDispositivo, nombreVisible });
 }
 
 /** Imprime un archivo (PDF u otro que Chromium pueda mostrar) directo a la
@@ -86,8 +81,8 @@ async function imprimirArchivo(rutaArchivo: string, deviceName: string): Promise
  * diálogo, siempre en A4 (ver comentario en imprimirArchivo). El
  * comprobante de entrega NUNCA usa esta función — tiene su propio tamaño
  * fijo vía imprimirComprobanteHtml. */
-export async function imprimirPdf(db: Queryable, pdfPath: string): Promise<void> {
-  const impresora = await obtenerImpresoraSeleccionada(db);
+export async function imprimirPdf(pdfPath: string): Promise<void> {
+  const impresora = await obtenerImpresoraSeleccionada();
   if (!impresora) {
     throw new DenszError("No hay una impresora predeterminada configurada. Configurala en Configuración → Impresora.");
   }
@@ -133,12 +128,12 @@ export async function imprimirPdf(db: Queryable, pdfPath: string): Promise<void>
  * guía de corte — comprobanteHtmlTemplate.ts) para quien corta después.
  * Nunca más depende de un formulario que alguien tuvo que registrar a
  * mano en una compu puntual. */
-export async function imprimirComprobanteHtml(db: Queryable, html: string): Promise<void> {
-  const impresora = await obtenerImpresoraSeleccionada(db);
+export async function imprimirComprobanteHtml(html: string): Promise<void> {
+  const impresora = await obtenerImpresoraSeleccionada();
   if (!impresora) {
     throw new DenszError("No hay una impresora predeterminada configurada. Configurala en Configuración → Impresora.");
   }
-  const preferenciaTamano = await obtenerTamanoImpresionComprobante(db);
+  const preferenciaTamano = await apiClient.configTamanoImpresionObtener();
   const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
   try {
     await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);

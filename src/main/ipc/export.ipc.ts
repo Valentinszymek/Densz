@@ -1,57 +1,43 @@
 import { ipcMain, dialog, shell } from "electron";
-import type { Pool } from "pg";
-import { exportarDatos, type TipoExport, type FormatoExport } from "../services/exportService";
-import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
-import { getUsuarioActualId, requerirPermiso } from "../services/sessionService";
-import { PERMISOS } from "../../shared/constants/permisos";
-import { traducirErrorPostgres } from "../utils/errors";
+import fs from "node:fs";
+import { apiClient } from "../services/apiClient";
 import { IPC_CHANNELS } from "../../shared/types/ipc-contracts";
 import type { RangoFechas, FiltroAuditoriaDto } from "../../shared/types/entities";
 
-const FILTROS: Record<FormatoExport, Electron.FileFilter> = {
+const FILTROS: Record<"csv" | "xlsx" | "pdf", Electron.FileFilter> = {
   csv: { name: "CSV", extensions: ["csv"] },
   xlsx: { name: "Excel", extensions: ["xlsx"] },
   pdf: { name: "PDF", extensions: ["pdf"] }
 };
 
-export function registrarHandlersExport(db: Pool): void {
+// El backend (POST /export) ya hace todo lo que antes vivía acá contra
+// Postgres directo: el permiso especial de Auditoría y la auditoría de la
+// exportación en sí (ver export.route.ts). Lo único que sigue siendo
+// genuinamente del escritorio es el diálogo nativo de "Guardar como" —
+// elegido ANTES de pedir el archivo, igual que siempre, así nunca se
+// descarga nada si la persona cancela.
+export function registrarHandlersExport(): void {
   ipcMain.handle(
     IPC_CHANNELS.EXPORT_GENERAR,
     async (
       _e,
-      tipo: TipoExport,
-      formato: FormatoExport,
+      tipo: "odontologos" | "clinicas" | "pacientes" | "trabajos" | "cuenta" | "pagos" | "estadisticas" | "auditoria",
+      formato: "csv" | "xlsx" | "pdf",
       nombreSugerido: string,
-      opciones: { odontologoId?: number; clinicaId?: number; rango?: RangoFechas; filtroAuditoria?: FiltroAuditoriaDto }
+      opciones?: { odontologoId?: number; clinicaId?: number; rango?: RangoFechas; filtroAuditoria?: FiltroAuditoriaDto }
     ) => {
-      try {
-        // Auditoría es la única exportación que necesita su propio
-        // permiso: es información sensible restringida a ADMINISTRADOR
-        // (§10) — el resto de los tipos ya se comportaba así antes de
-        // esta tarea y no se toca.
-        if (tipo === "auditoria") requerirPermiso(PERMISOS.AUDITORIA_VER);
+      const resultado = await dialog.showSaveDialog({
+        title: "Exportar",
+        defaultPath: `${nombreSugerido}.${formato}`,
+        filters: [FILTROS[formato]]
+      });
+      if (resultado.canceled || !resultado.filePath) return null;
 
-        const resultado = await dialog.showSaveDialog({
-          title: "Exportar",
-          defaultPath: `${nombreSugerido}.${formato}`,
-          filters: [FILTROS[formato]]
-        });
-        if (resultado.canceled || !resultado.filePath) return null;
+      const { buffer } = await apiClient.postBuffer("/export", { tipo, formato, nombreSugerido, opciones });
+      fs.writeFileSync(resultado.filePath, buffer);
 
-        await exportarDatos(db, tipo, formato, resultado.filePath, opciones);
-
-        await registrarAuditoria(db, {
-          usuarioId: getUsuarioActualId(),
-          accion: "exportar",
-          entidad: tipo,
-          detalle: { formato, ruta: resultado.filePath }
-        });
-
-        shell.showItemInFolder(resultado.filePath);
-        return resultado.filePath;
-      } catch (err) {
-        throw traducirErrorPostgres(err);
-      }
+      shell.showItemInFolder(resultado.filePath);
+      return resultado.filePath;
     }
   );
 }

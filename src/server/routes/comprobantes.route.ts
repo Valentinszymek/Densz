@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { Pool } from "pg";
-import { obtenerComprobantePorOrden, listarComprobantes, type FiltroComprobantes } from "../../main/db/repositories/comprobantesRepo";
+import { obtenerComprobante, obtenerComprobantePorOrden, listarComprobantes, type FiltroComprobantes } from "../../main/db/repositories/comprobantesRepo";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
 import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
 import { generarComprobanteWeb, descargarPdfComprobanteWeb } from "../comprobantesWeb";
+import { construirHtmlComprobante } from "../../main/services/comprobanteService";
 
 const esquemaId = z.coerce.number().int().positive();
 const esquemaFiltro = z.object({
@@ -91,6 +92,49 @@ export function crearRouterComprobantes(db: Pool): Router {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="comprobante-${id}.pdf"`);
       res.send(buffer);
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Solo para impresión física SILENCIOSA del escritorio (ver
+  // impresoraService.ts#imprimirComprobanteHtml): necesita el HTML crudo,
+  // no el PDF ya renderizado — imprimir un .pdf con print() dispara un bug
+  // conocido de Chromium (visor todavía pintando) que sale en blanco; el
+  // escritorio siempre imprimió directo desde HTML por eso mismo, nunca
+  // desde el archivo. Sin equivalente en la web (que imprime el PDF vía el
+  // diálogo nativo del navegador, sin ese problema).
+  router.get("/:id/html", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
+    try {
+      const id = esquemaId.parse(req.params.id);
+      const { html, comprobante } = await construirHtmlComprobante(db, id);
+      res.json({ html, numero: comprobante.numero });
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // El escritorio llama esto recién DESPUÉS de que la impresión física
+  // silenciosa terminó bien (mismo criterio exacto que antes: nunca se
+  // auditaba un intento fallido) — mismo patrón que ya usan las demás
+  // acciones, solo que acá el paso real (imprimir) ocurre fuera de este
+  // pedido, en la máquina del escritorio, no en el servidor.
+  router.post("/:id/registrar-impresion", async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
+    try {
+      const id = esquemaId.parse(req.params.id);
+      const comprobante = await obtenerComprobante(db, id);
+      await registrarAuditoria(db, {
+        usuarioId: (req as unknown as RequestConSesion).sesion.usuarioId,
+        accion: "imprimir",
+        entidad: "comprobantes",
+        entidadId: id,
+        detalle: { numero: comprobante?.numero }
+      });
+      res.json({ ok: true });
     } catch (err) {
       const error = traducirErrorPostgres(err);
       res.status(400).json({ error: error.message });

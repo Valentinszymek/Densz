@@ -1,5 +1,4 @@
 import { ipcMain } from "electron";
-import type { Pool } from "pg";
 import { requerirPermiso } from "../services/sessionService";
 import { DenszError } from "../utils/errors";
 import { PERMISOS } from "../../shared/constants/permisos";
@@ -17,7 +16,7 @@ import { logger } from "../utils/logger";
 const MENSAJE_NO_DISPONIBLE =
   "El backup local ya no aplica: Densz guarda todos los datos en Supabase. La continuidad de los datos depende del respaldo del proyecto de Supabase, no de un archivo local.";
 
-export function registrarHandlersBackups(_db: Pool): void {
+export function registrarHandlersBackups(): void {
   ipcMain.handle(IPC_CHANNELS.BACKUPS_LISTAR, () => {
     requerirPermiso(PERMISOS.BACKUPS_GESTIONAR);
     return [];

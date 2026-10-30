@@ -1,6 +1,5 @@
 import { app, BrowserWindow } from "electron";
-import { openDatabase, closeDatabase } from "./db/connection";
-import { loadEnvFile, getDatabaseUrl } from "./utils/appPaths";
+import { loadEnvFile } from "./utils/appPaths";
 import { registrarHandlersSistema } from "./ipc/system.ipc";
 import { registrarHandlersConfig } from "./ipc/config.ipc";
 import { registrarHandlersBusqueda } from "./ipc/search.ipc";
@@ -27,11 +26,11 @@ import { registrarHandlersImpresora } from "./ipc/impresora.ipc";
 import { registrarHandlersProteccion } from "./ipc/proteccion.ipc";
 import { registrarHandlersActualizacion } from "./ipc/actualizacion.ipc";
 import { createMainWindow } from "./windows/mainWindow";
-import { logger } from "./utils/logger";
-import { ensureBootstrapUser } from "./db/ensureBootstrapUser";
 import { intentarRestaurarSesionGoogle } from "./services/googleOAuthDesktop";
-import { getLaboratorioActualId } from "./services/sessionService";
 import { iniciarAutoUpdate } from "./services/autoUpdaterService";
+import { alExpirarSesion } from "./services/apiClient";
+import { limpiarSesion } from "./services/sessionService";
+import { IPC_CHANNELS } from "../shared/types/ipc-contracts";
 
 // Evita instancias múltiples de Densz pisándose entre sí al arrancar.
 const obtuvoElLock = app.requestSingleInstanceLock();
@@ -48,53 +47,48 @@ if (!obtuvoElLock) {
 
   app.whenReady().then(async () => {
     loadEnvFile();
-    const pool = openDatabase(getDatabaseUrl());
 
-    // Se intenta restaurar la sesión de Google guardada LO ANTES POSIBLE
-    // (antes de cualquier otra cosa que toque la base) para que el
-    // laboratorio quede resuelto cuanto antes — ver connection.ts, cada
-    // conexión nueva del pool lo lee. Nunca tira: si no hay sesión
-    // guardada o falla, sigue el arranque normal sin laboratorio todavía.
-    await intentarRestaurarSesionGoogle(pool);
+    // Plan de seguridad del escritorio: ya no se abre ninguna conexión
+    // directa a Postgres acá — cada handler de abajo habla por HTTP con
+    // Railway a través de apiClient.ts (mismo backend que ya usa la web).
+    // Un 401 en cualquier pedido (ej. Railway se reinició y perdió su
+    // mapa de sesiones en memoria) limpia la sesión local y avisa a la
+    // ventana para que vuelva al login con un mensaje claro, en vez de
+    // quedarse fallando en silencio en la pantalla donde estaba.
+    alExpirarSesion(() => {
+      limpiarSesion();
+      BrowserWindow.getAllWindows()[0]?.webContents.send(IPC_CHANNELS.AUTH_SESION_EXPIRADA);
+    });
 
-    // A diferencia de SQLite (siempre disponible localmente), acá la base
-    // depende de la red: el arranque NO bloquea esperando la conexión —
-    // la ventana se muestra enseguida y es el `ConexionGate` del renderer
-    // (con `window.densz.ping()`) el que muestra el spinner/reintento
-    // hasta que la primera consulta real funcione. `ensureBootstrapUser`
-    // solo tiene sentido si ya se sabe a qué laboratorio pertenece esta
-    // instalación (si no, no hay dónde crear el usuario todavía — recién
-    // se resuelve con el primer login de Google, ver plan §4).
-    if (getLaboratorioActualId() !== null) {
-      ensureBootstrapUser(pool).catch((err) => {
-        logger.error("No se pudo verificar/crear el usuario administrador de arranque:", err);
-      });
-    }
+    // Se intenta restaurar la sesión guardada LO ANTES POSIBLE. Nunca
+    // tira: si no hay nada guardado o falla, sigue el arranque normal sin
+    // sesión todavía (pantalla de login).
+    await intentarRestaurarSesionGoogle();
 
-    registrarHandlersSistema(pool);
-    registrarHandlersConfig(pool);
-    registrarHandlersBusqueda(pool);
-    registrarHandlersOdontologos(pool);
-    registrarHandlersClinicas(pool);
-    registrarHandlersPacientes(pool);
-    registrarHandlersPrecios(pool);
-    registrarHandlersListasPrecio(pool);
-    registrarHandlersListaPrecios(pool);
-    registrarHandlersOrdenes(pool);
-    registrarHandlersComprobantes(pool);
-    registrarHandlersCuentas(pool);
-    registrarHandlersPagos(pool);
-    registrarHandlersDeudas(pool);
-    registrarHandlersEstadisticas(pool);
-    registrarHandlersBackups(pool);
-    registrarHandlersAuth(pool);
-    registrarHandlersUsuarios(pool);
-    registrarHandlersAuditoria(pool);
-    registrarHandlersExport(pool);
-    registrarHandlersLaboratorios(pool);
-    registrarHandlersBilling(pool);
-    registrarHandlersImpresora(pool);
-    registrarHandlersProteccion(pool);
+    registrarHandlersSistema();
+    registrarHandlersConfig();
+    registrarHandlersBusqueda();
+    registrarHandlersOdontologos();
+    registrarHandlersClinicas();
+    registrarHandlersPacientes();
+    registrarHandlersPrecios();
+    registrarHandlersListasPrecio();
+    registrarHandlersListaPrecios();
+    registrarHandlersOrdenes();
+    registrarHandlersComprobantes();
+    registrarHandlersCuentas();
+    registrarHandlersPagos();
+    registrarHandlersDeudas();
+    registrarHandlersEstadisticas();
+    registrarHandlersBackups();
+    registrarHandlersAuth();
+    registrarHandlersUsuarios();
+    registrarHandlersAuditoria();
+    registrarHandlersExport();
+    registrarHandlersLaboratorios();
+    registrarHandlersBilling();
+    registrarHandlersImpresora();
+    registrarHandlersProteccion();
     registrarHandlersActualizacion();
 
     createMainWindow();
@@ -108,7 +102,6 @@ if (!obtuvoElLock) {
   });
 
   app.on("window-all-closed", () => {
-    void closeDatabase();
     if (process.platform !== "darwin") {
       app.quit();
     }

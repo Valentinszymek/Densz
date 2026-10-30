@@ -1,11 +1,9 @@
 import { ipcMain } from "electron";
 import { z } from "zod";
-import type { Pool } from "pg";
-import { login, logout } from "../services/authService";
-import { getSesionActual } from "../services/sessionService";
+import { apiClient, getTokenActual } from "../services/apiClient";
+import { getSesionActual, setSesionConToken, limpiarSesion } from "../services/sessionService";
 import { iniciarLoginGoogleEscritorio, iniciarRegistroLaboratorioEscritorio } from "../services/googleOAuthDesktop";
 import { borrarSesionGuardada } from "../services/supabaseSessionStorage";
-import { listarUsuariosActivosParaSeleccion } from "../db/repositories/usuariosRepo";
 import { traducirErrorPostgres } from "../utils/errors";
 import { IPC_CHANNELS } from "../../shared/types/ipc-contracts";
 
@@ -18,47 +16,58 @@ const esquemaRegistroLaboratorio = z.object({
   nombreLaboratorio: z.string().trim().min(1, "Ingresá el nombre de tu laboratorio.")
 });
 
-export function registrarHandlersAuth(db: Pool): void {
+/**
+ * Plan de seguridad del escritorio, Etapa 3: estos handlers ya no llaman a
+ * ningún servicio con una conexión local a Postgres — hablan por HTTP con
+ * Railway a través de `apiClient` (mismos endpoints que ya usa la web). Los
+ * errores que llegan acá ya son `ApiError`, con un mensaje claro armado por
+ * el backend — `traducirErrorPostgres` ya no hace falta para esos casos
+ * (no hay ningún código SQLSTATE que traducir del lado del cliente), solo
+ * se mantiene para `esquemaLogin.parse` (validación local, antes de
+ * siquiera pedir red).
+ */
+export function registrarHandlersAuth(): void {
   ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN, async (_e, data) => {
+    let validado: z.infer<typeof esquemaLogin>;
     try {
-      const validado = esquemaLogin.parse(data);
-      return await login(db, validado.nombreUsuario, validado.password);
+      validado = esquemaLogin.parse(data);
     } catch (err) {
       throw traducirErrorPostgres(err);
     }
+    const sesion = await apiClient.authLogin(validado.nombreUsuario, validado.password);
+    setSesionConToken(sesion, getTokenActual()!);
+    return sesion;
   });
 
-  ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN_GOOGLE, async () => {
-    try {
-      return await iniciarLoginGoogleEscritorio(db);
-    } catch (err) {
-      throw traducirErrorPostgres(err);
-    }
-  });
+  ipcMain.handle(IPC_CHANNELS.AUTH_LOGIN_GOOGLE, () => iniciarLoginGoogleEscritorio());
 
   ipcMain.handle(IPC_CHANNELS.AUTH_REGISTRAR_LABORATORIO, async (_e, data) => {
+    let validado: z.infer<typeof esquemaRegistroLaboratorio>;
     try {
-      const { nombreLaboratorio } = esquemaRegistroLaboratorio.parse(data);
-      return await iniciarRegistroLaboratorioEscritorio(db, nombreLaboratorio);
+      validado = esquemaRegistroLaboratorio.parse(data);
     } catch (err) {
       throw traducirErrorPostgres(err);
     }
+    return iniciarRegistroLaboratorioEscritorio(validado.nombreLaboratorio);
   });
 
   ipcMain.handle(IPC_CHANNELS.AUTH_LOGOUT, async () => {
-    const sesion = getSesionActual();
-    if (sesion) await logout(db, sesion.usuarioId);
-    // Por si la sesión era de Google: se borra el archivo guardado — si
-    // no, el próximo arranque la restauraría sola sin pedir login de
-    // nuevo, contradiciendo "cerrar sesión". No-op si no existe.
-    borrarSesionGuardada();
+    try {
+      await apiClient.authLogout();
+    } finally {
+      limpiarSesion();
+      // Por si la sesión era de Google: se borra el archivo guardado — si
+      // no, el próximo arranque la restauraría sola sin pedir login de
+      // nuevo, contradiciendo "cerrar sesión". No-op si no existe.
+      // apiClient.authLogout() ya borró el token HTTP guardado por su lado.
+      borrarSesionGuardada();
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.AUTH_SESION_ACTUAL, () => getSesionActual());
 
-  // Sin requerirPermiso a propósito: se llama ANTES de autenticarse, para
-  // poblar el selector "¿Quién va a utilizar Densz?" — por eso el
-  // repositorio solo devuelve id/usuario/nombre/rol de usuarios activos,
-  // nunca nada sensible (ver UsuarioParaSeleccion).
-  ipcMain.handle(IPC_CHANNELS.AUTH_USUARIOS_DISPONIBLES, () => listarUsuariosActivosParaSeleccion(db));
+  // Sin sesión a propósito: se llama ANTES de autenticarse, para poblar el
+  // selector "¿Quién va a utilizar Densz?" — mismo endpoint sin
+  // requireAuth que ya usa la web (GET /auth/usuarios-disponibles).
+  ipcMain.handle(IPC_CHANNELS.AUTH_USUARIOS_DISPONIBLES, () => apiClient.authUsuariosDisponibles());
 }

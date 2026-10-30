@@ -66,7 +66,8 @@ export type MetodosEspecificosPorPlataforma =
   | "backupsObtenerConfig"
   | "backupsGuardarConfig"
   | "onActualizacionLista"
-  | "reiniciarParaActualizar";
+  | "reiniciarParaActualizar"
+  | "onSesionExpirada";
 
 /** Arma un query string a partir de un objeto de filtro, omitiendo
  * undefined/null. Los booleans se mandan como "true"/"false" — el mismo

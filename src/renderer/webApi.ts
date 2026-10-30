@@ -366,5 +366,10 @@ export const webApi: DenszApi = {
   // hay nada que escuchar acá, a diferencia del resto de `pendiente(...)`
   // esto no es un gap, es la web funcionando como corresponde.
   onActualizacionLista: () => () => {},
-  reiniciarParaActualizar: () => {}
+  reiniciarParaActualizar: () => {},
+
+  // Idem: la web ya maneja un 401 directo en `apiFetch` (arriba), sin
+  // necesidad de ningún evento — esto es exclusivo del escritorio
+  // (apiClient.ts corre en otro proceso que el renderer).
+  onSesionExpirada: () => () => {}
 };

@@ -202,6 +202,11 @@ const api: DenszApi = {
     ipcRenderer.on(IPC_CHANNELS.ACTUALIZACION_LISTA, listener);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.ACTUALIZACION_LISTA, listener);
   },
+  onSesionExpirada: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on(IPC_CHANNELS.AUTH_SESION_EXPIRADA, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.AUTH_SESION_EXPIRADA, listener);
+  },
   reiniciarParaActualizar: () => {
     void ipcRenderer.invoke(IPC_CHANNELS.ACTUALIZACION_REINICIAR);
   }

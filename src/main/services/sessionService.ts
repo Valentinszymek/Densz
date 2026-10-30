@@ -41,13 +41,32 @@ export interface SesionActual {
 }
 
 let sesionActual: SesionActual | null = null;
+/** Token HTTP (`sesionId`, ver src/server/session.ts) que acompaña a
+ * `sesionActual` cuando la sesión vino del cliente HTTP del escritorio
+ * (apiClient.ts, plan de seguridad del escritorio) — nunca lo setea el
+ * camino viejo de login directo a Postgres. `null` hasta el primer login
+ * por ese camino nuevo. */
+let tokenSesionActual: string | null = null;
 
 export function setUsuarioActual(sesion: SesionActual): void {
   sesionActual = sesion;
 }
 
+/** Igual que `setUsuarioActual`, pero además guarda el token HTTP que
+ * `apiClient.ts` ya persistió en disco — usado por el login/restauración
+ * de sesión del escritorio nuevo (ver googleOAuthDesktop.ts, auth.ipc.ts). */
+export function setSesionConToken(sesion: SesionActual, token: string): void {
+  sesionActual = sesion;
+  tokenSesionActual = token;
+}
+
+export function getTokenSesionActual(): string | null {
+  return tokenSesionActual;
+}
+
 export function limpiarSesion(): void {
   sesionActual = null;
+  tokenSesionActual = null;
 }
 
 export function getSesionActual(): SesionActual | null {

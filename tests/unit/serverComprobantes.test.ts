@@ -268,6 +268,47 @@ describe("HTTP /comprobantes", () => {
       const pdf = await request(app).get(`/comprobantes/${comprobanteId}/pdf`).set("Cookie", cookieOtra);
       expect(pdf.status).toBe(200);
     });
+
+    // --- GET /:id/html y POST /:id/registrar-impresion (plan de seguridad
+    // del escritorio): el único camino que le queda al escritorio para
+    // imprimir el comprobante en silencio sin tener ya una conexión local
+    // a Postgres — ver impresoraService.ts#imprimirComprobanteHtml. ---
+    it("GET /comprobantes/:id/html devuelve el HTML real del comprobante (mismo origen que el PDF)", async () => {
+      const res = await request(app).get(`/comprobantes/${comprobanteId}/html`).set("Cookie", cookieAdmin);
+      expect(res.status).toBe(200);
+      expect(res.body.numero).toBe(numero);
+      expect(res.body.html).toContain(numero);
+      expect(res.body.html.toLowerCase()).toContain("<html");
+    });
+
+    it("GET /comprobantes/:id/html sin sesión devuelve 401", async () => {
+      const res = await request(app).get(`/comprobantes/${comprobanteId}/html`);
+      expect(res.status).toBe(401);
+    });
+
+    it("GET /comprobantes/:id/html con un id inexistente devuelve un error claro (400)", async () => {
+      const res = await request(app).get("/comprobantes/999999999/html").set("Cookie", cookieAdmin);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe("El comprobante no existe.");
+    });
+
+    it("POST /comprobantes/:id/registrar-impresion audita la impresión con el número real", async () => {
+      const res = await request(app).post(`/comprobantes/${comprobanteId}/registrar-impresion`).set("Cookie", cookieAdmin);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ ok: true });
+
+      const { rows } = await ctx.db.query<{ accion: string; entidad: string; entidad_id: number; detalle: unknown }>(
+        "SELECT accion, entidad, entidad_id, detalle FROM auditoria WHERE entidad = 'comprobantes' AND accion = 'imprimir' ORDER BY id DESC LIMIT 1"
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].entidad_id).toBe(comprobanteId);
+      expect(JSON.stringify(rows[0].detalle)).toContain(numero);
+    });
+
+    it("POST /comprobantes/:id/registrar-impresion sin sesión devuelve 401", async () => {
+      const res = await request(app).post(`/comprobantes/${comprobanteId}/registrar-impresion`);
+      expect(res.status).toBe(401);
+    });
   });
 
   // --- PRUEBA DE RECUPERACIÓN: transacción de DB exitosa + falla de Storage ---

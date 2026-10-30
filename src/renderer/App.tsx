@@ -34,6 +34,15 @@ function SesionInicial({ children }: { children: ReactNode }) {
       .finally(() => setCargando(false));
   }, [setSesion, setCargando]);
 
+  // Solo escritorio en la práctica (no-op en web, ver webApi.ts): si el
+  // backend deja de reconocer la sesión a mitad de uso (ej. Railway se
+  // reinició), vuelve directo a la pantalla de login en vez de quedarse
+  // fallando en silencio en la pantalla donde estaba.
+  useEffect(() => {
+    if (typeof window.densz === "undefined") return;
+    return window.densz.onSesionExpirada(() => setSesion(null));
+  }, [setSesion]);
+
   if (cargando) return <Splash />;
   return <>{children}</>;
 }

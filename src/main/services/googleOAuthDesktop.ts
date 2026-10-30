@@ -1,24 +1,31 @@
 import http from "node:http";
-import type { Pool } from "pg";
 import { shell, BrowserWindow } from "electron";
 import { GoTrueClient } from "@supabase/auth-js";
 import { crearAlmacenamientoDeSesion } from "./supabaseSessionStorage";
-import { loginConGoogle, registrarseConGoogle, type IdentidadGoogle } from "./googleAuthService";
-import type { SesionActual } from "./sessionService";
+import { apiClient, getTokenActual } from "./apiClient";
+import { setSesionConToken, type SesionActual } from "./sessionService";
 import { logger } from "../utils/logger";
 
 /**
  * Login con Google en el escritorio (plan multi-laboratorio) — ver
- * compiled-pondering-hammock.md §7 para el diseño completo. Todo el
- * intercambio ocurre acá, en el proceso principal de Electron: el
- * navegador del sistema (nunca uno embebido, Google lo bloquea) abre la
- * pantalla de Google, y un servidor HTTP local temporal recibe la
- * respuesta — mismo patrón que usan GitHub Desktop, VS Code o
- * `gh auth login`.
+ * compiled-pondering-hammock.md §7 (diseño original) y la sección "el
+ * escritorio deja de conectarse directo a Postgres" (plan de seguridad
+ * del escritorio) para el porqué del cambio de esta etapa: antes, el
+ * token de Supabase se usaba para consultar Postgres DIRECTO
+ * (loginConGoogle(pool, identidad)); ahora se manda al mismo endpoint
+ * HTTP que ya usa la web (`POST /auth/google-callback`, vía
+ * apiClient.authLoginGoogle) — cero cambios de backend para esto, el
+ * endpoint ya existía y ya hacía exactamente lo mismo, solo que para
+ * pedidos HTTP en vez de llamados locales.
+ *
+ * El resto del trámite no cambió: el navegador del sistema (nunca uno
+ * embebido, Google lo bloquea) abre la pantalla de Google, y un servidor
+ * HTTP local temporal recibe la respuesta — mismo patrón que usan GitHub
+ * Desktop, VS Code o `gh auth login`.
  *
  * Usa `@supabase/auth-js` directamente (no el SDK completo
  * `@supabase/supabase-js`, que trae acceso a datos/tiempo real/archivos
- * que el escritorio no necesita — ya habla con Postgres directo).
+ * que el escritorio no necesita).
  */
 
 const PUERTO_CALLBACK = 53682;
@@ -47,31 +54,43 @@ function getAuthClient(): GoTrueClient {
   return clienteAuth;
 }
 
-/** De la sesión de Supabase (ya autenticada) a lo que necesita
- * loginConGoogle — mismo shape que usa la web en src/server/googleAuth.ts. */
-function identidadDesdeSesion(usuario: { id: string; email?: string; user_metadata?: Record<string, unknown> }): IdentidadGoogle {
-  if (!usuario.email) {
-    throw new Error("Esa cuenta de Google no tiene un email verificado.");
-  }
-  return {
-    supabaseUserId: usuario.id,
-    email: usuario.email,
-    nombreCompleto: (usuario.user_metadata?.full_name as string | undefined) ?? usuario.email
-  };
+/** Guarda la sesión Y el token HTTP que `apiClient` ya persistió (lo que
+ * faltaría si solo se llamara a `setUsuarioActual`) — un solo lugar para
+ * no repetir `getTokenActual()!` en cada punto de entrada de acá abajo. */
+function guardarSesion(sesion: SesionActual): SesionActual {
+  setSesionConToken(sesion, getTokenActual()!);
+  return sesion;
 }
 
-/** Al arrancar la app: si hay una sesión de Google guardada de una vez
- * anterior (y sigue vigente o se puede renovar sola), la restaura sin
- * abrir ningún navegador. Nunca tira — si falla o no hay nada guardado,
- * el arranque sigue normal, simplemente sin laboratorio resuelto
- * todavía (como ya pasa hoy). */
-export async function intentarRestaurarSesionGoogle(pool: Pool): Promise<SesionActual | null> {
+/** Al arrancar la app, en dos niveles — nunca abre un navegador sin
+ * necesitarlo de verdad:
+ *
+ * 1. Si hay un token HTTP ya guardado de una vez anterior (apiClient lo
+ *    restaura solo desde disco), se prueba directo contra
+ *    `GET /auth/session` — si Railway todavía lo reconoce, la sesión
+ *    vuelve sin tocar Google ni Postgres para nada.
+ * 2. Si eso falla (nunca hubo token, o Railway se reinició y perdió su
+ *    mapa de sesiones en memoria — pasa en cada `git push` al backend),
+ *    se cae al login silencioso de Supabase (sin abrir navegador): si
+ *    sigue teniendo una sesión vigente ahí, se la vuelve a mandar a
+ *    `/auth/google-callback` como si fuera un login nuevo.
+ *
+ * Nunca tira — si los dos niveles fallan, el arranque sigue normal,
+ * simplemente sin sesión todavía (como ya pasa hoy). */
+export async function intentarRestaurarSesionGoogle(): Promise<SesionActual | null> {
+  try {
+    const sesionHttp = await apiClient.authSesionActual();
+    if (sesionHttp) return guardarSesion(sesionHttp);
+  } catch (err) {
+    logger.info(`No se pudo validar el token guardado (se intenta con Supabase): ${String(err)}`);
+  }
+
   try {
     const auth = getAuthClient();
     const { data, error } = await auth.getSession();
     if (error || !data.session) return null;
-    const identidad = identidadDesdeSesion(data.session.user);
-    return await loginConGoogle(pool, identidad);
+    const sesion = await apiClient.authLoginGoogle(data.session.access_token);
+    return guardarSesion(sesion);
   } catch (err) {
     logger.info(`No se pudo restaurar la sesión de Google guardada (se pedirá login de nuevo): ${String(err)}`);
     return null;
@@ -93,10 +112,11 @@ function paginaRespuesta(ok: boolean): string {
 }
 
 /** Abre el navegador del sistema, espera el login de Google, e
- * intercambia el código por una identidad ya verificada — el mismo
- * trámite para "Iniciar sesión" y para "Crear mi laboratorio", que solo
- * difieren en qué hacen con la identidad una vez resuelta. */
-async function completarLoginGoogle(): Promise<IdentidadGoogle> {
+ * intercambia el código por un access token ya verificado por
+ * Supabase — el mismo trámite para "Iniciar sesión" y para "Crear mi
+ * laboratorio", que solo difieren en a qué endpoint HTTP mandan ese
+ * token una vez resuelto. */
+async function completarLoginGoogle(): Promise<{ accessToken: string }> {
   const auth = getAuthClient();
   const redirectTo = `http://127.0.0.1:${PUERTO_CALLBACK}/callback`;
 
@@ -114,32 +134,33 @@ async function completarLoginGoogle(): Promise<IdentidadGoogle> {
     throw new Error(errorIntercambio?.message ?? "No se pudo completar el login con Google.");
   }
 
-  return identidadDesdeSesion(sesionData.session.user);
+  return { accessToken: sesionData.session.access_token };
 }
 
 /** Levanta el servidor local (127.0.0.1 únicamente — nunca accesible
  * desde la red), abre el navegador del sistema, y devuelve la sesión ya
  * autenticada una vez que la persona completa el login en Google. */
-export async function iniciarLoginGoogleEscritorio(pool: Pool): Promise<SesionActual> {
-  const identidad = await completarLoginGoogle();
-  const sesion = await loginConGoogle(pool, identidad);
+export async function iniciarLoginGoogleEscritorio(): Promise<SesionActual> {
+  const { accessToken } = await completarLoginGoogle();
+  const sesion = await apiClient.authLoginGoogle(accessToken);
 
   // La persona va a estar en el navegador — la traemos de vuelta a Densz.
   BrowserWindow.getAllWindows()[0]?.focus();
 
-  return sesion;
+  return guardarSesion(sesion);
 }
 
 /** Variante de "Crear mi laboratorio" — mismo navegador del sistema +
  * servidor local, solo que al volver da de alta el laboratorio nuevo en
- * vez de buscar uno existente (ver googleAuthService.ts). */
-export async function iniciarRegistroLaboratorioEscritorio(pool: Pool, nombreLaboratorio: string): Promise<SesionActual> {
-  const identidad = await completarLoginGoogle();
-  const sesion = await registrarseConGoogle(pool, identidad, nombreLaboratorio);
+ * vez de buscar uno existente (ver googleAuthService.ts, que sigue
+ * corriendo del lado del servidor sin cambios). */
+export async function iniciarRegistroLaboratorioEscritorio(nombreLaboratorio: string): Promise<SesionActual> {
+  const { accessToken } = await completarLoginGoogle();
+  const sesion = await apiClient.authRegistrarseConGoogle(nombreLaboratorio, accessToken);
 
   BrowserWindow.getAllWindows()[0]?.focus();
 
-  return sesion;
+  return guardarSesion(sesion);
 }
 
 /** Abre el navegador del sistema en `urlGoogle` y espera, con el

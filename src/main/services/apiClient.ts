@@ -59,6 +59,15 @@ function getToken(): string | null {
   return tokenEnMemoria;
 }
 
+/** El token actualmente en uso (ya persistido o recién obtenido por un
+ * login) — para los pocos lugares del proceso principal que necesitan
+ * guardarlo junto con la sesión (sessionService.ts#setSesionConToken, ver
+ * googleOAuthDesktop.ts/auth.ipc.ts). La mayoría del código nunca necesita
+ * leerlo directo: alcanza con que `apiClient` lo mande solo en cada pedido. */
+export function getTokenActual(): string | null {
+  return getToken();
+}
+
 export function setToken(token: string): void {
   tokenEnMemoria = token;
   guardarToken(token);
@@ -275,4 +284,7 @@ type SinImplementarAca =
   | "backupsObtenerConfig"
   | "backupsGuardarConfig"
   | "onActualizacionLista"
-  | "reiniciarParaActualizar";
+  | "reiniciarParaActualizar"
+  // Implementado en preload.ts (escucha el evento IPC que este archivo
+  // dispara vía alExpirarSesion) — no es un método HTTP.
+  | "onSesionExpirada";

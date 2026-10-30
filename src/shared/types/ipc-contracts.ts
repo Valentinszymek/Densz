@@ -205,6 +205,13 @@ export const IPC_CHANNELS = {
   AUTH_LOGOUT: "auth:logout",
   AUTH_SESION_ACTUAL: "auth:sesionActual",
   AUTH_USUARIOS_DISPONIBLES: "auth:usuariosDisponibles",
+  // Evento PUSH (main -> renderer, nunca invoke/handle), solo escritorio —
+  // ver apiClient.ts#alExpirarSesion. Plan de seguridad del escritorio: el
+  // escritorio ahora depende de que Railway todavía reconozca su token
+  // (puede perderlo, ej. tras un reinicio del backend) — sin esto, una
+  // sesión cortada a mitad de uso se quedaría fallando en silencio en vez
+  // de mandar de vuelta al login con un mensaje claro.
+  AUTH_SESION_EXPIRADA: "auth:sesionExpirada",
 
   USUARIOS_LISTAR: "usuarios:listar",
   USUARIOS_LISTAR_ROLES: "usuarios:listarRoles",
@@ -494,6 +501,13 @@ export interface DenszApi {
   authLogout: () => Promise<void>;
   authSesionActual: () => Promise<SesionActualDto | null>;
   authUsuariosDisponibles: () => Promise<UsuarioParaSeleccion[]>;
+  /** Solo escritorio: avisa si el backend dejó de reconocer la sesión
+   * actual a mitad de uso (ej. Railway se reinició y perdió su mapa de
+   * sesiones en memoria) — mismo patrón que `onActualizacionLista`. En web
+   * es un no-op silencioso: ya tiene su propio manejo de 401 en
+   * `webApi.ts#apiFetch`, sin necesidad de este evento. Devuelve una
+   * función para des-suscribirse. */
+  onSesionExpirada: (callback: () => void) => () => void;
 
   usuariosListar: () => Promise<Usuario[]>;
   usuariosListarRoles: () => Promise<Rol[]>;
