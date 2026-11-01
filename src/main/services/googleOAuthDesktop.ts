@@ -33,15 +33,21 @@ const TIMEOUT_LOGIN_MS = 120_000;
 
 let clienteAuth: GoTrueClient | null = null;
 
+// Igual que DENSZ_API_URL en apiClient.ts (Etapa 4 del plan de seguridad
+// del escritorio): ni la URL del proyecto de Supabase ni la "anon key"
+// son secretas (la propia clave empieza con `sb_publishable_` — está
+// pensada por diseño para viajar en código cliente, es la misma que ya
+// expone públicamente el bundle de la web). Hornearlas acá como default
+// evita que un instalador real necesite un `.env` solo para que el login
+// con Google funcione. `SUPABASE_URL`/`SUPABASE_ANON_KEY` siguen pisando
+// este default en cualquier entorno que los fije.
+const SUPABASE_URL_DEFAULT = "https://cvplaqzlaeyhnwbrrkfi.supabase.co";
+const SUPABASE_ANON_KEY_DEFAULT = "sb_publishable_ZCu4KXoflum_DzyPFyelog_ECN8lUVV";
+
 function getAuthClient(): GoTrueClient {
   if (clienteAuth) return clienteAuth;
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error(
-      "Login con Google no está configurado todavía: faltan SUPABASE_URL / SUPABASE_ANON_KEY (ver .env.example)."
-    );
-  }
+  const url = process.env.SUPABASE_URL ?? SUPABASE_URL_DEFAULT;
+  const anonKey = process.env.SUPABASE_ANON_KEY ?? SUPABASE_ANON_KEY_DEFAULT;
   clienteAuth = new GoTrueClient({
     url: `${url}/auth/v1`,
     headers: { apikey: anonKey },
