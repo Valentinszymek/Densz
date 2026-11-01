@@ -35,13 +35,33 @@ function leerArchivo(): Record<string, string> {
 }
 
 /** Escritura seguro: a un archivo temporal y rename — así una app
- * cerrada a mitad de escritura nunca deja el archivo real corrupto. */
+ * cerrada a mitad de escritura nunca deja el archivo real corrupto.
+ *
+ * El rename puede fallar con EPERM/EBUSY en Windows si algo tiene el
+ * archivo destino abierto un instante (ej. OneDrive sincronizando la
+ * carpeta, un antivirus) — es transitorio, así que se reintenta unas
+ * pocas veces con una espera corta antes de darlo por error real. */
 function escribirArchivo(datos: Record<string, string>): void {
   const ruta = rutaArchivoSesion();
   const rutaTemp = `${ruta}.tmp`;
   fs.mkdirSync(path.dirname(ruta), { recursive: true });
   fs.writeFileSync(rutaTemp, JSON.stringify(datos), "utf-8");
-  fs.renameSync(rutaTemp, ruta);
+
+  const intentos = 5;
+  for (let intento = 1; intento <= intentos; intento++) {
+    try {
+      fs.renameSync(rutaTemp, ruta);
+      return;
+    } catch (error) {
+      const esTransitorio = error instanceof Error && "code" in error && (error.code === "EPERM" || error.code === "EBUSY");
+      if (!esTransitorio || intento === intentos) throw error;
+      const esperaHastaMs = intento * 50;
+      const hasta = Date.now() + esperaHastaMs;
+      while (Date.now() < hasta) {
+        /* espera corta y bloqueante — esta función ya es síncrona end-to-end */
+      }
+    }
+  }
 }
 
 export function crearAlmacenamientoDeSesion(): {
