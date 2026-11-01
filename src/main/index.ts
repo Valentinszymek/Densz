@@ -46,6 +46,14 @@ if (!obtuvoElLock) {
   });
 
   app.whenReady().then(async () => {
+    // Antes que nada: si nadie fijó NODE_ENV (el caso normal de un
+    // instalador real, que el cliente abre con doble clic, sin ninguna
+    // variable de entorno propia), se infiere de si esta es una build
+    // empaquetada o no. apiClient.ts usa esto para elegir el backend de
+    // Railway horneado en vez de `http://localhost:4000` — tiene que
+    // quedar fijado ANTES del primer pedido HTTP real.
+    process.env.NODE_ENV ??= app.isPackaged ? "production" : "development";
+
     loadEnvFile();
 
     // Plan de seguridad del escritorio: ya no se abre ninguna conexión

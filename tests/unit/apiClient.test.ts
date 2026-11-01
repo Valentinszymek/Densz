@@ -164,4 +164,21 @@ describe("apiClient", () => {
       else process.env.DENSZ_API_URL = original;
     }
   });
+
+  it("sin DENSZ_API_URL pero con NODE_ENV=production, usa el backend de Railway horneado (Etapa 4: instalador sin .env)", async () => {
+    const originalUrl = process.env.DENSZ_API_URL;
+    const originalEnv = process.env.NODE_ENV;
+    delete process.env.DENSZ_API_URL;
+    process.env.NODE_ENV = "production";
+    try {
+      const fetchMock = mockFetchOnce(200, []);
+      const { apiClient } = await import("../../src/main/services/apiClient");
+      await apiClient.odontologosListar();
+      expect(fetchMock.mock.calls[0][0]).toBe("https://densz-production.up.railway.app/odontologos");
+    } finally {
+      if (originalUrl === undefined) delete process.env.DENSZ_API_URL;
+      else process.env.DENSZ_API_URL = originalUrl;
+      process.env.NODE_ENV = originalEnv;
+    }
+  });
 });

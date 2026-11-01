@@ -78,7 +78,20 @@ export function limpiarToken(): void {
   borrarTokenGuardado();
 }
 
-const API_BASE = process.env.DENSZ_API_URL ?? "http://localhost:4000";
+/** La URL del backend de Railway no es secreta (a diferencia de
+ * `DATABASE_URL`) — por eso puede "hornearse" acá como default de la
+ * build empaquetada, en vez de depender de un `.env` que el cliente
+ * tendría que configurar a mano (ver plan de seguridad del escritorio,
+ * Etapa 4). `DENSZ_API_URL` sigue pisando este default en cualquier
+ * entorno (dev contra un backend local, o un instalador de prueba
+ * apuntado a un backend que no es producción). Función (no `const`) a
+ * propósito: así lee `process.env` recién en el primer pedido real, no
+ * en el momento en que este módulo se importa — `src/main/index.ts` fija
+ * `NODE_ENV` apenas arranca la app, antes de que se haga ningún pedido. */
+function getApiBase(): string {
+  if (process.env.DENSZ_API_URL) return process.env.DENSZ_API_URL;
+  return process.env.NODE_ENV === "production" ? "https://densz-production.up.railway.app" : "http://localhost:4000";
+}
 
 function manejarNoAutorizado(): void {
   limpiarToken();
@@ -89,7 +102,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   const token = getToken();
   let respuesta: Response;
   try {
-    respuesta = await fetch(`${API_BASE}${path}`, {
+    respuesta = await fetch(`${getApiBase()}${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -147,7 +160,7 @@ async function getBuffer(path: string): Promise<Buffer> {
   const token = getToken();
   let respuesta: Response;
   try {
-    respuesta = await fetch(`${API_BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    respuesta = await fetch(`${getApiBase()}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   } catch {
     throw new ApiError(0, "No se pudo conectar con el servidor. Revisá tu conexión a internet.");
   }
@@ -175,7 +188,7 @@ async function postBuffer(path: string, body: unknown): Promise<{ buffer: Buffer
   const token = getToken();
   let respuesta: Response;
   try {
-    respuesta = await fetch(`${API_BASE}${path}`, {
+    respuesta = await fetch(`${getApiBase()}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify(body)

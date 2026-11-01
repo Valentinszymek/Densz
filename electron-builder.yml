@@ -43,6 +43,28 @@ files:
   - "!node_modules/http-proxy-agent/**"
   - "!node_modules/https-proxy-agent/**"
   - "!node_modules/pac-proxy-agent/**"
+  # El escritorio dejó de conectarse directo a Postgres (plan de seguridad
+  # "el escritorio deja de conectarse directo a Postgres" — ver
+  # src/main/services/apiClient.ts): ahora habla por HTTP autenticado con
+  # el mismo backend que la web, nunca con la contraseña real de la base.
+  # `pg` y sus paquetes solo quedan en package.json porque src/server/**
+  # (el backend, que no viaja en este instalador) los sigue necesitando.
+  # Excluirlos acá es la garantía real de que ningún instalador de Densz
+  # vuelva a tener en la máquina del cliente una forma de conectarse
+  # directo a la base — aunque algún código viejo lo importe por error,
+  # el paquete ni va a estar presente para que ese require() funcione.
+  - "!node_modules/pg/**"
+  - "!node_modules/pg-cloudflare/**"
+  - "!node_modules/pg-connection-string/**"
+  - "!node_modules/pg-int8/**"
+  - "!node_modules/pg-pool/**"
+  - "!node_modules/pg-protocol/**"
+  - "!node_modules/pg-types/**"
+  - "!node_modules/pgpass/**"
+  - "!node_modules/postgres-array/**"
+  - "!node_modules/postgres-bytea/**"
+  - "!node_modules/postgres-date/**"
+  - "!node_modules/postgres-interval/**"
 # A propósito NO se empaqueta `.env` acá (ver incidente 2026-10-27: un
 # `extraResources: - .env` viejo metía el `.env` REAL de esta máquina de
 # build — DATABASE_URL de producción, service role key de Supabase, claves
