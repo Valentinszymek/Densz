@@ -205,6 +205,7 @@ export const IPC_CHANNELS = {
   AUTH_LOGOUT: "auth:logout",
   AUTH_SESION_ACTUAL: "auth:sesionActual",
   AUTH_USUARIOS_DISPONIBLES: "auth:usuariosDisponibles",
+  AUTH_USUARIOS_DEL_LABORATORIO: "auth:usuariosDelLaboratorio",
   // Evento PUSH (main -> renderer, nunca invoke/handle), solo escritorio —
   // ver apiClient.ts#alExpirarSesion. Plan de seguridad del escritorio: el
   // escritorio ahora depende de que Railway todavía reconozca su token
@@ -501,6 +502,12 @@ export interface DenszApi {
   authLogout: () => Promise<void>;
   authSesionActual: () => Promise<SesionActualDto | null>;
   authUsuariosDisponibles: () => Promise<UsuarioParaSeleccion[]>;
+  /** Variante correctamente aislada por laboratorio (ver auth.route.ts) —
+   * usada por el paso "Continuar con Google" del login diario: con el
+   * access token de una cuenta de Google ya verificada, devuelve solo
+   * los usuarios activos de SU laboratorio, nunca de otro. En escritorio
+   * no se pasa nada (igual que authLoginGoogle, resuelve el token solo). */
+  authUsuariosDelLaboratorio: (accessToken?: string) => Promise<UsuarioParaSeleccion[]>;
   /** Solo escritorio: avisa si el backend dejó de reconocer la sesión
    * actual a mitad de uso (ej. Railway se reinició y perdió su mapa de
    * sesiones en memoria) — mismo patrón que `onActualizacionLista`. En web

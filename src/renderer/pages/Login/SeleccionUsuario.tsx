@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from "react";
-import { useUsuariosDisponibles } from "../../features/auth/hooks";
 import { DenszLogo } from "../../components/brand/DenszLogo";
 import { formatearRol } from "../../lib/format";
 import {
@@ -37,15 +36,22 @@ function TarjetaUsuario({ usuario, onClick }: { usuario: UsuarioParaSeleccion; o
 /** Paso 1 del login: "¿Quién va a utilizar Densz?" — los usuarios salen
  * dinámicamente de la base (solo activos), nunca hardcodeados. Funciona
  * igual con 1 usuario que con 10: se acomodan en una grilla que envuelve
- * y hace scroll interno si no entran todos en alto. */
+ * y hace scroll interno si no entran todos en alto.
+ *
+ * `usuarios` lo resuelve Login/index.tsx, no este componente: en
+ * escritorio es la lista sin filtrar de siempre; en la web, SOLO existe
+ * después de pasar por Google (ver CallbackGoogle.tsx) — `undefined`
+ * antes de eso, a propósito, para no mostrar nunca una lista de usuarios
+ * sin haber verificado a qué laboratorio pertenecen. */
 export function SeleccionUsuario({
+  usuarios,
   onSeleccionar,
   onOlvideContrasena
 }: {
+  usuarios: UsuarioParaSeleccion[] | undefined;
   onSeleccionar: (u: UsuarioParaSeleccion) => void;
   onOlvideContrasena: () => void;
 }) {
-  const { data: usuarios, isLoading } = useUsuariosDisponibles();
   const setSesion = useAuthStore((s) => s.setSesion);
   const [email, setEmail] = useState("");
   const [passwordEmail, setPasswordEmail] = useState("");
@@ -112,15 +118,13 @@ export function SeleccionUsuario({
       <DenszLogo height={120} className="mb-10" />
       <h1 className="text-cream/80 text-lg font-medium mb-8 text-center">¿Quién va a utilizar Densz?</h1>
 
-      {isLoading && <p className="text-cream/40 text-sm">Cargando usuarios…</p>}
-
-      {!isLoading && usuarios?.length === 0 && (
+      {usuarios !== undefined && usuarios.length === 0 && (
         <p className="text-cream/40 text-sm max-w-sm text-center">
           No hay usuarios activos para iniciar sesión. Contactá a un administrador de este Densz.
         </p>
       )}
 
-      {!isLoading && !!usuarios?.length && (
+      {!!usuarios?.length && (
         <div className="flex flex-wrap justify-center gap-4 max-w-3xl max-h-[55vh] overflow-y-auto scrollbar-invisible px-2 py-2">
           {usuarios.map((u) => (
             <TarjetaUsuario key={u.id} usuario={u} onClick={() => onSeleccionar(u)} />

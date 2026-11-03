@@ -2,7 +2,11 @@ import { ipcMain } from "electron";
 import { z } from "zod";
 import { apiClient, getTokenActual } from "../services/apiClient";
 import { getSesionActual, setSesionConToken, limpiarSesion } from "../services/sessionService";
-import { iniciarLoginGoogleEscritorio, iniciarRegistroLaboratorioEscritorio } from "../services/googleOAuthDesktop";
+import {
+  iniciarLoginGoogleEscritorio,
+  iniciarRegistroLaboratorioEscritorio,
+  verificarUsuariosDelLaboratorioEscritorio
+} from "../services/googleOAuthDesktop";
 import { borrarSesionGuardada } from "../services/supabaseSessionStorage";
 import { traducirErrorPostgres } from "../utils/errors";
 import { IPC_CHANNELS } from "../../shared/types/ipc-contracts";
@@ -70,4 +74,9 @@ export function registrarHandlersAuth(): void {
   // selector "¿Quién va a utilizar Densz?" — mismo endpoint sin
   // requireAuth que ya usa la web (GET /auth/usuarios-disponibles).
   ipcMain.handle(IPC_CHANNELS.AUTH_USUARIOS_DISPONIBLES, () => apiClient.authUsuariosDisponibles());
+
+  // "Continuar con Google" del login diario (ver comentario en
+  // googleOAuthDesktop.ts) — todavía sin conectar a ningún botón real de
+  // escritorio (pendiente de la Etapa 5), pero ya queda listo.
+  ipcMain.handle(IPC_CHANNELS.AUTH_USUARIOS_DEL_LABORATORIO, () => verificarUsuariosDelLaboratorioEscritorio());
 }

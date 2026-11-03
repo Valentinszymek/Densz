@@ -6,10 +6,11 @@ import { toast } from "../../store/toastStore";
  * se pide antes de autenticarse, así que nunca trae datos sensibles (ver
  * UsuarioParaSeleccion). Se resuelve dinámicamente desde la base: nada
  * hardcodeado acá ni en el componente que lo consume. */
-export function useUsuariosDisponibles() {
+export function useUsuariosDisponibles(opciones?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["auth", "usuariosDisponibles"],
-    queryFn: () => window.densz.authUsuariosDisponibles()
+    queryFn: () => window.densz.authUsuariosDisponibles(),
+    enabled: opciones?.enabled ?? true
   });
 }
 

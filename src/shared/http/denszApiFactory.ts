@@ -46,6 +46,7 @@ export type MetodosEspecificosPorPlataforma =
   | "authLogout"
   | "authSesionActual"
   | "authUsuariosDisponibles"
+  | "authUsuariosDelLaboratorio"
   | "comprobantesVerPdf"
   | "comprobantesImprimir"
   | "cuentasVerPdfResumen"

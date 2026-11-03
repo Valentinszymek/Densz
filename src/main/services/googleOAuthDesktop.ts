@@ -5,6 +5,7 @@ import { crearAlmacenamientoDeSesion } from "./supabaseSessionStorage";
 import { apiClient, getTokenActual } from "./apiClient";
 import { setSesionConToken, type SesionActual } from "./sessionService";
 import { logger } from "../utils/logger";
+import type { UsuarioParaSeleccion } from "../../shared/types/entities";
 
 /**
  * Login con Google en el escritorio (plan multi-laboratorio) — ver
@@ -162,6 +163,24 @@ export async function iniciarLoginGoogleEscritorio(): Promise<SesionActual> {
   BrowserWindow.getAllWindows()[0]?.focus();
 
   return guardarSesion(sesion);
+}
+
+/** Verificación de Google para "Iniciar sesión" (ver comentario en
+ * SeleccionUsuario.tsx/CallbackGoogle.tsx — mismo criterio que la web,
+ * pendiente de conectar al botón de escritorio hasta que el instalador
+ * nuevo pueda publicarse, ver plan de la Etapa 5): abre el navegador del
+ * sistema igual que `iniciarLoginGoogleEscritorio`, pero NO arma ninguna
+ * sesión de Densz — solo confirma la identidad real y devuelve los
+ * usuarios activos de SU laboratorio, para que la persona elija su
+ * propio perfil y ponga SU contraseña a través del login normal
+ * (usuario/contraseña), completamente aparte. */
+export async function verificarUsuariosDelLaboratorioEscritorio(): Promise<UsuarioParaSeleccion[]> {
+  const { accessToken } = await completarLoginGoogle();
+  const usuarios = await apiClient.authUsuariosDelLaboratorio(accessToken);
+
+  BrowserWindow.getAllWindows()[0]?.focus();
+
+  return usuarios;
 }
 
 /** Variante de "Crear mi laboratorio" — mismo navegador del sistema +

@@ -168,6 +168,9 @@ const api: DenszApi = {
   authLogout: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_LOGOUT),
   authSesionActual: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_SESION_ACTUAL),
   authUsuariosDisponibles: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USUARIOS_DISPONIBLES),
+  // Mismo criterio que authLoginGoogle: el escritorio ignora el
+  // accessToken (no aplica) y hace todo el trámite de Google él solo.
+  authUsuariosDelLaboratorio: () => ipcRenderer.invoke(IPC_CHANNELS.AUTH_USUARIOS_DEL_LABORATORIO),
 
   usuariosListar: () => ipcRenderer.invoke(IPC_CHANNELS.USUARIOS_LISTAR),
   usuariosListarRoles: () => ipcRenderer.invoke(IPC_CHANNELS.USUARIOS_LISTAR_ROLES),

@@ -259,7 +259,9 @@ export const apiClient = {
     }
   },
   authSesionActual: (): Promise<SesionActualDto | null> => get("/auth/session"),
-  authUsuariosDisponibles: (): Promise<UsuarioParaSeleccion[]> => get("/auth/usuarios-disponibles")
+  authUsuariosDisponibles: (): Promise<UsuarioParaSeleccion[]> => get("/auth/usuarios-disponibles"),
+  authUsuariosDelLaboratorio: (accessToken: string): Promise<UsuarioParaSeleccion[]> =>
+    post("/auth/usuarios-del-laboratorio", { accessToken })
 } satisfies Omit<DenszApi, SinImplementarAca> & Record<string, unknown>;
 
 /** Métodos de DenszApi que NO se arman en este archivo — necesitan una
@@ -277,6 +279,10 @@ type SinImplementarAca =
   // auth.ipc.ts, orquestando googleOAuthDesktop + este cliente.
   | "authLoginGoogle"
   | "authRegistrarseConGoogle"
+  // Mismo motivo que los dos de arriba: acá el token es siempre
+  // obligatorio (lo resuelve googleOAuthDesktop.ts antes de llamar a
+  // esto); la firma completa con token opcional la arma auth.ipc.ts.
+  | "authUsuariosDelLaboratorio"
   | "comprobantesVerPdf"
   | "comprobantesImprimir"
   | "cuentasVerPdfResumen"

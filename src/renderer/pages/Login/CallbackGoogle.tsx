@@ -60,9 +60,19 @@ export default function CallbackGoogle() {
           navigate("/", { replace: true });
         } else {
           // Ver comentario arriba: "Iniciar sesión" nunca entra directo
-          // con Google — vuelve al selector de usuarios.
-          toast({ titulo: "Cuenta de Google verificada", descripcion: "Elegí tu usuario y poné tu contraseña para entrar.", tono: "exito" });
-          navigate("/login", { replace: true });
+          // con Google — pide los usuarios de SU laboratorio (nunca de
+          // otro) y vuelve al selector con esa lista ya resuelta.
+          const usuarios = await window.densz.authUsuariosDelLaboratorio(accessToken);
+          if (usuarios.length > 0) {
+            toast({ titulo: "Cuenta de Google verificada", descripcion: "Elegí tu usuario y poné tu contraseña para entrar.", tono: "exito" });
+          } else {
+            toast({
+              titulo: "Cuenta de Google verificada",
+              descripcion: "Pero no está vinculada a ningún laboratorio con usuarios activos todavía.",
+              tono: "info"
+            });
+          }
+          navigate("/login", { replace: true, state: { usuariosDelLaboratorio: usuarios } });
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "No se pudo completar el login con Google.");

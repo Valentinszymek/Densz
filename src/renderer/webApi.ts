@@ -346,6 +346,7 @@ export const webApi: DenszApi = {
   authLogout: () => post("/auth/logout"),
   authSesionActual: () => get("/auth/session"),
   authUsuariosDisponibles: () => get("/auth/usuarios-disponibles"),
+  authUsuariosDelLaboratorio: (accessToken) => post("/auth/usuarios-del-laboratorio", { accessToken }),
 
   // Exportación: descarga real vía el navegador (Content-Disposition:
   // attachment) — nunca un diálogo nativo, que no existe en la web.

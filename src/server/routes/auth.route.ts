@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Pool } from "pg";
 import { login, logout } from "../../main/services/authService";
 import { loginConGoogle, registrarseConGoogle } from "../../main/services/googleAuthService";
-import { listarUsuariosActivosParaSeleccion } from "../../main/db/repositories/usuariosRepo";
+import { listarUsuariosActivosParaSeleccion, buscarUsuarioParaLoginGoogle } from "../../main/db/repositories/usuariosRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { crearSesionHttp, obtenerSesionHttp, destruirSesionHttp, obtenerIdSesionDeRequest, COOKIE_SESION } from "../session";
 import { verificarTokenGoogle } from "../googleAuth";
@@ -158,8 +158,68 @@ export function crearRouterAuth(db: Pool): Router {
   // de autenticarse (selector "¿Quién va a utilizar Densz?"), por eso sin
   // requireAuth, igual que el escritorio. El repositorio ya devuelve solo
   // id/usuario/nombre/rol de usuarios activos, nunca nada sensible.
+  //
+  // OJO (2026-11-03): esto NO filtra por laboratorio — `db` es el Pool
+  // crudo del servidor, que nunca tiene fijado `app.current_laboratorio_id`
+  // acá (ese GUC solo lo fija `attachTenantDb`, DESPUÉS de un login real).
+  // Con RLS activa esto devuelve today 0 filas la mayoría de las veces (o,
+  // en una conexión reciclada que por una ventana muy chica todavía tenga
+  // el GUC de un pedido autenticado anterior, filas de ESE laboratorio por
+  // error) — nunca confiable para multi-laboratorio. Se deja sin tocar por
+  // compatibilidad con el escritorio (todavía no migrado a HTTP en
+  // producción), pero la web ya NO lo usa — ver POST /usuarios-del-laboratorio.
   router.get("/usuarios-disponibles", async (_req, res) => {
     res.json(await listarUsuariosActivosParaSeleccion(db));
+  });
+
+  // Variante CORRECTAMENTE aislada por laboratorio del endpoint de arriba
+  // — pensada para el paso "Continuar con Google" del login diario
+  // (CallbackGoogle.tsx): Google ahí no inicia sesión por sí solo, solo
+  // verifica una identidad real y resuelve a qué laboratorio pertenece
+  // (misma función SECURITY DEFINER que el login real), y ESTE endpoint
+  // devuelve los usuarios de ESE laboratorio puntual — nunca de otro —
+  // para que la persona elija su propio perfil y ponga SU contraseña
+  // (/auth/login, sin relación con Google). Se abre una conexión y
+  // transacción propias para fijar el GUC sin pisar la del pool
+  // compartido, mismo patrón que attachTenantDb.ts.
+  router.post("/usuarios-del-laboratorio", async (req, res) => {
+    try {
+      const { accessToken } = esquemaLoginGoogle.parse(req.body);
+      const identidad = await verificarTokenGoogle(accessToken);
+      const usuario = await buscarUsuarioParaLoginGoogle(db, identidad.supabaseUserId, identidad.email);
+      if (!usuario || usuario.laboratorioId === null) {
+        res.json([]);
+        return;
+      }
+      // Mismo chequeo dual que attachTenantDb.ts: en los tests HTTP, `db`
+      // es en realidad un PoolClient ya abierto disfrazado de Pool (toda
+      // la request de un test corre a propósito dentro de esa misma
+      // transacción, que el test revierte al final) — ahí no hay que
+      // abrir ("connect") ninguna conexión nueva, alcanza con fijar el
+      // GUC sobre esa misma.
+      if (typeof (db as unknown as { release?: unknown }).release === "function") {
+        await db.query("SELECT set_config('app.current_laboratorio_id', $1, true)", [String(usuario.laboratorioId)]);
+        res.json(await listarUsuariosActivosParaSeleccion(db));
+        return;
+      }
+      const client = await db.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SELECT set_config('app.current_laboratorio_id', $1, true)", [String(usuario.laboratorioId)]);
+        const usuarios = await listarUsuariosActivosParaSeleccion(client);
+        await client.query("COMMIT");
+        res.json(usuarios);
+      } catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      logger.error("Error en POST /auth/usuarios-del-laboratorio:", err);
+      const error = traducirErrorPostgres(err);
+      res.status(400).json({ error: error.message });
+    }
   });
 
   return router;
