@@ -129,6 +129,16 @@ function SeccionTamanoImpresion() {
   const { data: tamano, isLoading } = useTamanoImpresionComprobante();
   const guardar = useGuardarTamanoImpresionComprobante();
   const esA4 = tamano === "a4";
+  // El tamaño del ticket solo es 100% confiable desde la app de escritorio
+  // (Densz le pide el tamaño directo a la impresora, sin diálogo de por
+  // medio). Desde el navegador, el tamaño físico de papel lo decide el
+  // diálogo de impresión de Windows/Chrome — ningún sitio web puede
+  // forzarlo — así que si la impresora no tiene cargado papel realmente
+  // precortado (o su tamaño personalizado no está bien registrado), el
+  // comprobante puede salir en una hoja grande con el ticket en una
+  // esquina. "A4 completa" evita ese riesgo por completo: A4 es un
+  // tamaño que cualquier impresora soporta sin configuración extra.
+  const esEscritorio = window.densz.plataforma === "escritorio";
 
   return (
     <Card>
@@ -141,6 +151,14 @@ function SeccionTamanoImpresion() {
           en papel ya precortado a ese tamaño. Activá esto si en cambio imprimís en hoja A4 entera y recortás el
           ticket vos mismo después, siguiendo la guía punteada.
         </p>
+
+        {!esEscritorio && !esA4 && (
+          <p className="text-xs text-amber-800/80 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
+            Estás usando Densz desde el navegador: el tamaño de papel que imprime lo decide la ventana de impresión
+            de Windows/Chrome, no Densz. Si tu impresora no tiene cargado un papel realmente precortado a 10,5 ×
+            14,8 cm, elegí <strong>"Imprimir en hoja A4 completa"</strong> acá abajo para un resultado confiable.
+          </p>
+        )}
 
         <div className="flex items-center justify-between rounded-lg border border-carbon/10 bg-cream px-4 py-3">
           <div>
