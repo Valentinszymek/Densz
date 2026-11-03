@@ -4,13 +4,30 @@ import { DenszLogo } from "../../components/brand/DenszLogo";
 import { supabase } from "../../lib/supabaseClient";
 
 /**
- * Supabase redirige acá (mismo mecanismo PKCE que CallbackGoogle.tsx)
- * después de que la persona toca el link de recuperación del email — el
- * cliente de supabase-js canjea el `?code=...` solo y queda con una
- * sesión temporal de recuperación. Desde acá solo se permite UNA cosa:
+ * A diferencia del login con Google (CallbackGoogle.tsx, que sí usa
+ * PKCE — `?code=...` como query param real), el link de "recuperar
+ * contraseña" que manda Supabase por email usa el flujo implícito
+ * (`access_token`/`refresh_token` pegados después de un `#`), sin
+ * importar la configuración `flowType: "pkce"` del cliente — es el
+ * propio servidor de Supabase el que arma ese link así para este caso.
+ * Como esta pantalla YA vive detrás de su propio `#/auth/restablecer`
+ * (HashRouter), el resultado es una URL con DOS `#` seguidos
+ * (`.../#/auth/restablecer#access_token=...`) — ahí la detección
+ * automática de supabase-js (`detectSessionInUrl`, que espera el token
+ * como el fragmento ÚNICO y al principio de la URL) nunca lo encuentra,
+ * y el link parecía "vencido" sin estarlo. Por eso acá se buscan los
+ * tokens a mano, en cualquier posición de la URL completa, y se arma la
+ * sesión directo con `setSession`. Desde acá solo se permite UNA cosa:
  * elegir la contraseña nueva (`updateUser`) — nunca se manda nada al
  * backend de Densz con esta sesión (es de Supabase, no de Densz).
  */
+function extraerTokensDeUrl(href: string): { access_token: string; refresh_token: string } | null {
+  const accessMatch = href.match(/[#&?]access_token=([^&]+)/);
+  const refreshMatch = href.match(/[#&?]refresh_token=([^&]+)/);
+  if (!accessMatch || !refreshMatch) return null;
+  return { access_token: decodeURIComponent(accessMatch[1]), refresh_token: decodeURIComponent(refreshMatch[1]) };
+}
+
 export default function RestablecerContrasena() {
   const navigate = useNavigate();
   const [listo, setListo] = useState(false);
@@ -40,6 +57,13 @@ export default function RestablecerContrasena() {
     const { data: suscripcion } = supabase.auth.onAuthStateChange((_evento, sesion) => {
       if (sesion) marcarListo();
     });
+
+    const tokens = extraerTokensDeUrl(window.location.href);
+    if (tokens) {
+      supabase.auth.setSession(tokens).then(({ error: errSet }) => {
+        if (!errSet) marcarListo();
+      });
+    }
 
     const timeoutId = window.setTimeout(() => {
       if (!yaProceso.current) setError("El link de recuperación venció o no es válido — pedí uno nuevo.");
