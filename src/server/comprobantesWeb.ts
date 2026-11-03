@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import type { Pool, PoolClient } from "pg";
-import { generarComprobante, regenerarPdfComprobante } from "../main/services/comprobanteService";
+import { generarComprobante, regenerarPdfComprobante, paginaPdfSegunPreferencia } from "../main/services/comprobanteService";
 import { setPdfPath, obtenerComprobante } from "../main/db/repositories/comprobantesRepo";
-import type { Comprobante } from "../shared/types/entities";
+import type { Comprobante, TamanoImpresionComprobante } from "../shared/types/entities";
 import { generarPdfDesdeHtmlWeb } from "./pdf";
 import { subirDocumento, descargarDocumento, eliminarDocumento } from "./storage";
 
@@ -128,4 +128,35 @@ export async function regenerarComprobanteWeb(db: Pool | PoolClient, comprobante
 export async function descargarPdfComprobanteWeb(db: Pool | PoolClient, comprobanteId: number): Promise<Buffer> {
   const rutaStorage = await regenerarComprobanteWeb(db, comprobanteId);
   return descargarDocumento(rutaStorage);
+}
+
+/**
+ * Variante de `descargarPdfComprobanteWeb` con un tamaño de página elegido
+ * puntualmente DESDE ESTA COMPUTADORA (preferencia guardada local, nunca
+ * en la base — ver `tamanoImpresionLocal.ts` en el renderer), que puede
+ * no coincidir con la preferencia del laboratorio (Configuración →
+ * Tamaño de impresión). A propósito, esta variante NUNCA toca Storage ni
+ * `pdf_path`: ese archivo compartido sigue reflejando siempre la
+ * preferencia real del laboratorio, para cualquier otra persona/compu que
+ * lo abra — generar acá un PDF con un tamaño distinto no debe "filtrarse"
+ * a nadie más. Se genera a un archivo local descartable y se borra apenas
+ * se lee, sin dejar rastro en pdf_path. */
+export async function descargarPdfComprobanteWebConTamano(
+  db: Pool | PoolClient,
+  comprobanteId: number,
+  tamano: TamanoImpresionComprobante
+): Promise<Buffer> {
+  await limpiarPdfPathSiEsDeStorage(db, comprobanteId);
+  await regenerarPdfComprobante(db, comprobanteId, generarPdfDesdeHtmlWeb, paginaPdfSegunPreferencia(tamano));
+  const comprobante = (await obtenerComprobante(db, comprobanteId))!;
+  const rutaLocal = comprobante.pdfPath;
+  if (!rutaLocal) throw new Error("No se pudo generar el PDF del comprobante.");
+  const buffer = fs.readFileSync(rutaLocal);
+  fs.rmSync(rutaLocal, { force: true });
+  // Vuelve a null (no a la ruta local que recién se borró, ni a una de
+  // Storage que nunca se subió) — así el próximo pedido, con o sin
+  // override, siempre regenera de cero en vez de arrastrar esta ruta
+  // puntual.
+  await setPdfPath(db, comprobanteId, null);
+  return buffer;
 }

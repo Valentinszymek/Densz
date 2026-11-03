@@ -66,7 +66,7 @@ export async function guardarTamanoImpresionComprobante(db: Queryable, valor: Ta
   await setConfig(db, CLAVE_TAMANO_IMPRESION_COMPROBANTE, valor);
 }
 
-function paginaPdfSegunPreferencia(pref: TamanoImpresionComprobante): Electron.PrintToPDFOptions["pageSize"] {
+export function paginaPdfSegunPreferencia(pref: TamanoImpresionComprobante): Electron.PrintToPDFOptions["pageSize"] {
   return pref === "a4" ? TAMANO_PAGINA_A4 : TAMANO_PAGINA_TICKET;
 }
 

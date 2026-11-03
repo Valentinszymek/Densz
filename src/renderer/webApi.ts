@@ -3,6 +3,16 @@ import { ApiError } from "@shared/http/ApiError";
 import { buildQuery, crearMetodosHttpComunes } from "@shared/http/denszApiFactory";
 import { useAuthStore } from "./store/authStore";
 import { toast } from "./store/toastStore";
+import { leerTamanoImpresionLocal } from "./lib/tamanoImpresionLocal";
+
+/** Arma la ruta del PDF del comprobante, con `?tamano=` solo si esta
+ * computadora tiene una preferencia local guardada (ver
+ * tamanoImpresionLocal.ts) — sin eso, el servidor usa la del laboratorio,
+ * como siempre. */
+function rutaPdfComprobante(comprobanteId: number): string {
+  const local = leerTamanoImpresionLocal();
+  return `/comprobantes/${comprobanteId}/pdf${local ? buildQuery({ tamano: local }) : ""}`;
+}
 
 /**
  * Implementación de `DenszApi` para la versión WEB (fetch + cookie de
@@ -304,13 +314,13 @@ export const webApi: DenszApi = {
   // Igual patrón que cuentasVerPdfResumen: descarga autenticada vía GET
   // /comprobantes/:id/pdf (nunca un path elegido por el cliente), abierta
   // en una pestaña nueva a partir de un blob local.
-  comprobantesVerPdf: (comprobanteId) => abrirPdfEnNuevaPestana(() => getBlob(`/comprobantes/${comprobanteId}/pdf`)),
+  comprobantesVerPdf: (comprobanteId) => abrirPdfEnNuevaPestana(() => getBlob(rutaPdfComprobante(comprobanteId))),
   // Impresión física SILENCIOSA (sin diálogo, a una impresora elegida de
   // antemano) solo existe en Desktop — ninguna API de navegador lo
   // permite. En Web, "Imprimir" dispara el diálogo de impresión nativo
   // del navegador directo sobre el PDF, sin abrir ninguna pestaña visible
   // (ver imprimirPdf).
-  comprobantesImprimir: (comprobanteId) => imprimirPdf(() => getBlob(`/comprobantes/${comprobanteId}/pdf`)),
+  comprobantesImprimir: (comprobanteId) => imprimirPdf(() => getBlob(rutaPdfComprobante(comprobanteId))),
 
   // Descarga autenticada vía GET /cuentas/resumenes/:id/pdf (nunca un path
   // elegido por el cliente) y lo abre en una pestaña nueva a partir de un

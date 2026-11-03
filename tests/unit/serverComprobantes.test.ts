@@ -262,6 +262,29 @@ describe("HTTP /comprobantes", () => {
       expect(res.status).toBe(401);
     });
 
+    // Preferencia LOCAL de una computadora puntual (2026-11-03) — ver
+    // tamanoImpresionLocal.ts en el renderer: pisa la del laboratorio
+    // (que acá es "ticket", el default) solo para este pedido, sin tocar
+    // el PDF compartido en Storage.
+    it("?tamano=a4 pisa puntualmente la preferencia del laboratorio para ese pedido", async () => {
+      const res = await request(app).get(`/comprobantes/${comprobanteId}/pdf?tamano=a4`).set("Cookie", cookieAdmin);
+      expect(res.status).toBe(200);
+      const { anchoMm, altoMm } = leerMediaBoxPdfMm(Buffer.from(res.body));
+      expect(anchoMm).toBeCloseTo(210, 0);
+      expect(altoMm).toBeCloseTo(297, 0);
+    });
+
+    it("el override puntual nunca toca el PDF compartido de Storage que ven las demás computadoras", async () => {
+      await request(app).get(`/comprobantes/${comprobanteId}/pdf?tamano=a4`).set("Cookie", cookieAdmin);
+
+      // Sin override, sigue siendo el tamaño del ticket (la preferencia
+      // real del laboratorio) — el "a4" de la compu de arriba no se filtró.
+      const res = await request(app).get(`/comprobantes/${comprobanteId}/pdf`).set("Cookie", cookieAdmin);
+      const { anchoMm, altoMm } = leerMediaBoxPdfMm(Buffer.from(res.body));
+      expect(anchoMm).toBeCloseTo(ANCHO_PAGINA_COMPROBANTE_MM, 0);
+      expect(altoMm).toBeCloseTo(ALTO_PAGINA_COMPROBANTE_MM, 0);
+    });
+
     it("un usuario sin permisos 'comprobantes.*' igual puede acceder — paridad exacta con el escritorio", async () => {
       // 19. Documentado en el informe: comprobantes.ipc.ts no exige ningún
       // permiso hoy — no se agregó ninguno nuevo acá.

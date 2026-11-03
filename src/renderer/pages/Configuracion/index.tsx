@@ -17,6 +17,7 @@ import {
   useTamanoImpresionComprobante,
   useGuardarTamanoImpresionComprobante
 } from "../../features/configuracion/hooks";
+import { leerTamanoImpresionLocal, guardarTamanoImpresionLocal } from "../../lib/tamanoImpresionLocal";
 import { ImpresoraSelectorModal } from "./ImpresoraSelectorModal";
 import { SeccionProteccion } from "./SeccionProteccion";
 import { SeccionSuscripcion } from "./SeccionSuscripcion";
@@ -166,6 +167,7 @@ function SeccionTamanoImpresion() {
             <p className="text-xs text-carbon/50 mt-0.5">
               {esA4 ? "Hoja A4 con el ticket en la esquina y guía de corte." : "Directo al tamaño del ticket, sin hoja A4 de por medio."}
             </p>
+            <p className="text-xs text-carbon/40 mt-0.5">Esto aplica para todo el laboratorio, en todas las computadoras.</p>
           </div>
           <Toggle
             activo={esA4}
@@ -174,8 +176,59 @@ function SeccionTamanoImpresion() {
             label="Imprimir en hoja A4 completa"
           />
         </div>
+
+        {!esEscritorio && <SeccionTamanoImpresionLocal />}
       </CardContent>
     </Card>
+  );
+}
+
+/** Preferencia LOCAL de esta computadora (localStorage, nunca la base) —
+ * pisa puntualmente lo de arriba solo para los PDFs que se piden desde
+ * ESTE navegador, sin afectar a nadie más. Pensado para cuando una
+ * impresora puntual ya está bien configurada en Windows para el tamaño
+ * del ticket (ver la guía de configuración más abajo) y esa compu puede
+ * aprovechar el tamaño chico aunque el resto del laboratorio imprima en
+ * A4 por seguridad. Solo tiene sentido en la Web — el escritorio ya es
+ * 100% confiable con cualquiera de los dos tamaños, sin esto. */
+function SeccionTamanoImpresionLocal() {
+  const [local, setLocal] = useState(() => leerTamanoImpresionLocal());
+
+  function elegir(valor: "ticket" | "a4" | null) {
+    guardarTamanoImpresionLocal(valor);
+    setLocal(valor);
+  }
+
+  const opciones: Array<{ valor: "ticket" | "a4" | null; etiqueta: string }> = [
+    { valor: null, etiqueta: "Usar la del laboratorio" },
+    { valor: "ticket", etiqueta: "Ticket (chico)" },
+    { valor: "a4", etiqueta: "A4 completa" }
+  ];
+
+  return (
+    <div className="rounded-lg border border-carbon/10 bg-cream px-4 py-3 space-y-2">
+      <p className="font-medium text-sm">Tamaño de impresión en esta computadora</p>
+      <p className="text-xs text-carbon/50">
+        Si esta impresora ya está configurada en Windows para el tamaño del ticket, podés elegirlo acá sin cambiar
+        lo que ven las demás computadoras del laboratorio.
+      </p>
+      <div className="flex gap-2 flex-wrap">
+        {opciones.map((o) => (
+          <button
+            key={o.etiqueta}
+            type="button"
+            onClick={() => elegir(o.valor)}
+            className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+              local === o.valor
+                ? "bg-carbon text-cream border-carbon"
+                : "border-carbon/15 text-carbon/60 hover:bg-carbon/5"
+            }`}
+          >
+            {o.etiqueta}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

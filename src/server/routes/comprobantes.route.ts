@@ -7,10 +7,11 @@ import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
 import { requireActiveSubscription } from "../middleware/requireActiveSubscription";
 import { attachTenantDb, type RequestConTenantDb } from "../middleware/tenantDb";
-import { generarComprobanteWeb, descargarPdfComprobanteWeb } from "../comprobantesWeb";
+import { generarComprobanteWeb, descargarPdfComprobanteWeb, descargarPdfComprobanteWebConTamano } from "../comprobantesWeb";
 import { construirHtmlComprobante } from "../../main/services/comprobanteService";
 
 const esquemaId = z.coerce.number().int().positive();
+const esquemaTamanoQuery = z.enum(["ticket", "a4"]).optional();
 const esquemaFiltro = z.object({
   odontologoId: z.coerce.number().int().positive().optional(),
   clinicaId: z.coerce.number().int().positive().optional(),
@@ -88,7 +89,14 @@ export function crearRouterComprobantes(db: Pool): Router {
     const db = (req as unknown as RequestConTenantDb).db;
     try {
       const id = esquemaId.parse(req.params.id);
-      const buffer = await descargarPdfComprobanteWeb(db, id);
+      // `tamano` es una preferencia LOCAL de esta computadora (ver
+      // Configuración → Tamaño de impresión en esta compu, guardada en
+      // localStorage del navegador, nunca en la base) — cuando viene,
+      // pisa puntualmente la preferencia del laboratorio solo para esta
+      // descarga, sin tocar el PDF compartido que ve cualquier otra
+      // persona/compu (ver descargarPdfComprobanteWebConTamano).
+      const tamano = esquemaTamanoQuery.parse(req.query.tamano);
+      const buffer = tamano ? await descargarPdfComprobanteWebConTamano(db, id, tamano) : await descargarPdfComprobanteWeb(db, id);
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="comprobante-${id}.pdf"`);
       res.send(buffer);
