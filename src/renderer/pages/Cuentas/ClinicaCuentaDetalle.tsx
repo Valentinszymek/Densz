@@ -57,6 +57,10 @@ export default function ClinicaCuentaDetalle() {
 
   const { data: bloques, isLoading: cargandoResumen } = useResumenMesClinica(clinicaId, periodo);
   const { data: resumenesGenerados } = useResumenesMensualesClinica(clinicaId);
+  const resumenesDelMes = useMemo(
+    () => (resumenesGenerados ?? []).filter((r) => r.anio === anio && r.mes === mes),
+    [resumenesGenerados, anio, mes]
+  );
   const { data: movimientos } = useMovimientosClinica(clinicaId);
   const pagos = useMemo(() => (movimientos ?? []).filter((m) => m.tipo === "haber"), [movimientos]);
   const deudas = useMemo(() => (movimientos ?? []).filter((m) => m.tipo === "debe" && m.ordenId === null), [movimientos]);
@@ -210,38 +214,36 @@ export default function ClinicaCuentaDetalle() {
                 </Table>
               </div>
             )}
+
+            {resumenesDelMes.filter((r) => r.moneda === b.moneda).length > 0 && (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2 mt-6">
+                  Resúmenes generados — {NOMBRES_MES[mes - 1]} {anio}
+                </p>
+                <div className="space-y-2">
+                  {resumenesDelMes.filter((r) => r.moneda === b.moneda).map((r) => (
+                    <div
+                      key={r.id}
+                      className="flex items-center justify-between rounded-lg border border-carbon/10 bg-cream-card px-4 py-2.5"
+                    >
+                      <div>
+                        <p className="text-xs text-carbon/40">
+                          Generado: {formatearFechaHora(r.generadoEn)}
+                          {r.generadoPorNombre ? ` por ${r.generadoPorNombre}` : ""} · Trabajos:{" "}
+                          {formatearMoneda(r.totalTrabajosCentavos, r.moneda)} · Pagos: {formatearMoneda(r.totalPagosCentavos, r.moneda)} · Saldo:{" "}
+                          {formatearMoneda(r.saldoPendienteCentavos, r.moneda)}
+                        </p>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => verPdfResumen.mutate(r.id)}>
+                        <FileText size={14} /> Ver PDF
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ))}
-
-      {resumenesGenerados && resumenesGenerados.length > 0 && (
-        <>
-          <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2 mt-8">Resúmenes mensuales generados</p>
-          <div className="space-y-2">
-            {resumenesGenerados.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center justify-between rounded-lg border border-carbon/10 bg-cream-card px-4 py-2.5"
-              >
-                <div>
-                  <p className="text-sm font-medium">
-                    {NOMBRES_MES[r.mes - 1]} {r.anio}
-                    <span className="ml-2 text-carbon/40 font-normal">{r.moneda}</span>
-                  </p>
-                  <p className="text-xs text-carbon/40">
-                    Generado: {formatearFechaHora(r.generadoEn)}
-                    {r.generadoPorNombre ? ` por ${r.generadoPorNombre}` : ""} · Trabajos:{" "}
-                    {formatearMoneda(r.totalTrabajosCentavos, r.moneda)} · Pagos: {formatearMoneda(r.totalPagosCentavos, r.moneda)} · Saldo:{" "}
-                    {formatearMoneda(r.saldoPendienteCentavos, r.moneda)}
-                  </p>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => verPdfResumen.mutate(r.id)}>
-                  <FileText size={14} /> Ver PDF
-                </Button>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
 
       <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2 mt-8">Pagos registrados</p>
       {pagos.length === 0 && <p className="text-sm text-carbon/40">Sin pagos todavía.</p>}
