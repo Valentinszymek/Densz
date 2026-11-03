@@ -227,6 +227,10 @@ export default function ClinicaCuentaDetalle() {
                       className="flex items-center justify-between rounded-lg border border-carbon/10 bg-cream-card px-4 py-2.5"
                     >
                       <div>
+                        <p className="text-sm font-medium">
+                          {NOMBRES_MES[r.mes - 1]} {r.anio}
+                          <span className="ml-2 text-carbon/40 font-normal">{r.moneda}</span>
+                        </p>
                         <p className="text-xs text-carbon/40">
                           Generado: {formatearFechaHora(r.generadoEn)}
                           {r.generadoPorNombre ? ` por ${r.generadoPorNombre}` : ""} · Trabajos:{" "}
