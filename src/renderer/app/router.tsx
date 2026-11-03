@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "../components/layout/AppShell";
 import { RutaProtegida } from "../components/layout/RutaProtegida";
 import { RutaSuscripcionActiva } from "../components/layout/RutaSuscripcionActiva";
@@ -84,6 +84,11 @@ export function AppRouter() {
             </Route>
           </Route>
         </Route>
+        {/* Cualquier otro hash (ej. un link de Supabase vencido/inválido
+            que redirige a "#error=...", sin ningún "/" adelante — no
+            matchea ninguna ruta de arriba) cae acá en vez de quedar en
+            blanco: manda al login, listo para pedir un link nuevo. */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </HashRouter>
   );
