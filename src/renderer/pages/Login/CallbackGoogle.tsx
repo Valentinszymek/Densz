@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { DenszLogo } from "../../components/brand/DenszLogo";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuthStore } from "../../store/authStore";
+import { toast } from "../../store/toastStore";
 
 /**
  * Google redirige acá (PKCE) después de que la persona aceptó el login.
@@ -14,19 +15,24 @@ import { useAuthStore } from "../../store/authStore";
  * pasó antes de que este componente montara, se lee la sesión ya
  * establecida con `getSession()`).
  *
- * Una vez que supabase-js tiene sesión:
- * 1. Se manda el access token al backend de Densz
- *    (window.densz.authLoginGoogle, o authRegistrarseConGoogle si venía
- *    de "Crear mi laboratorio" — ver `labName` abajo) — lo revalida y
- *    arma la sesión REAL de Densz (la cookie propia), la única que
- *    importa de acá en más.
- * 2. Se cierra la sesión de Supabase del lado del cliente (ya cumplió su
- *    propósito).
- *
  * `labName`: si la persona vino de RegistroLaboratorio.tsx, el nombre
  * tipeado viaja en la query string (`?labName=...#/auth/callback`, ver
  * supabaseClient.ts) — nunca se pisa con el `?code=...` que agrega
  * Supabase, así que sigue disponible acá sin guardar nada entre medio.
+ *
+ * Diseño (2026-11-03, pedido explícito del dueño del producto): Google
+ * cumple roles MUY distintos según de dónde venga el click:
+ * - Con `labName` (alta de un laboratorio nuevo, sin usuarios todavía):
+ *   sigue siendo el login real — se manda el token al backend y arma la
+ *   sesión de una, como siempre.
+ * - SIN `labName` ("Iniciar sesión" del día a día): Google acá es solo
+ *   una verificación — nunca abre Densz directo, aunque haya salido
+ *   bien. Siempre vuelve a "¿Quién va a utilizar Densz?" para que la
+ *   persona elija SU perfil (Nicolás, Rosalía, el admin, etc.) y ponga
+ *   LA CONTRASEÑA DE ESE PERFIL — nunca la de Gmail de nuevo. El token
+ *   de Google ni se manda al backend en este caso: no hace falta, la
+ *   sesión real de Densz la arma recién el login con usuario+contraseña
+ *   (IngresoPassword.tsx), completamente aparte.
  */
 export default function CallbackGoogle() {
   const navigate = useNavigate();
@@ -48,11 +54,16 @@ export default function CallbackGoogle() {
       yaProceso.current = true;
       try {
         const labName = new URLSearchParams(window.location.search).get("labName");
-        const sesion = labName
-          ? await window.densz.authRegistrarseConGoogle(labName, accessToken)
-          : await window.densz.authLoginGoogle(accessToken);
-        setSesion(sesion);
-        navigate("/", { replace: true });
+        if (labName) {
+          const sesion = await window.densz.authRegistrarseConGoogle(labName, accessToken);
+          setSesion(sesion);
+          navigate("/", { replace: true });
+        } else {
+          // Ver comentario arriba: "Iniciar sesión" nunca entra directo
+          // con Google — vuelve al selector de usuarios.
+          toast({ titulo: "Cuenta de Google verificada", descripcion: "Elegí tu usuario y poné tu contraseña para entrar.", tono: "exito" });
+          navigate("/login", { replace: true });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "No se pudo completar el login con Google.");
       } finally {
@@ -98,7 +109,7 @@ export default function CallbackGoogle() {
           </button>
         </>
       ) : (
-        <p className="text-cream/60 text-sm">Completando el login con Google…</p>
+        <p className="text-cream/60 text-sm">Verificando tu cuenta de Google…</p>
       )}
     </div>
   );
