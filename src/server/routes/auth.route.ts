@@ -39,11 +39,18 @@ const esProduccion = process.env.NODE_ENV === "production";
 // producción), si no el navegador la descarta directamente.
 const SAME_SITE: "none" | "lax" = esProduccion ? "none" : "lax";
 
+// Sin `maxAge`/`expires` a propósito (pedido explícito del dueño del
+// producto, 2026-11-03): sin eso, el navegador la trata como cookie DE
+// SESIÓN — desaparece sola al cerrar el navegador entero (no alcanza con
+// cerrar una sola pestaña si quedan otras abiertas de la misma Chrome:
+// es un límite real de cómo funcionan las cookies de sesión en todos los
+// navegadores, no algo que Densz pueda ajustar más fino). Antes duraba 8
+// horas aunque se cerrara el navegador — ya no: cada apertura nueva
+// vuelve a pedir usuario y contraseña.
 const opcionesCookie = {
   httpOnly: true,
   sameSite: SAME_SITE,
-  secure: esProduccion,
-  maxAge: 8 * 60 * 60 * 1000
+  secure: esProduccion
 };
 
 /** Rutas HTTP equivalentes a src/main/ipc/auth.ipc.ts, reutilizando la misma lógica de negocio (authService). */
