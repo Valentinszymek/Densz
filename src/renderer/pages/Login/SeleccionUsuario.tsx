@@ -2,12 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useUsuariosDisponibles } from "../../features/auth/hooks";
 import { DenszLogo } from "../../components/brand/DenszLogo";
 import { formatearRol } from "../../lib/format";
-import {
-  supabaseAuthDisponible,
-  iniciarLoginGoogle,
-  iniciarSesionConEmailPassword,
-  tomarRegistroPendiente
-} from "../../lib/supabaseClient";
+import { supabaseAuthDisponible, iniciarSesionConEmailPassword, tomarRegistroPendiente } from "../../lib/supabaseClient";
 import { useAuthStore } from "../../store/authStore";
 import type { UsuarioParaSeleccion } from "@shared/types/entities";
 
@@ -47,9 +42,6 @@ export function SeleccionUsuario({
 }) {
   const { data: usuarios, isLoading } = useUsuariosDisponibles();
   const setSesion = useAuthStore((s) => s.setSesion);
-  const [errorGoogle, setErrorGoogle] = useState<string | null>(null);
-  const [cargandoGoogle, setCargandoGoogle] = useState(false);
-  const [mostrarEmail, setMostrarEmail] = useState(false);
   const [email, setEmail] = useState("");
   const [passwordEmail, setPasswordEmail] = useState("");
   const [errorEmail, setErrorEmail] = useState<string | null>(null);
@@ -58,26 +50,6 @@ export function SeleccionUsuario({
   // `window.densz` recién se asigna (main.web.tsx) después de que este
   // módulo se evalúa, así que leerlo al importar rompería ese build.
   const esEscritorio = window.densz.plataforma === "escritorio";
-
-  async function onClickGoogle() {
-    setErrorGoogle(null);
-    setCargandoGoogle(true);
-    try {
-      if (esEscritorio) {
-        // Acá no hay redirect de pestaña: authLoginGoogle abre el
-        // navegador del sistema, espera, y devuelve la sesión real ya
-        // armada — se fija directo, sin pasar por ningún callback.
-        const sesion = await window.densz.authLoginGoogle();
-        setSesion(sesion);
-        setCargandoGoogle(false);
-      } else {
-        await iniciarLoginGoogle(); // redirige la pestaña — si resuelve sin redirigir, algo falló (deja "Redirigiendo…" hasta que la página se vaya)
-      }
-    } catch (err) {
-      setErrorGoogle(err instanceof Error ? err.message : "No se pudo iniciar el login con Google.");
-      setCargandoGoogle(false);
-    }
-  }
 
   // Login con email+contraseña (cuentas propias de laboratorio, dadas de
   // alta desde RegistroLaboratorio.tsx) — solo tiene sentido en la web,
@@ -124,79 +96,56 @@ export function SeleccionUsuario({
         </div>
       )}
 
-      {/* En web, solo se muestra si el entorno tiene Supabase Auth
-          configurado (VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY) — nunca un
-          botón que lleva a un error garantizado si todavía no se cargaron
-          esas variables (ver supabaseClient.ts). En escritorio siempre se
-          muestra: el login con Google lo resuelve enteramente el proceso
-          main (googleOAuthDesktop.ts), sin depender de esas variables acá. */}
-      {(supabaseAuthDisponible || esEscritorio) && (
-        <div className="mt-8 flex flex-col items-center gap-2 w-full max-w-xs">
-          <div className="flex items-center gap-3 text-cream/25 text-xs w-full">
-            <span className="h-px flex-1 bg-cream/10" />o<span className="h-px flex-1 bg-cream/10" />
-          </div>
-          <button
-            type="button"
-            onClick={onClickGoogle}
-            disabled={cargandoGoogle}
-            className="flex items-center gap-2 rounded-lg border border-cream/15 bg-cream/[0.03] hover:bg-cream/[0.06] px-5 py-2.5 text-sm text-cream/80 disabled:opacity-50"
-          >
-            {cargandoGoogle ? (esEscritorio ? "Esperando el navegador…" : "Redirigiendo…") : "Continuar con Google"}
-          </button>
-          {errorGoogle && <p className="text-red-400 text-xs max-w-sm text-center">{errorGoogle}</p>}
-
-          {/* Email+contraseña: solo tiene sentido en la web (dueños de
-              laboratorio que se registraron sin Google) — en escritorio
-              ese camino no existe todavía (ver limitación documentada). */}
-          {!esEscritorio && supabaseAuthDisponible && (
-            <>
-              {!mostrarEmail ? (
-                <button
-                  type="button"
-                  onClick={() => setMostrarEmail(true)}
-                  className="text-cream/40 text-xs mt-1 hover:text-cream/70 transition-colors underline underline-offset-2"
-                >
-                  Iniciar sesión con email y contraseña
-                </button>
-              ) : (
-                <form onSubmit={onSubmitEmail} className="w-full flex flex-col gap-2 mt-1">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="tu@email.com"
-                    autoFocus
-                    required
-                    className="rounded-lg border border-cream/15 bg-cream/[0.03] text-cream placeholder:text-cream/30 px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-                  />
-                  <input
-                    type="password"
-                    value={passwordEmail}
-                    onChange={(e) => setPasswordEmail(e.target.value)}
-                    placeholder="Contraseña"
-                    autoComplete="current-password"
-                    required
-                    className="rounded-lg border border-cream/15 bg-cream/[0.03] text-cream placeholder:text-cream/30 px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-                  />
-                  <button
-                    type="submit"
-                    disabled={cargandoEmail}
-                    className="rounded-lg bg-gold text-carbon font-medium px-5 py-2.5 text-sm hover:bg-gold/90 transition-colors disabled:opacity-50"
-                  >
-                    {cargandoEmail ? "Ingresando…" : "Ingresar"}
-                  </button>
-                  {errorEmail && <p className="text-red-400 text-xs text-center">{errorEmail}</p>}
-                  <button
-                    type="button"
-                    onClick={onOlvideContrasena}
-                    className="text-cream/35 text-xs hover:text-cream/60 transition-colors"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </button>
-                </form>
-              )}
-            </>
+      {/* Login con email+contraseña — por seguridad, es el ÚNICO camino
+          para el ingreso del día a día (sin "Continuar con Google": ese
+          botón quedaba expuesto a que cualquiera con Chrome ya logueado en
+          la Google del laboratorio entrara directo, sin contraseña).
+          Google sigue existiendo, pero solo para REGISTRAR un laboratorio
+          nuevo (ver RegistroLaboratorio.tsx), nunca para este ingreso.
+          Solo tiene sentido en la web — en escritorio el ingreso es
+          siempre con las tarjetas de arriba + contraseña. */}
+      {!esEscritorio && supabaseAuthDisponible && (
+        <div className="mt-8 w-full max-w-xs">
+          {!!usuarios?.length && (
+            <div className="flex items-center gap-3 text-cream/25 text-xs w-full mb-3">
+              <span className="h-px flex-1 bg-cream/10" />o<span className="h-px flex-1 bg-cream/10" />
+            </div>
           )}
+          <form onSubmit={onSubmitEmail} className="w-full flex flex-col gap-2">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tu@email.com"
+              autoFocus
+              required
+              className="rounded-lg border border-cream/15 bg-cream/[0.03] text-cream placeholder:text-cream/30 px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            />
+            <input
+              type="password"
+              value={passwordEmail}
+              onChange={(e) => setPasswordEmail(e.target.value)}
+              placeholder="Contraseña"
+              autoComplete="current-password"
+              required
+              className="rounded-lg border border-cream/15 bg-cream/[0.03] text-cream placeholder:text-cream/30 px-4 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
+            />
+            <button
+              type="submit"
+              disabled={cargandoEmail}
+              className="rounded-lg bg-gold text-carbon font-medium px-5 py-2.5 text-sm hover:bg-gold/90 transition-colors disabled:opacity-50"
+            >
+              {cargandoEmail ? "Ingresando…" : "Ingresar"}
+            </button>
+            {errorEmail && <p className="text-red-400 text-xs text-center">{errorEmail}</p>}
+            <button
+              type="button"
+              onClick={onOlvideContrasena}
+              className="text-cream/35 text-xs hover:text-cream/60 transition-colors mx-auto"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </form>
         </div>
       )}
     </div>
