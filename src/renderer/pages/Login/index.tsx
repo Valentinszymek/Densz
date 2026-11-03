@@ -98,5 +98,16 @@ export default function Login() {
     );
   }
 
-  return <SeleccionUsuario usuarios={usuarios} onSeleccionar={seleccionar} onOlvideContrasena={() => setVista("olvide")} />;
+  return (
+    <SeleccionUsuario
+      usuarios={usuarios}
+      // Ya se verificó con Google y SÍ hay tarjetas para elegir: mostrar
+      // de nuevo el botón de Google (o el email+contraseña) ahí abajo es
+      // redundante — la persona ya pasó ese paso, lo que sigue es elegir
+      // su tarjeta y poner su contraseña, nada más.
+      ocultarOtrosMetodos={usuariosDelLaboratorio !== undefined && usuariosDelLaboratorio.length > 0}
+      onSeleccionar={seleccionar}
+      onOlvideContrasena={() => setVista("olvide")}
+    />
+  );
 }

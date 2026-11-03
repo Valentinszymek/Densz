@@ -45,10 +45,15 @@ function TarjetaUsuario({ usuario, onClick }: { usuario: UsuarioParaSeleccion; o
  * sin haber verificado a qué laboratorio pertenecen. */
 export function SeleccionUsuario({
   usuarios,
+  ocultarOtrosMetodos,
   onSeleccionar,
   onOlvideContrasena
 }: {
   usuarios: UsuarioParaSeleccion[] | undefined;
+  /** Ya se pasó por Google y hay tarjetas reales para elegir — mostrar
+   * de nuevo el botón de Google (o el email+contraseña) acá abajo sería
+   * un paso redundante que la persona ya hizo (ver Login/index.tsx). */
+  ocultarOtrosMetodos: boolean;
   onSeleccionar: (u: UsuarioParaSeleccion) => void;
   onOlvideContrasena: () => void;
 }) {
@@ -133,8 +138,9 @@ export function SeleccionUsuario({
       )}
 
       {/* "Continuar con Google", con prompt=login forzado (ver comentario
-          arriba) — opción permanente, no un atajo sin contraseña. */}
-      {(supabaseAuthDisponible || esEscritorio) && (
+          arriba) — opción permanente, no un atajo sin contraseña. Oculto
+          si ya se pasó por Google (ver ocultarOtrosMetodos). */}
+      {!ocultarOtrosMetodos && (supabaseAuthDisponible || esEscritorio) && (
         <div className="mt-8 flex flex-col items-center gap-1 w-full max-w-xs">
           <button
             type="button"
@@ -151,8 +157,9 @@ export function SeleccionUsuario({
       {/* Email+contraseña propia de Densz — alternativa a Google, para
           quien prefiera no depender de su cuenta de Gmail. Solo tiene
           sentido en la web — en escritorio el ingreso sin Google es
-          siempre con las tarjetas de arriba + contraseña. */}
-      {!esEscritorio && supabaseAuthDisponible && (
+          siempre con las tarjetas de arriba + contraseña. Oculto si ya
+          se pasó por Google (ver ocultarOtrosMetodos). */}
+      {!ocultarOtrosMetodos && !esEscritorio && supabaseAuthDisponible && (
         <div className="mt-4 w-full max-w-xs">
           <div className="flex items-center gap-3 text-cream/25 text-xs w-full mb-3">
             <span className="h-px flex-1 bg-cream/10" />o<span className="h-px flex-1 bg-cream/10" />
