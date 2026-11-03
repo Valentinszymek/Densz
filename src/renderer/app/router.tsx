@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { toast } from "../store/toastStore";
 import { AppShell } from "../components/layout/AppShell";
 import { RutaProtegida } from "../components/layout/RutaProtegida";
 import { RutaSuscripcionActiva } from "../components/layout/RutaSuscripcionActiva";
@@ -29,6 +31,19 @@ import Configuracion from "../pages/Configuracion";
 import Usuarios from "../pages/Usuarios";
 import Auditoria from "../pages/Auditoria";
 import Laboratorios from "../pages/Laboratorios";
+
+/** Cuando un link de Supabase (recuperar contraseña, etc.) venció o ya
+ * se usó, GoTrue redirige con "#error=...&error_description=..." —  un
+ * hash sin ninguna ruta real adelante, que cae en el catch-all de abajo.
+ * Antes eso mandaba en silencio al login sin explicar nada; esto
+ * muestra el motivo real (si vino uno) antes de redirigir. */
+function RedirigirConError() {
+  useEffect(() => {
+    const descripcion = new URLSearchParams(window.location.hash.replace(/^#\/?/, "")).get("error_description");
+    if (descripcion) toast({ titulo: "No se pudo completar", descripcion: descripcion.replace(/\+/g, " "), tono: "error" });
+  }, []);
+  return <Navigate to="/login" replace />;
+}
 
 // HashRouter (en vez de BrowserRouter): la app se sirve desde file://
 // en producción, sin servidor HTTP que resuelva rutas arbitrarias.
@@ -87,8 +102,8 @@ export function AppRouter() {
         {/* Cualquier otro hash (ej. un link de Supabase vencido/inválido
             que redirige a "#error=...", sin ningún "/" adelante — no
             matchea ninguna ruta de arriba) cae acá en vez de quedar en
-            blanco: manda al login, listo para pedir un link nuevo. */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+            blanco: muestra el motivo si vino uno, y manda al login. */}
+        <Route path="*" element={<RedirigirConError />} />
       </Routes>
     </HashRouter>
   );

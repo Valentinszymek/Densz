@@ -2,7 +2,12 @@ import { useState, type FormEvent } from "react";
 import { useUsuariosDisponibles } from "../../features/auth/hooks";
 import { DenszLogo } from "../../components/brand/DenszLogo";
 import { formatearRol } from "../../lib/format";
-import { supabaseAuthDisponible, iniciarSesionConEmailPassword, tomarRegistroPendiente } from "../../lib/supabaseClient";
+import {
+  supabaseAuthDisponible,
+  iniciarLoginGoogle,
+  iniciarSesionConEmailPassword,
+  tomarRegistroPendiente
+} from "../../lib/supabaseClient";
 import { useAuthStore } from "../../store/authStore";
 import type { UsuarioParaSeleccion } from "@shared/types/entities";
 
@@ -46,10 +51,38 @@ export function SeleccionUsuario({
   const [passwordEmail, setPasswordEmail] = useState("");
   const [errorEmail, setErrorEmail] = useState<string | null>(null);
   const [cargandoEmail, setCargandoEmail] = useState(false);
+  const [errorGoogle, setErrorGoogle] = useState<string | null>(null);
+  const [cargandoGoogle, setCargandoGoogle] = useState(false);
   // Se lee en cada render (nunca a nivel de módulo): en la web,
   // `window.densz` recién se asigna (main.web.tsx) después de que este
   // módulo se evalúa, así que leerlo al importar rompería ese build.
   const esEscritorio = window.densz.plataforma === "escritorio";
+
+  // TEMPORAL (2026-11-03): el botón de abajo se había sacado del login
+  // diario por seguridad (ver commit "sacar Continuar con Google del
+  // login del día a día"), pero el camino de reemplazo —email+contraseña
+  // con recuperación por correo— todavía no se confirmó funcionando en
+  // producción (el link de recuperación de Supabase está fallando). Se
+  // reactiva este atajo SOLO hasta confirmar que la contraseña nueva
+  // funciona, para no dejar al dueño del laboratorio sin acceso a sus
+  // propios datos reales mientras tanto — sacar de nuevo apenas se
+  // confirme.
+  async function onClickGoogle() {
+    setErrorGoogle(null);
+    setCargandoGoogle(true);
+    try {
+      if (esEscritorio) {
+        const sesion = await window.densz.authLoginGoogle();
+        setSesion(sesion);
+        setCargandoGoogle(false);
+      } else {
+        await iniciarLoginGoogle();
+      }
+    } catch (err) {
+      setErrorGoogle(err instanceof Error ? err.message : "No se pudo iniciar el login con Google.");
+      setCargandoGoogle(false);
+    }
+  }
 
   // Login con email+contraseña (cuentas propias de laboratorio, dadas de
   // alta desde RegistroLaboratorio.tsx) — solo tiene sentido en la web,
@@ -96,21 +129,31 @@ export function SeleccionUsuario({
         </div>
       )}
 
-      {/* Login con email+contraseña — por seguridad, es el ÚNICO camino
-          para el ingreso del día a día (sin "Continuar con Google": ese
-          botón quedaba expuesto a que cualquiera con Chrome ya logueado en
-          la Google del laboratorio entrara directo, sin contraseña).
-          Google sigue existiendo, pero solo para REGISTRAR un laboratorio
-          nuevo (ver RegistroLaboratorio.tsx), nunca para este ingreso.
-          Solo tiene sentido en la web — en escritorio el ingreso es
-          siempre con las tarjetas de arriba + contraseña. */}
+      {/* Botón TEMPORAL (ver comentario arriba) — sacar apenas se confirme
+          que el login con email+contraseña funciona de punta a punta. */}
+      {(supabaseAuthDisponible || esEscritorio) && (
+        <div className="mt-8 flex flex-col items-center gap-1 w-full max-w-xs">
+          <button
+            type="button"
+            onClick={onClickGoogle}
+            disabled={cargandoGoogle}
+            className="flex items-center gap-2 rounded-lg border border-cream/15 bg-cream/[0.03] hover:bg-cream/[0.06] px-5 py-2.5 text-sm text-cream/80 disabled:opacity-50"
+          >
+            {cargandoGoogle ? (esEscritorio ? "Esperando el navegador…" : "Redirigiendo…") : "Continuar con Google"}
+          </button>
+          {errorGoogle && <p className="text-red-400 text-xs max-w-sm text-center">{errorGoogle}</p>}
+        </div>
+      )}
+
+      {/* Email+contraseña — el camino definitivo para el ingreso del día a
+          día (ver nota TEMPORAL arriba). Solo tiene sentido en la web —
+          en escritorio el ingreso es siempre con las tarjetas de arriba +
+          contraseña. */}
       {!esEscritorio && supabaseAuthDisponible && (
-        <div className="mt-8 w-full max-w-xs">
-          {!!usuarios?.length && (
-            <div className="flex items-center gap-3 text-cream/25 text-xs w-full mb-3">
-              <span className="h-px flex-1 bg-cream/10" />o<span className="h-px flex-1 bg-cream/10" />
-            </div>
-          )}
+        <div className="mt-4 w-full max-w-xs">
+          <div className="flex items-center gap-3 text-cream/25 text-xs w-full mb-3">
+            <span className="h-px flex-1 bg-cream/10" />o<span className="h-px flex-1 bg-cream/10" />
+          </div>
           <form onSubmit={onSubmitEmail} className="w-full flex flex-col gap-2">
             <input
               type="email"
