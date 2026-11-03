@@ -30,9 +30,13 @@ function leerMediaBoxPdfMm(buffer: Buffer): { anchoMm: number; altoMm: number } 
  * - el archivo resultante es un PDF real y no está vacío;
  * - el /MediaBox real del PDF (no solo el parámetro pedido) coincide con el
  *   tamaño de página esperado: 105×148.5mm (tamaño del ticket en sí, pedido
- *   acá directo sin pasar por comprobanteService.ts — el PDF real que
- *   genera la app es A4 completa, ver serverComprobantes.test.ts) para el
- *   comprobante, A4 (210×297mm) para el estado de cuenta.
+ *   acá directo sin pasar por comprobanteService.ts) para el comprobante,
+ *   A4 (210×297mm) para el estado de cuenta. Puppeteer (acá) respeta el
+ *   tamaño explícito pasado a la función por sobre el `@page` del propio
+ *   HTML; el `printToPDF`/`print()` nativo de Electron que usa el
+ *   escritorio hace lo contrario (`@page` manda) — por eso
+ *   comprobanteHtmlTemplate.ts tiene que declarar el `@page` correcto
+ *   también, ver el historial ahí (regresión real, 2026-11-03).
  */
 describe("server/pdf (Puppeteer)", () => {
   const dirTemporal = fs.mkdtempSync(path.join(os.tmpdir(), "densz-pdf-test-"));
@@ -59,7 +63,8 @@ describe("server/pdf (Puppeteer)", () => {
       },
       odontologoNombre: "Dr. Prueba",
       clinicaNombre: null,
-      pacienteNombreCompleto: "Paciente de Prueba"
+      pacienteNombreCompleto: "Paciente de Prueba",
+      tamanoPagina: "ticket"
     });
 
     const outputPath = path.join(dirTemporal, "comprobante-test.pdf");

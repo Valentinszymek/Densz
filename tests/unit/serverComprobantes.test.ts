@@ -217,11 +217,13 @@ describe("HTTP /comprobantes", () => {
     });
 
     // --- 12, 13, 14, 15, 16, 17, 18, 19. PDF real + Storage + descarga ---
-    // 2026-10-28: a diferencia del escritorio (que sigue generando su PDF
-    // local en hoja A4 completa — ver comprobanteService.test.ts), el PDF
-    // que termina en Storage para la Web se genera directo al tamaño real
-    // del ticket (105×148.5mm) — ver el comentario largo sobre esto en
-    // comprobantesWeb.ts (TAMANO_PAGINA_TICKET_WEB).
+    // El PDF que termina en Storage para la Web se genera directo al
+    // tamaño real del ticket (105×148.5mm) — ver TAMANO_PAGINA_TICKET_WEB
+    // en comprobantesWeb.ts. El escritorio, desde el 2026-11-03, también
+    // respeta la preferencia del laboratorio para este mismo tamaño (ver
+    // comprobanteService.test.ts) — antes de esa fecha generaba siempre
+    // A4 completa sin importar la configuración (bug real, ver el
+    // historial en comprobanteHtmlTemplate.ts).
     it("el PDF quedó subido a Storage al tamaño real del ticket (105x148.5mm, sin hoja A4 de por medio)", async () => {
       const rutaEsperada = `comprobantes/${numero}.pdf`;
       const buffer = await storageModule.descargarDocumento(rutaEsperada); // 14.

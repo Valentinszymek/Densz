@@ -137,18 +137,17 @@ describe("comprobanteService", () => {
     expect(await obtenerSaldos(db, odontologoId)).toHaveLength(0);
   });
 
-  // "Ver PDF" e "Imprimir" comparten una sola plantilla y un solo tamaño
-  // físico de página: hoja A4 completa (210×297mm) — el único tamaño que
-  // cualquier impresora soporta sin configuración manual por máquina (se
-  // abandonó el formulario de papel a medida "DENSZ" de 110×150mm, que
-  // dependía de una configuración de Windows por impresora puntual — ver
-  // historial largo en comprobanteHtmlTemplate.ts e impresoraService.ts).
-  // El ticket en sí sigue siendo chico (105×148.5mm), dibujado dentro de
-  // esa hoja A4. Regresión importante: printToPDF espera ese tamaño a
-  // medida en PULGADAS ({width, height}), no en micrones (a diferencia de
-  // webContents.print(), que sí usa micrones) — pasar el valor en
-  // micrones por error generaría una página de ~2700 km y el PDF saldría
-  // en blanco.
+  // "Ver PDF" e "Imprimir" comparten una sola plantilla, y el tamaño
+  // físico de página sigue la preferencia del laboratorio (Configuración
+  // → Tamaño de impresión): el tamaño real del ticket (105×148.5mm) por
+  // defecto, para quien ya imprime en papel precortado a ese tamaño; A4
+  // completa (210×297mm, con el ticket en una esquina y guía de corte)
+  // para quien prefiere cortar después — ver historial largo en
+  // comprobanteHtmlTemplate.ts e impresoraService.ts. Regresión
+  // importante: printToPDF espera ese tamaño a medida en PULGADAS
+  // ({width, height}), no en micrones (a diferencia de webContents.print(),
+  // que sí usa micrones) — pasar el valor en micrones por error generaría
+  // una página de ~2700 km y el PDF saldría en blanco.
   it("por defecto (sin configurar nada) genera el PDF al tamaño real del ticket, en pulgadas", async () => {
     const { db, usuarioId } = ctx;
     const orden = await crearOrdenDePrueba([{ prestacionId: coronaId, cantidad: 1, piezasFdi: [11] }]);
@@ -184,5 +183,33 @@ describe("comprobanteService", () => {
 
     const [, , pageSize] = pdfFalso.mock.calls[0];
     expect(pageSize).toBe("A5");
+  });
+
+  // Regresión real (2026-11-03): el `pageSize` que se le pasa a
+  // generarPdf/print() NO alcanza por sí solo — el documento HTML en sí
+  // declaraba `@page { size: 210mm 297mm }` siempre, sin importar la
+  // preferencia, y esa declaración es la que de verdad manda al imprimir
+  // con Electron (ver el historial largo en comprobanteHtmlTemplate.ts).
+  // Estos dos tests inspeccionan el HTML real (no solo el parámetro
+  // pasado a un mock) para que esto no pueda volver a pasar en silencio.
+  it("por defecto ('ticket'), el HTML real declara @page al tamaño del ticket y sin guía de corte", async () => {
+    const { db, usuarioId } = ctx;
+    const orden = await crearOrdenDePrueba([{ prestacionId: coronaId, cantidad: 1, piezasFdi: [11] }]);
+    await generarComprobante(db, orden.id, usuarioId, pdfFalso);
+
+    const [html] = pdfFalso.mock.calls[0];
+    expect(html).toContain("@page { size: 105mm 148.5mm; margin: 0; }");
+    expect(html).not.toContain("border-right: 1px dashed");
+  });
+
+  it("si el laboratorio eligió 'a4', el HTML real declara @page a hoja A4 completa y con guía de corte", async () => {
+    const { db, usuarioId } = ctx;
+    await guardarTamanoImpresionComprobante(db, "a4");
+    const orden = await crearOrdenDePrueba([{ prestacionId: coronaId, cantidad: 1, piezasFdi: [11] }]);
+    await generarComprobante(db, orden.id, usuarioId, pdfFalso);
+
+    const [html] = pdfFalso.mock.calls[0];
+    expect(html).toContain("@page { size: 210mm 297mm; margin: 0; }");
+    expect(html).toContain("border-right: 1px dashed");
   });
 });

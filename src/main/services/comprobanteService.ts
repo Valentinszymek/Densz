@@ -101,11 +101,13 @@ export async function construirHtmlComprobante(
   if (!orden) throw new DenszError("La orden asociada a este comprobante ya no existe.");
 
   const { direccion, telefono } = await obtenerDatosContacto(db, orden.odontologoId, orden.clinicaId);
+  const tamanoPagina = await obtenerTamanoImpresionComprobante(db);
 
   const html = generarHtmlComprobante({
     laboratorioNombre: comprobante.laboratorioNombre,
     direccion,
     telefono,
+    tamanoPagina,
     comprobante: { numero: comprobante.numero, fechaEmision: comprobante.fechaEmision },
     orden: {
       numero: orden.numero,

@@ -1,6 +1,6 @@
 import { formatearMoneda, formatearFecha } from "../utils/formatShared";
 import { LOGO_COMPLETO_PDF_DATA_URI } from "./brandAssets";
-import type { Moneda } from "../../shared/types/entities";
+import type { Moneda, TamanoImpresionComprobante } from "../../shared/types/entities";
 
 export interface LineaComprobanteHtml {
   nombre: string;
@@ -31,6 +31,12 @@ export interface DatosComprobanteHtml {
   /** Si la OT es de un profesional de una clínica, se muestra CLÍNICA + PROFESIONAL (§7). */
   clinicaNombre: string | null;
   pacienteNombreCompleto: string;
+  /** Preferencia del laboratorio (Configuración → Tamaño de impresión).
+   * Determina el tamaño de página que este documento declara en su propio
+   * `@page` — ver el comentario largo más abajo sobre por qué esto tiene
+   * que coincidir con el tamaño real del papel, no solo con el que se le
+   * pide a `print()`/`printToPDF()` desde el proceso main. */
+  tamanoPagina: TamanoImpresionComprobante;
 }
 
 /** Historial (2026-10-27/28): antes se imprimía en una hoja chica a
@@ -44,16 +50,35 @@ export interface DatosComprobanteHtml {
  * hoja A4 física (confirmado con una impresión real: el comprobante
  * salió corrido hacia abajo, con la mitad de arriba en blanco).
  *
- * Arreglo definitivo: dejar de depender de cualquier formulario de papel
- * a medida (nunca más una configuración manual por máquina que se pueda
- * romper o perderse). El comprobante ahora se imprime SIEMPRE en una
- * hoja A4 estándar — el único tamaño que cualquier impresora/driver
- * soporta sin configuración extra — con el ticket dibujado a un tamaño
- * fijo y predecible (un cuarto exacto de A4, 105×148.5mm — lo mismo que
- * el tamaño ISO A6) posicionado en la esquina superior izquierda. Así la
- * posición y el tamaño quedan 100% controlados por este documento, nunca
- * por lo que el driver de turno decida. Misma hoja, mismo tamaño, tanto
- * para "Ver PDF" como para "Imprimir" (§13): una sola fuente de verdad. */
+ * Arreglo definitivo (primera versión, 2026-10-28): dejar de depender de
+ * cualquier formulario de papel a medida (nunca más una configuración
+ * manual por máquina que se pueda romper o perderse). El comprobante se
+ * imprimía SIEMPRE en una hoja A4 estándar — el único tamaño que
+ * cualquier impresora/driver soporta sin configuración extra — con el
+ * ticket dibujado a un tamaño fijo y predecible (un cuarto exacto de A4,
+ * 105×148.5mm — lo mismo que el tamaño ISO A6) posicionado en la esquina
+ * superior izquierda.
+ *
+ * Bug real encontrado en vivo (2026-11-03, con papel YA precortado al
+ * tamaño del ticket cargado en la impresora): ese primer arreglo asumía
+ * que la bandeja SIEMPRE tiene A4 entera cargada, pero
+ * `obtenerTamanoImpresionComprobante`/impresoraService.ts ya habían
+ * agregado la preferencia "ticket" para el caso contrario (papel
+ * precortado) — y esta plantilla nunca se enteró: seguía declarando
+ * `@page { size: 210mm 297mm }` SIEMPRE, sin importar la preferencia. La
+ * declaración `@page` dentro del propio HTML es lo que de verdad decide
+ * el tamaño físico de página que usa el motor de paginación de Chromium
+ * al imprimir (por eso se agregó en primer lugar, según el comentario de
+ * abajo) — así que pasarle `pageSize: "A6"` a `print()` desde
+ * impresoraService.ts no alcanzaba: el documento igual se paginaba e
+ * imprimía como A4 completa, con el ticket en la esquina y una guía de
+ * corte de más, sobre papel que ya era del tamaño del ticket. Arreglo:
+ * el tamaño de página (y si se dibuja la guía de corte) ahora sigue
+ * `tamanoPagina` — "a4" se comporta exactamente como antes; "ticket"
+ * declara `@page` al tamaño real del ticket, sin guía de corte (el papel
+ * ya viene cortado, no hay nada que recortar). Misma plantilla, mismos
+ * datos, tanto para "Ver PDF" como para "Imprimir" (§13): una sola
+ * fuente de verdad, ahora correcta para los dos tamaños. */
 export const ANCHO_HOJA_MM = 210;
 export const ALTO_HOJA_MM = 297;
 
@@ -81,6 +106,9 @@ const ICONO_BILLETERA = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
  */
 export function generarHtmlComprobante(d: DatosComprobanteHtml): string {
   const moneda = d.orden.moneda;
+  const paginaEsA4 = d.tamanoPagina === "a4";
+  const anchoHojaMm = paginaEsA4 ? ANCHO_HOJA_MM : ANCHO_PAGINA_COMPROBANTE_MM;
+  const altoHojaMm = paginaEsA4 ? ALTO_HOJA_MM : ALTO_PAGINA_COMPROBANTE_MM;
 
   const items = d.orden.prestaciones
     .map(
@@ -114,11 +142,12 @@ export function generarHtmlComprobante(d: DatosComprobanteHtml): string {
      el motor de paginación de impresión de Chromium puede terminar
      usando otro alto de página por defecto (el de la impresora/driver
      seleccionada) aunque el tamaño se pase también al llamar a print()
-     desde el proceso main. Hoja A4 completa a propósito (ver comentario
-     arriba de ANCHO_HOJA_MM) — el ticket en sí queda adentro, en
-     ".ticket", con su propio tamaño fijo. */
-  @page { size: ${ANCHO_HOJA_MM}mm ${ALTO_HOJA_MM}mm; margin: 0; }
-  html, body { width: ${ANCHO_HOJA_MM}mm; height: ${ALTO_HOJA_MM}mm; }
+     desde el proceso main. Sigue la preferencia (ver el historial de
+     arriba): A4 completa cuando se eligió "a4", o el tamaño real del
+     ticket cuando se eligió "ticket" — nunca más A4 fija sin importar la
+     preferencia. */
+  @page { size: ${anchoHojaMm}mm ${altoHojaMm}mm; margin: 0; }
+  html, body { width: ${anchoHojaMm}mm; height: ${altoHojaMm}mm; }
   body { margin: 0; }
   .ticket {
     font-family: "Helvetica Neue", Arial, sans-serif;
@@ -130,11 +159,17 @@ export function generarHtmlComprobante(d: DatosComprobanteHtml): string {
     line-height: 1.25;
     display: flex;
     flex-direction: column;
-    /* Guía de corte: el ticket es un cuarto de la hoja A4, pensado para
-       recortarse — estos dos bordes marcan dónde (los otros dos ya
-       coinciden con el borde físico de la hoja). */
+    ${
+      paginaEsA4
+        ? `/* Guía de corte: el ticket es un cuarto de la hoja A4, pensado
+       para recortarse — estos dos bordes marcan dónde (los otros dos ya
+       coinciden con el borde físico de la hoja). Solo tiene sentido en
+       modo "a4" — en "ticket" el papel ya viene cortado a este tamaño,
+       no hay nada que recortar. */
     border-right: 1px dashed #C9C6BC;
-    border-bottom: 1px dashed #C9C6BC;
+    border-bottom: 1px dashed #C9C6BC;`
+        : ""
+    }
   }
   /* Un ".relleno" flexible entre cada bloque reparte el espacio sobrante
      cuando el comprobante es corto (para que ocupe toda la hoja) y se
