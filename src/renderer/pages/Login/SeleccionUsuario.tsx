@@ -58,15 +58,14 @@ export function SeleccionUsuario({
   // módulo se evalúa, así que leerlo al importar rompería ese build.
   const esEscritorio = window.densz.plataforma === "escritorio";
 
-  // TEMPORAL (2026-11-03): el botón de abajo se había sacado del login
-  // diario por seguridad (ver commit "sacar Continuar con Google del
-  // login del día a día"), pero el camino de reemplazo —email+contraseña
-  // con recuperación por correo— todavía no se confirmó funcionando en
-  // producción (el link de recuperación de Supabase está fallando). Se
-  // reactiva este atajo SOLO hasta confirmar que la contraseña nueva
-  // funciona, para no dejar al dueño del laboratorio sin acceso a sus
-  // propios datos reales mientras tanto — sacar de nuevo apenas se
-  // confirme.
+  // Diseño final (2026-11-03, pedido explícito del dueño del producto):
+  // "Continuar con Google" se queda como opción permanente del login
+  // diario — lo que se sacó fue el ATAJO, no el botón. `iniciarLoginGoogle`
+  // (supabaseClient.ts) manda `prompt: "login"` a Google, que lo obliga a
+  // mostrar SU PROPIA pantalla de usuario/contraseña siempre, aunque el
+  // navegador ya tenga esa cuenta de Google abierta — así cualquiera que
+  // toque este botón en una compu ajena igual tiene que escribir la
+  // contraseña real de Gmail, nunca entra solo por tener Chrome logueado.
   async function onClickGoogle() {
     setErrorGoogle(null);
     setCargandoGoogle(true);
@@ -129,8 +128,8 @@ export function SeleccionUsuario({
         </div>
       )}
 
-      {/* Botón TEMPORAL (ver comentario arriba) — sacar apenas se confirme
-          que el login con email+contraseña funciona de punta a punta. */}
+      {/* "Continuar con Google", con prompt=login forzado (ver comentario
+          arriba) — opción permanente, no un atajo sin contraseña. */}
       {(supabaseAuthDisponible || esEscritorio) && (
         <div className="mt-8 flex flex-col items-center gap-1 w-full max-w-xs">
           <button
@@ -145,10 +144,10 @@ export function SeleccionUsuario({
         </div>
       )}
 
-      {/* Email+contraseña — el camino definitivo para el ingreso del día a
-          día (ver nota TEMPORAL arriba). Solo tiene sentido en la web —
-          en escritorio el ingreso es siempre con las tarjetas de arriba +
-          contraseña. */}
+      {/* Email+contraseña propia de Densz — alternativa a Google, para
+          quien prefiera no depender de su cuenta de Gmail. Solo tiene
+          sentido en la web — en escritorio el ingreso sin Google es
+          siempre con las tarjetas de arriba + contraseña. */}
       {!esEscritorio && supabaseAuthDisponible && (
         <div className="mt-4 w-full max-w-xs">
           <div className="flex items-center gap-3 text-cream/25 text-xs w-full mb-3">

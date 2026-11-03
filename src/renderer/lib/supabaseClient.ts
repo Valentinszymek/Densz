@@ -43,7 +43,15 @@ export async function iniciarLoginGoogle(nombreLaboratorio?: string): Promise<vo
   const query = nombreLaboratorio ? `?labName=${encodeURIComponent(nombreLaboratorio)}` : "";
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: `${window.location.origin}${window.location.pathname}${query}#/auth/callback` }
+    options: {
+      redirectTo: `${window.location.origin}${window.location.pathname}${query}#/auth/callback`,
+      // `prompt: "login"` obliga a Google a mostrar SU propia pantalla de
+      // usuario/contraseña siempre, aunque el navegador ya tenga esa
+      // cuenta de Google abierta — pedido explícito del dueño del
+      // producto: sin esto, cualquiera con esa Chrome ya logueada en
+      // Google entraba directo a Densz, sin que nada pidiera nada.
+      queryParams: { prompt: "login" }
+    }
   });
   if (error) throw error;
 }

@@ -128,7 +128,15 @@ async function completarLoginGoogle(): Promise<{ accessToken: string }> {
 
   const { data, error } = await auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo, skipBrowserRedirect: true }
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+      // Ver comentario en supabaseClient.ts (iniciarLoginGoogle) — mismo
+      // motivo acá: que Google pida usuario/contraseña siempre, nunca
+      // reusar en silencio una sesión de Google ya abierta en el
+      // navegador del sistema.
+      queryParams: { prompt: "login" }
+    }
   });
   if (error || !data.url) {
     throw new Error(error?.message ?? "No se pudo armar el login con Google.");
