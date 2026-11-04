@@ -12,7 +12,6 @@ import { Odontograma } from "../../components/odontograma/Odontograma";
 import { useOdontologos, useOdontologo } from "../../features/odontologos/hooks";
 import { usePrestaciones } from "../../features/precios/hooks";
 import { useItemsListaPrecio } from "../../features/listasPrecio/hooks";
-import { usePacientes } from "../../features/pacientes/hooks";
 import { useOrden, useCrearOrden, useEditarOrden } from "../../features/ordenes/hooks";
 import { useGenerarComprobante } from "../../features/comprobantes/hooks";
 import { useTienePagos } from "../../features/cuentas/hooks";
@@ -97,95 +96,43 @@ function registroDesdeLinea(p: {
 }
 
 /**
- * Campo "Paciente" de Nuevo Trabajo: un único input de texto que además
- * sugiere pacientes ya existentes del odontólogo elegido a medida que se
- * escribe. Si el usuario hace click en una sugerencia, ese paciente
- * existente queda elegido (`pacienteId`). Si en cambio deja escrito un
- * nombre que no coincide con ninguna sugerencia, ese texto ES el paciente
- * nuevo — no hace falta ningún botón ni opción de "crear": la creación
- * ocurre sola al Guardar la OT (ver `onGuardar`). A propósito NO existe
- * ningún "+ Nuevo paciente" en este campo (§ comportamiento definitivo).
+ * Campo "Paciente" de Nuevo Trabajo: un único input de texto libre, sin
+ * ninguna sugerencia de pacientes ya cargados (pedido explícito del dueño
+ * del producto, 2026-11-04 — antes sugería pacientes existentes del
+ * odontólogo elegido a medida que se escribía). El texto escrito ES el
+ * paciente — se crea solo al Guardar la OT (ver `onGuardar`), sin ningún
+ * botón ni opción de "crear" en el medio.
+ *
+ * Nota: en modo edición, `pacienteId` puede venir ya seteado (el paciente
+ * real de la OT que se está editando) — este campo no lo toca, solo
+ * limpia la selección si la persona sigue escribiendo (ver `onCambiarTexto`
+ * en NuevoTrabajo.tsx).
  */
 function CampoPaciente({
-  pacientes,
   texto,
-  pacienteId,
   onCambiarTexto,
-  onSeleccionar,
   disabled,
   placeholder
 }: {
-  pacientes: Array<{ id: number; label: string }>;
   texto: string;
-  pacienteId: number | null;
   onCambiarTexto: (texto: string) => void;
-  onSeleccionar: (id: number, label: string) => void;
   disabled?: boolean;
   placeholder?: string;
 }) {
-  const [abierto, setAbierto] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const sugeridas = useMemo(() => {
-    const q = texto.trim().toLowerCase();
-    // Con el campo vacío no hay sugerencias — el buscador solo debe
-    // activarse cuando el usuario empieza a escribir, nunca al hacer
-    // foco/clic solo.
-    if (!q) return [];
-    return pacientes.filter((p) => p.label.toLowerCase().includes(q));
-  }, [pacientes, texto]);
-
-  useEffect(() => {
-    function onClickFuera(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
-    }
-    document.addEventListener("mousedown", onClickFuera);
-    return () => document.removeEventListener("mousedown", onClickFuera);
-  }, []);
-
   return (
-    <div ref={ref} className="relative">
-      <input
-        type="text"
-        disabled={disabled}
-        value={texto}
-        onChange={(e) => {
-          onCambiarTexto(e.target.value);
-          // Solo se abre si queda al menos un carácter escrito — un clic
-          // en el campo vacío (o borrar todo el texto) nunca debe mostrar
-          // el listado de pacientes.
-          setAbierto(e.target.value.trim().length > 0);
-        }}
-        placeholder={placeholder}
-        className={cn(
-          "flex h-10 w-full items-center rounded-lg border border-carbon/15 bg-cream-card px-3 text-sm",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold",
-          "placeholder:text-carbon/35",
-          disabled && "opacity-50 cursor-not-allowed"
-        )}
-      />
-      {abierto && !disabled && sugeridas.length > 0 && (
-        <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-carbon/10 bg-cream-card py-1 shadow-lg">
-          {sugeridas.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => {
-                onSeleccionar(p.id, p.label);
-                setAbierto(false);
-              }}
-              className={cn(
-                "flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gold/10",
-                p.id === pacienteId && "bg-gold/10"
-              )}
-            >
-              <Check size={14} className={cn("shrink-0", p.id === pacienteId ? "opacity-100 text-gold-dim" : "opacity-0")} />
-              <span className="flex-1 truncate">{p.label}</span>
-            </button>
-          ))}
-        </div>
+    <input
+      type="text"
+      disabled={disabled}
+      value={texto}
+      onChange={(e) => onCambiarTexto(e.target.value)}
+      placeholder={placeholder}
+      className={cn(
+        "flex h-10 w-full items-center rounded-lg border border-carbon/15 bg-cream-card px-3 text-sm",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold",
+        "placeholder:text-carbon/35",
+        disabled && "opacity-50 cursor-not-allowed"
       )}
-    </div>
+    />
   );
 }
 
@@ -231,7 +178,6 @@ export default function NuevoTrabajo() {
 
   const { data: odontologos } = useOdontologos({ soloActivos: true });
   const { data: odontologo } = useOdontologo(odontologoId ?? undefined);
-  const { data: pacientes } = usePacientes(odontologoId ? { odontologoId } : {});
   const { data: prestaciones } = usePrestaciones({ soloActivas: true });
   const { data: itemsLista } = useItemsListaPrecio(odontologo?.listaPrecioId, true);
   const crearOrden = useCrearOrden();
@@ -526,24 +472,15 @@ export default function NuevoTrabajo() {
             </FormField>
 
             <FormField label="Paciente">
-              {/* Un único campo de texto: escribís el nombre y, si ya
-                  existe un paciente de este odontólogo que coincide,
-                  aparece como sugerencia para elegirlo con un click. Si no
-                  lo elegís, el texto tal cual escrito ES el paciente nuevo
-                  — se crea solo, en el mismo momento de Guardar la OT, sin
-                  ningún botón ni opción de "crear" en el medio (flujo
-                  definitivo: la creación es invisible para el usuario). */}
+              {/* Un único campo de texto libre, sin sugerencias de
+                  pacientes ya cargados (pedido explícito, 2026-11-04) — el
+                  texto escrito ES el paciente, se crea solo al Guardar la
+                  OT, sin ningún botón ni opción de "crear" en el medio. */}
               <CampoPaciente
-                pacientes={(pacientes ?? []).map((p) => ({ id: p.id, label: p.nombreCompleto }))}
                 texto={pacienteTexto}
-                pacienteId={pacienteId}
                 onCambiarTexto={(texto) => {
                   setPacienteTexto(capitalizarPalabras(texto));
                   setPacienteId(null);
-                }}
-                onSeleccionar={(id, label) => {
-                  setPacienteId(id);
-                  setPacienteTexto(label);
                 }}
                 disabled={!odontologoId}
                 placeholder={odontologoId ? "Nombre del paciente…" : "Elegí primero un odontólogo…"}
