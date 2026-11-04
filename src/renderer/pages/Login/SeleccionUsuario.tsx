@@ -8,6 +8,7 @@ import {
   tomarRegistroPendiente
 } from "../../lib/supabaseClient";
 import { useAuthStore } from "../../store/authStore";
+import { guardarUsuariosLaboratorioCache } from "../../lib/usuariosLaboratorioCache";
 import type { UsuarioParaSeleccion } from "@shared/types/entities";
 
 function TarjetaUsuario({ usuario, onClick }: { usuario: UsuarioParaSeleccion; onClick: () => void }) {
@@ -46,6 +47,7 @@ function TarjetaUsuario({ usuario, onClick }: { usuario: UsuarioParaSeleccion; o
 export function SeleccionUsuario({
   usuarios,
   ocultarOtrosMetodos,
+  onCambiarLaboratorio,
   onSeleccionar,
   onOlvideContrasena
 }: {
@@ -54,6 +56,10 @@ export function SeleccionUsuario({
    * de nuevo el botón de Google (o el email+contraseña) acá abajo sería
    * un paso redundante que la persona ya hizo (ver Login/index.tsx). */
   ocultarOtrosMetodos: boolean;
+  /** Presente solo cuando las tarjetas salen del cache de esta compu
+   * (ver usuariosLaboratorioCache.ts) — "no soy yo / otra cuenta": borra
+   * el cache y vuelve a pedir Google desde cero. */
+  onCambiarLaboratorio?: () => void;
   onSeleccionar: (u: UsuarioParaSeleccion) => void;
   onOlvideContrasena: () => void;
 }) {
@@ -128,6 +134,7 @@ export function SeleccionUsuario({
       // arriba) — resuelve los usuarios de SU laboratorio y los muestra.
       const usuariosDelLab = await window.densz.authUsuariosDelLaboratorio(accessToken);
       setUsuariosVerificados(usuariosDelLab);
+      guardarUsuariosLaboratorioCache(usuariosDelLab);
       setEmail("");
       setPasswordEmail("");
     } catch (err) {
@@ -154,6 +161,16 @@ export function SeleccionUsuario({
             <TarjetaUsuario key={u.id} usuario={u} onClick={() => onSeleccionar(u)} />
           ))}
         </div>
+      )}
+
+      {!!usuariosAMostrar?.length && onCambiarLaboratorio && (
+        <button
+          type="button"
+          onClick={onCambiarLaboratorio}
+          className="text-cream/35 text-xs mt-4 hover:text-cream/60 transition-colors"
+        >
+          ¿No sos vos? Usar otra cuenta
+        </button>
       )}
 
       {/* "Continuar con Google", con prompt=login forzado (ver comentario
