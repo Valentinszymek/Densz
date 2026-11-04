@@ -1,4 +1,4 @@
-import { Search, LogOut } from "lucide-react";
+import { Search, LogOut, Users } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useUiStore } from "../../store/uiStore";
 import { useAuthStore } from "../../store/authStore";
@@ -52,6 +52,18 @@ export function Topbar() {
               className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-600/5 cursor-pointer outline-none"
             >
               <LogOut size={14} /> Cerrar sesión
+            </DropdownMenu.Item>
+            {/* Mismo cierre de sesión que de arriba — con el cache de
+                usuarios de esta compu ya guardado (ver
+                usuariosLaboratorioCache.ts), cerrar sesión ya lleva
+                directo a elegir perfil, sin pasar por Google de nuevo.
+                Esta opción es solo un atajo más claro para "quiero
+                entrar con otro usuario", mismo resultado. */}
+            <DropdownMenu.Item
+              onSelect={() => logout.mutate()}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-carbon/70 hover:bg-carbon/5 cursor-pointer outline-none"
+            >
+              <Users size={14} /> Cambiar usuario
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
