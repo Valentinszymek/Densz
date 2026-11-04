@@ -10,8 +10,6 @@ import { RegistroLaboratorio } from "./RegistroLaboratorio";
 import { OlvideContrasena } from "./OlvideContrasena";
 import type { UsuarioParaSeleccion } from "@shared/types/entities";
 
-const CLAVE_ULTIMO_USUARIO = "densz.login.ultimoUsuario";
-
 type Vista = "bienvenida" | "seleccion" | "password" | "registro" | "olvide";
 
 export default function Login() {
@@ -38,7 +36,6 @@ export default function Login() {
   const usuarios = usuariosVerificados ?? (esEscritorio ? usuariosSinFiltrar : undefined);
   const [vista, setVista] = useState<Vista>(usuariosVerificados ? "seleccion" : "bienvenida");
   const [seleccionado, setSeleccionado] = useState<UsuarioParaSeleccion | null>(null);
-  const [yaIntentoRestaurar, setYaIntentoRestaurar] = useState(false);
 
   // Guarda en el cache de esta compu apenas se resuelve una lista nueva
   // (recién verificada por Google, o por email+contraseña dentro de
@@ -50,27 +47,6 @@ export default function Login() {
     }
   }, [usuariosRecienVerificados]);
 
-  // Preselecciona el último usuario elegido (comodidad, nunca la
-  // contraseña) — si no existe más o ya no está activo, simplemente no
-  // preselecciona nada y se ve la bienvenida normal. Si se encuentra, se
-  // salta directo a la pantalla de contraseña (sin pasar por la
-  // bienvenida) — es quien ya usaba Densz, no alguien nuevo.
-  useEffect(() => {
-    if (yaIntentoRestaurar || !usuarios) return;
-    setYaIntentoRestaurar(true);
-    try {
-      const ultimo = localStorage.getItem(CLAVE_ULTIMO_USUARIO);
-      const encontrado = ultimo ? usuarios.find((u) => u.nombreUsuario === ultimo) : undefined;
-      if (encontrado) {
-        setSeleccionado(encontrado);
-        setVista("password");
-      }
-    } catch {
-      // localStorage puede no estar disponible (ventana privada, storage
-      // bloqueado) — no es crítico, el selector simplemente no preselecciona.
-    }
-  }, [usuarios, yaIntentoRestaurar]);
-
   // Si ya hay sesión activa (login recién exitoso, o sesión restaurada al
   // arrancar), no tiene sentido seguir mostrando el selector/login.
   if (sesion) return <Navigate to="/" replace />;
@@ -78,11 +54,6 @@ export default function Login() {
   function seleccionar(u: UsuarioParaSeleccion) {
     setSeleccionado(u);
     setVista("password");
-    try {
-      localStorage.setItem(CLAVE_ULTIMO_USUARIO, u.nombreUsuario);
-    } catch {
-      // Ver comentario arriba.
-    }
   }
 
   // "Esta no es mi cuenta" / cambiar de laboratorio en esta compu — borra
