@@ -33,6 +33,7 @@ import { crearRouterEstadisticas } from "./routes/estadisticas.route";
 import { crearRouterExport } from "./routes/export.route";
 import { crearRouterLaboratorios } from "./routes/laboratorios.route";
 import { crearRouterBilling } from "./routes/billing.route";
+import { crearRouterDescargas } from "./routes/descargas.route";
 import { procesarWebhookStripe } from "../main/services/billingService";
 import { logger } from "../main/utils/logger";
 
@@ -120,6 +121,7 @@ async function main(): Promise<void> {
   app.use("/laboratorios", crearRouterLaboratorios(pool));
   app.use("/export", crearRouterExport(pool));
   app.use("/billing", crearRouterBilling(pool));
+  app.use("/descargas", crearRouterDescargas());
 
   // Red de seguridad centralizada (corrección post-auditoría §23.7/§38.2):
   // debe ir DESPUÉS de montar todos los routers (Express la reconoce como

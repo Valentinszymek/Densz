@@ -18,6 +18,12 @@ import {
   useGuardarTamanoImpresionComprobante
 } from "../../features/configuracion/hooks";
 import { leerTamanoImpresionLocal, guardarTamanoImpresionLocal } from "../../lib/tamanoImpresionLocal";
+
+// No se importa de webApi.ts a propósito: ese archivo es exclusivo del
+// entry point web (ver su comentario) y esta página también se bundlea
+// para escritorio — esta sección solo se renderiza con !esEscritorio,
+// pero el import estático la arrastraría igual al bundle de Electron.
+const API_BASE_DESCARGAS = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:4000";
 import { ImpresoraSelectorModal } from "./ImpresoraSelectorModal";
 import { SeccionProteccion } from "./SeccionProteccion";
 import { SeccionSuscripcion } from "./SeccionSuscripcion";
@@ -66,7 +72,7 @@ function SeccionDescargaEscritorio() {
           nueva.
         </p>
         <Button variant="secondary" size="sm" asChild>
-          <a href="https://github.com/Valentinszymek/Densz/releases/latest" target="_blank" rel="noopener noreferrer">
+          <a href={`${API_BASE_DESCARGAS}/descargas/windows`}>
             <Download size={14} /> Descargar para Windows
           </a>
         </Button>
