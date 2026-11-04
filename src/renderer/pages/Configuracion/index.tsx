@@ -36,7 +36,7 @@ export default function Configuracion() {
     <div>
       <PageHeader
         title="Configuración"
-        description="Datos del laboratorio, numeración, comprobantes, backups y preferencias."
+        description="Datos del laboratorio, numeración, comprobantes y preferencias."
       />
 
       <div className="max-w-xl space-y-6">

@@ -26,7 +26,6 @@ import CuentaDetalle from "../pages/Cuentas/CuentaDetalle";
 import ClinicaCuentaDetalle from "../pages/Cuentas/ClinicaCuentaDetalle";
 import Comprobantes from "../pages/Comprobantes";
 import Estadisticas from "../pages/Estadisticas";
-import Backups from "../pages/Backups";
 import Configuracion from "../pages/Configuracion";
 import Usuarios from "../pages/Usuarios";
 import Auditoria from "../pages/Auditoria";
@@ -77,7 +76,6 @@ export function AppRouter() {
               <Route element={<RutaSoloAdmin />}>
                 <Route path="/precios" element={<Precios />} />
                 <Route path="/comprobantes" element={<Comprobantes />} />
-                <Route path="/backups" element={<Backups />} />
                 <Route path="/configuracion" element={<Configuracion />} />
                 <Route path="/usuarios" element={<Usuarios />} />
                 <Route path="/auditoria" element={<Auditoria />} />

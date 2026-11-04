@@ -8,7 +8,6 @@ import {
   Landmark,
   Receipt,
   BarChart3,
-  DatabaseBackup,
   Settings,
   UserCog,
   History,
@@ -44,7 +43,6 @@ export const NAVEGACION_PRINCIPAL: ItemNavegacion[] = [
 ];
 
 export const NAVEGACION_SECUNDARIA: ItemNavegacion[] = [
-  { path: "/backups", label: "Backups", icon: DatabaseBackup, soloAdmin: true },
   { path: "/usuarios", label: "Usuarios", icon: UserCog, soloAdmin: true },
   { path: "/auditoria", label: "Auditoría", icon: History, soloAdmin: true, soloProfessional: true },
   { path: "/configuracion", label: "Configuración", icon: Settings, soloAdmin: true },
