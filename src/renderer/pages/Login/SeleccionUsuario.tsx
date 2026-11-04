@@ -64,6 +64,14 @@ export function SeleccionUsuario({
   const [cargandoEmail, setCargandoEmail] = useState(false);
   const [errorGoogle, setErrorGoogle] = useState<string | null>(null);
   const [cargandoGoogle, setCargandoGoogle] = useState(false);
+  // Mismo criterio que Google (ver CallbackGoogle.tsx): el email+contraseña
+  // TAMPOCO entra directo a Densz — primero resuelve la lista de usuarios
+  // de SU laboratorio y la muestra acá mismo, sin navegar a ningún lado
+  // (a diferencia de Google, esto no tiene un redirect de por medio, así
+  // que alcanza con guardar el resultado en un estado local).
+  const [usuariosVerificados, setUsuariosVerificados] = useState<UsuarioParaSeleccion[] | null>(null);
+  const usuariosAMostrar = usuariosVerificados ?? usuarios;
+  const yaVerificado = ocultarOtrosMetodos || usuariosVerificados !== null;
   // Se lee en cada render (nunca a nivel de módulo): en la web,
   // `window.densz` recién se asigna (main.web.tsx) después de que este
   // módulo se evalúa, así que leerlo al importar rompería ese build.
@@ -108,12 +116,23 @@ export function SeleccionUsuario({
     try {
       const accessToken = await iniciarSesionConEmailPassword(email.trim(), passwordEmail);
       const nombrePendiente = tomarRegistroPendiente(email.trim());
-      const sesion = nombrePendiente
-        ? await window.densz.authRegistrarseConGoogle(nombrePendiente, accessToken)
-        : await window.densz.authLoginGoogle(accessToken);
-      setSesion(sesion);
+      if (nombrePendiente) {
+        // Alta de laboratorio nuevo recién confirmada por email — todavía
+        // no hay ningún otro usuario para elegir, entra directo (mismo
+        // criterio que CallbackGoogle.tsx con `labName`).
+        const sesion = await window.densz.authRegistrarseConGoogle(nombrePendiente, accessToken);
+        setSesion(sesion);
+        return;
+      }
+      // "Iniciar sesión" normal: nunca entra directo (ver comentario
+      // arriba) — resuelve los usuarios de SU laboratorio y los muestra.
+      const usuariosDelLab = await window.densz.authUsuariosDelLaboratorio(accessToken);
+      setUsuariosVerificados(usuariosDelLab);
+      setEmail("");
+      setPasswordEmail("");
     } catch (err) {
       setErrorEmail(err instanceof Error ? err.message : "No se pudo iniciar sesión.");
+    } finally {
       setCargandoEmail(false);
     }
   }
@@ -123,15 +142,15 @@ export function SeleccionUsuario({
       <DenszLogo height={120} className="mb-10" />
       <h1 className="text-cream/80 text-lg font-medium mb-8 text-center">¿Quién va a utilizar Densz?</h1>
 
-      {usuarios !== undefined && usuarios.length === 0 && (
+      {usuariosAMostrar !== undefined && usuariosAMostrar.length === 0 && (
         <p className="text-cream/40 text-sm max-w-sm text-center">
           No hay usuarios activos para iniciar sesión. Contactá a un administrador de este Densz.
         </p>
       )}
 
-      {!!usuarios?.length && (
+      {!!usuariosAMostrar?.length && (
         <div className="flex flex-wrap justify-center gap-4 max-w-3xl max-h-[55vh] overflow-y-auto scrollbar-invisible px-2 py-2">
-          {usuarios.map((u) => (
+          {usuariosAMostrar.map((u) => (
             <TarjetaUsuario key={u.id} usuario={u} onClick={() => onSeleccionar(u)} />
           ))}
         </div>
@@ -139,8 +158,8 @@ export function SeleccionUsuario({
 
       {/* "Continuar con Google", con prompt=login forzado (ver comentario
           arriba) — opción permanente, no un atajo sin contraseña. Oculto
-          si ya se pasó por Google (ver ocultarOtrosMetodos). */}
-      {!ocultarOtrosMetodos && (supabaseAuthDisponible || esEscritorio) && (
+          si ya se pasó por Google o por email+contraseña (ver yaVerificado). */}
+      {!yaVerificado && (supabaseAuthDisponible || esEscritorio) && (
         <div className="mt-8 flex flex-col items-center gap-1 w-full max-w-xs">
           <button
             type="button"
@@ -158,8 +177,8 @@ export function SeleccionUsuario({
           quien prefiera no depender de su cuenta de Gmail. Solo tiene
           sentido en la web — en escritorio el ingreso sin Google es
           siempre con las tarjetas de arriba + contraseña. Oculto si ya
-          se pasó por Google (ver ocultarOtrosMetodos). */}
-      {!ocultarOtrosMetodos && !esEscritorio && supabaseAuthDisponible && (
+          se pasó por Google o por email+contraseña (ver yaVerificado). */}
+      {!yaVerificado && !esEscritorio && supabaseAuthDisponible && (
         <div className="mt-4 w-full max-w-xs">
           <div className="flex items-center gap-3 text-cream/25 text-xs w-full mb-3">
             <span className="h-px flex-1 bg-cream/10" />o<span className="h-px flex-1 bg-cream/10" />
