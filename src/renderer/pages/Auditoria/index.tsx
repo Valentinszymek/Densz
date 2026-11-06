@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { Table, Thead, Tbody, Tr, Th, Td } from "../../components/ui/Table";
@@ -7,10 +7,15 @@ import { Button } from "../../components/ui/Button";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ExportMenu } from "../../components/ui/ExportMenu";
 import { useAuditoria, useOpcionesFiltroAuditoria } from "../../features/auditoria/hooks";
+import { useClinicas } from "../../features/clinicas/hooks";
+import { useOdontologos } from "../../features/odontologos/hooks";
+import { useMediosPago } from "../../features/pagos/hooks";
+import { useListasPrecio } from "../../features/listasPrecio/hooks";
 import { useDebouncedValue } from "../../lib/useDebouncedValue";
 import { formatearFechaHora } from "../../lib/format";
 import { etiquetaAccion } from "@shared/constants/auditoriaAcciones";
 import { AuditoriaDetalle } from "./AuditoriaDetalle";
+import { resumenDetalleAuditoria, type LookupsAuditoria } from "./resumenAuditoria";
 import type { PeriodoAuditoria, RegistroAuditoria } from "@shared/types/entities";
 
 const OPCIONES_PERIODO: Array<{ valor: PeriodoAuditoria; etiqueta: string }> = [
@@ -25,25 +30,24 @@ const OPCIONES_PERIODO: Array<{ valor: PeriodoAuditoria; etiqueta: string }> = [
 
 const CLASE_SELECT = "h-9 rounded-lg border border-carbon/15 bg-cream-card px-2.5 text-sm min-w-0";
 
-/** Resumen de una sola línea del `detalle` de un evento, para la columna
- * de la tabla — el detalle completo (con campos modificados, etc.) vive
- * en AuditoriaDetalle, esto es solo un vistazo rápido. */
-function resumenDetalle(detalle: RegistroAuditoria["detalle"]): string {
-  if (!detalle) return "—";
-  if (Array.isArray(detalle.cambios)) {
-    const cambios = detalle.cambios as Array<{ campo: string; anterior: string; nuevo: string }>;
-    if (cambios.length === 0) return "—";
-    return cambios.map((c) => `${c.campo}: ${c.anterior} → ${c.nuevo}`).join(" · ");
-  }
-  const partes: string[] = [];
-  for (const [clave, valor] of Object.entries(detalle)) {
-    if (valor === null || valor === undefined || typeof valor === "object") continue;
-    partes.push(`${clave}: ${valor}`);
-  }
-  return partes.length > 0 ? partes.join(" · ") : "—";
-}
-
 export default function Auditoria() {
+  // Catálogos para resolver los *Id del detalle crudo (clinicaId,
+  // odontologoId, etc.) a un nombre legible — ver resumenAuditoria.ts.
+  const { data: clinicas } = useClinicas();
+  const { data: odontologos } = useOdontologos();
+  const { data: mediosPago } = useMediosPago();
+  const { data: listasPrecio } = useListasPrecio();
+
+  const lookups: LookupsAuditoria = useMemo(
+    () => ({
+      clinicas: new Map((clinicas ?? []).map((c) => [c.id, c.nombre])),
+      odontologos: new Map((odontologos ?? []).map((o) => [o.id, o.nombre])),
+      mediosPago: new Map((mediosPago ?? []).map((m) => [m.id, m.nombre])),
+      listasPrecio: new Map((listasPrecio ?? []).map((l) => [l.id, l.nombre]))
+    }),
+    [clinicas, odontologos, mediosPago, listasPrecio]
+  );
+
   const [busquedaCruda, setBusquedaCruda] = useState("");
   const busqueda = useDebouncedValue(busquedaCruda, 300);
   const [usuarioId, setUsuarioId] = useState<number | undefined>(undefined);
@@ -233,8 +237,11 @@ export default function Auditoria() {
                   <Td className="font-medium whitespace-nowrap">{etiquetaAccion(e.accion)}</Td>
                   <Td className="text-carbon/60">{e.entidad}</Td>
                   <Td className="text-carbon/40">{e.entidadId ?? "—"}</Td>
-                  <Td className="text-carbon/60 text-xs max-w-md truncate" title={resumenDetalle(e.detalle)}>
-                    {resumenDetalle(e.detalle)}
+                  <Td
+                    className="text-carbon/60 text-xs max-w-md truncate"
+                    title={resumenDetalleAuditoria(e.detalle, lookups)}
+                  >
+                    {resumenDetalleAuditoria(e.detalle, lookups)}
                   </Td>
                 </Tr>
               ))}
@@ -271,7 +278,12 @@ export default function Auditoria() {
       )}
 
       {seleccionado && (
-        <AuditoriaDetalle open onOpenChange={(o) => !o && setSeleccionado(null)} evento={seleccionado} />
+        <AuditoriaDetalle
+          open
+          onOpenChange={(o) => !o && setSeleccionado(null)}
+          evento={seleccionado}
+          lookups={lookups}
+        />
       )}
     </div>
   );

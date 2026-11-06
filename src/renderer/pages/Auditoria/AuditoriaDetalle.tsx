@@ -2,6 +2,7 @@ import { Modal } from "../../components/ui/Modal";
 import { Badge } from "../../components/ui/Badge";
 import { etiquetaAccion } from "@shared/constants/auditoriaAcciones";
 import { formatearFechaHoraCompleta } from "../../lib/format";
+import { filasDetalleAuditoria, cambiosDesdeAnteriorNuevo, SIN_LOOKUPS_AUDITORIA, type LookupsAuditoria } from "./resumenAuditoria";
 import type { RegistroAuditoria } from "@shared/types/entities";
 
 interface Cambio {
@@ -15,6 +16,10 @@ function esArrayDeCambios(valor: unknown): valor is Cambio[] {
     Array.isArray(valor) &&
     valor.every((c) => c && typeof c === "object" && "campo" in c && "anterior" in c && "nuevo" in c)
   );
+}
+
+function esObjetoPlano(valor: unknown): valor is Record<string, unknown> {
+  return !!valor && typeof valor === "object" && !Array.isArray(valor);
 }
 
 function Fila({ label, children }: { label: string; children: React.ReactNode }) {
@@ -33,25 +38,28 @@ function Fila({ label, children }: { label: string; children: React.ReactNode })
 export function AuditoriaDetalle({
   open,
   onOpenChange,
-  evento
+  evento,
+  lookups = SIN_LOOKUPS_AUDITORIA
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   evento: RegistroAuditoria;
+  lookups?: LookupsAuditoria;
 }) {
   const esLogin = evento.accion === "login" || evento.accion === "login_fallido";
   const detalle = evento.detalle;
-  const cambios = detalle && esArrayDeCambios(detalle.cambios) ? (detalle.cambios as Cambio[]) : null;
+  const cambios = detalle && esArrayDeCambios(detalle.cambios)
+    ? (detalle.cambios as Cambio[])
+    : detalle && esObjetoPlano(detalle.anterior) && esObjetoPlano(detalle.nuevo)
+      ? cambiosDesdeAnteriorNuevo(detalle.anterior, detalle.nuevo)
+      : null;
 
-  const claveValor = (() => {
+  const filas = (() => {
     if (!detalle || cambios) return [];
-    return Object.entries(detalle).filter(([clave, valor]) => {
-      if (valor === null || valor === undefined || typeof valor === "object") return false;
-      // login_fallido guarda el usuario intentado en detalle.nombreUsuario
-      // y ya se muestra aparte como "Usuario intentado" — no duplicar acá.
-      if (esLogin && clave === "nombreUsuario") return false;
-      return true;
-    });
+    // login_fallido guarda el usuario intentado en detalle.nombreUsuario y
+    // ya se muestra aparte como "Usuario intentado" — no duplicar acá.
+    const { nombreUsuario: _nombreUsuario, ...resto } = detalle;
+    return filasDetalleAuditoria(esLogin ? resto : detalle, lookups);
   })();
 
   return (
@@ -98,17 +106,17 @@ export function AuditoriaDetalle({
             </div>
           )}
 
-          {!cambios && claveValor.length > 0 && (
+          {!cambios && filas.length > 0 && (
             <div className="space-y-1">
-              {claveValor.map(([clave, valor]) => (
-                <p key={clave} className="text-sm text-carbon">
-                  <span className="font-medium">{clave}:</span> {String(valor)}
+              {filas.map((f) => (
+                <p key={f.label} className="text-sm text-carbon">
+                  <span className="font-medium">{f.label}:</span> {f.texto}
                 </p>
               ))}
             </div>
           )}
 
-          {!cambios && claveValor.length === 0 && <p className="text-sm text-carbon/40">Sin detalles adicionales.</p>}
+          {!cambios && filas.length === 0 && <p className="text-sm text-carbon/40">Sin detalles adicionales.</p>}
         </div>
       </div>
     </Modal>
