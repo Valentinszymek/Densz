@@ -64,6 +64,19 @@ function Variacion({ actual, anterior }: { actual: number; anterior: number }) {
   );
 }
 
+function BotonVerMas({ expandido, restantes, onClick }: { expandido: boolean; restantes: number; onClick: () => void }) {
+  if (!expandido && restantes <= 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-3 w-full rounded-md py-1.5 text-center text-xs font-medium text-gold-dim transition-colors hover:bg-carbon/5 hover:text-carbon"
+    >
+      {expandido ? "Ver menos" : `Ver más (${restantes})`}
+    </button>
+  );
+}
+
 function TabsMoneda({ monedas, activa, onChange }: { monedas: Moneda[]; activa: Moneda; onChange: (m: Moneda) => void }) {
   if (monedas.length <= 1) return null;
   return (
@@ -122,7 +135,9 @@ export default function Estadisticas() {
   const { data: rankingOdo } = useRankingOdontologos(rango);
   const { data: rankingCli } = useRankingClinicas(rango);
   const { data: prestaciones } = usePrestacionesRanking(rango);
-  const { data: saldosTop } = useSaldosPendientesTop(10);
+  const { data: saldosTop } = useSaldosPendientesTop(100);
+  const [verTodosSaldos, setVerTodosSaldos] = useState(false);
+  const saldosVisibles = verTodosSaldos ? saldosTop : saldosTop?.slice(0, 10);
   const { data: porCategoria } = useTrabajosPorCategoria(rango);
 
   const monedasDisponibles = useMemo<Moneda[]>(() => {
@@ -333,7 +348,7 @@ export default function Estadisticas() {
             <p className="text-sm text-carbon/40">Nadie tiene saldo pendiente en este momento.</p>
           ) : (
             <div className="divide-y divide-carbon/8">
-              {saldosTop?.map((s) => (
+              {saldosVisibles?.map((s) => (
                 <button
                   key={`${s.tipo}-${s.id}-${s.moneda}`}
                   onClick={() => navigate(s.tipo === "odontologo" ? `/odontologos/${s.id}` : `/clinicas/${s.id}`)}
@@ -355,6 +370,11 @@ export default function Estadisticas() {
               ))}
             </div>
           )}
+          <BotonVerMas
+            expandido={verTodosSaldos}
+            restantes={(saldosTop?.length ?? 0) - 10}
+            onClick={() => setVerTodosSaldos((v) => !v)}
+          />
         </CardContent>
       </Card>
     </div>
@@ -582,15 +602,16 @@ function RankingCard<F extends FilaRanking>({
   onVer: (f: F) => void;
 }) {
   const [ordenarPor, setOrdenarPor] = useState<OrdenRanking>("facturadoCentavos");
+  const [verTodo, setVerTodo] = useState(false);
 
-  const filtradasYOrdenadas = useMemo(() => {
+  const todasFiltradas = useMemo(() => {
     return (filas ?? [])
       .filter((f) => f.moneda === moneda)
       .slice()
-      .sort((a, b) => b[ordenarPor] - a[ordenarPor])
-      .slice(0, 8);
+      .sort((a, b) => b[ordenarPor] - a[ordenarPor]);
   }, [filas, moneda, ordenarPor]);
 
+  const filtradasYOrdenadas = verTodo ? todasFiltradas : todasFiltradas.slice(0, 8);
   const maximo = Math.max(1, ...filtradasYOrdenadas.map((f) => f[ordenarPor]));
 
   return (
@@ -651,6 +672,11 @@ function RankingCard<F extends FilaRanking>({
             })}
           </div>
         )}
+        <BotonVerMas
+          expandido={verTodo}
+          restantes={todasFiltradas.length - 8}
+          onClick={() => setVerTodo((v) => !v)}
+        />
       </CardContent>
     </Card>
   );
@@ -671,14 +697,10 @@ function ListaPrestaciones({
   ordenarPor: "cantidad" | "totalCentavos";
   moneda: Moneda;
 }) {
-  const top = useMemo(
-    () =>
-      datos
-        .slice()
-        .sort((a, b) => b[ordenarPor] - a[ordenarPor])
-        .slice(0, 6),
-    [datos, ordenarPor]
-  );
+  const [verTodo, setVerTodo] = useState(false);
+
+  const todos = useMemo(() => datos.slice().sort((a, b) => b[ordenarPor] - a[ordenarPor]), [datos, ordenarPor]);
+  const top = verTodo ? todos : todos.slice(0, 6);
   const maximo = Math.max(1, ...top.map((d) => d[ordenarPor]));
 
   return (
@@ -708,6 +730,7 @@ function ListaPrestaciones({
           })}
         </div>
       )}
+      <BotonVerMas expandido={verTodo} restantes={todos.length - 6} onClick={() => setVerTodo((v) => !v)} />
     </div>
   );
 }
