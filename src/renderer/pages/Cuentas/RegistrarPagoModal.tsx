@@ -17,11 +17,16 @@ type Titular = { odontologoId: number } | { clinicaId: number };
 export function RegistrarPagoModal({
   open,
   onOpenChange,
-  titular
+  titular,
+  monedaSugerida
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   titular: Titular;
+  /** Para clínicas (sin lista de precios propia, a diferencia de un
+   * odontólogo): la pantalla que abre el modal ya sabe en qué moneda tiene
+   * saldo esa clínica — sin esto, siempre caía en ARS por defecto. */
+  monedaSugerida?: Moneda;
 }) {
   const [fecha, setFecha] = useState(hoyISO());
   const [importe, setImporte] = useState(0);
@@ -40,14 +45,14 @@ export function RegistrarPagoModal({
     if (open) {
       setFecha(hoyISO());
       setImporte(0);
-      setMoneda(odontologo?.listaPrecioMoneda ?? "ARS");
+      setMoneda(odontologo?.listaPrecioMoneda ?? monedaSugerida ?? "ARS");
       setMedioPagoId(medios?.[0]?.id ?? null);
       setReferencia("");
       setAdvertenciaDuplicado(false);
       setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, odontologo]);
+  }, [open, odontologo, monedaSugerida]);
 
   async function enviar(confirmarDuplicado: boolean) {
     setError(null);

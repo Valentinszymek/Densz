@@ -49,6 +49,14 @@ export default function ClinicaCuentaDetalle() {
   const clinicaId = Number(id);
   const { data: clinica } = useClinica(clinicaId);
   const { data: saldos } = useSaldosClinica(clinicaId);
+  // Una clínica no tiene una "moneda propia" (a diferencia de un
+  // odontólogo, con su lista de precios) — se sugiere la del saldo
+  // pendiente más alto, para no ofrecer ARS por defecto a una clínica que
+  // solo factura en USD.
+  const monedaSugerida = useMemo(() => {
+    const conSaldo = (saldos ?? []).filter((s) => s.saldoCentavos > 0);
+    return conSaldo.length > 0 ? conSaldo.slice().sort((a, b) => b.saldoCentavos - a.saldoCentavos)[0].moneda : undefined;
+  }, [saldos]);
 
   const ahora = new Date();
   const [anio, setAnio] = useState(ahora.getFullYear());
@@ -326,7 +334,12 @@ export default function ClinicaCuentaDetalle() {
         </Table>
       )}
 
-      <RegistrarPagoModal open={pagoAbierto} onOpenChange={setPagoAbierto} titular={{ clinicaId }} />
+      <RegistrarPagoModal
+        open={pagoAbierto}
+        onOpenChange={setPagoAbierto}
+        titular={{ clinicaId }}
+        monedaSugerida={monedaSugerida}
+      />
       {pagoAAnular !== null && (
         <AnularPagoModal open onOpenChange={(o) => !o && setPagoAAnular(null)} pagoId={pagoAAnular} />
       )}
