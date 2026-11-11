@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { History } from "lucide-react";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
@@ -22,12 +22,22 @@ export function CambiarPrecioModal({
   prestacion: PrestacionEnLista | null;
 }) {
   const [nuevoPrecio, setNuevoPrecio] = useState(0);
+  // $0 es un precio válido (ej. una repetición sin cargo) — hay que poder
+  // distinguirlo de "todavía no escribió nada", que en centavos es el mismo
+  // valor (0). Se resetea al abrir el modal para una prestación distinta,
+  // para no arrastrar el precio tipeado en la anterior.
+  const [tocado, setTocado] = useState(false);
   const { data: historial } = useHistorialItemLista(listaId ?? undefined, prestacion?.id);
   const cambiar = useCambiarPrecioLista();
 
+  useEffect(() => {
+    setNuevoPrecio(0);
+    setTocado(false);
+  }, [prestacion?.id]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!prestacion || !listaId || nuevoPrecio <= 0) return;
+    if (!prestacion || !listaId || !tocado) return;
     await cambiar.mutateAsync({ listaId, prestacionId: prestacion.id, precioCentavos: nuevoPrecio });
     onOpenChange(false);
   }
@@ -42,7 +52,15 @@ export function CambiarPrecioModal({
           <strong>{prestacion.precioCentavos !== null ? formatearMoneda(prestacion.precioCentavos, moneda) : "sin precio"}</strong>
         </p>
         <FormField label={`Nuevo precio (${moneda})`}>
-          <CurrencyInput autoFocus valueCentavos={nuevoPrecio} onChangeCentavos={setNuevoPrecio} simbolo={moneda === "USD" ? "US$" : "$"} />
+          <CurrencyInput
+            autoFocus
+            valueCentavos={nuevoPrecio}
+            onChangeCentavos={(c) => {
+              setNuevoPrecio(c);
+              setTocado(true);
+            }}
+            simbolo={moneda === "USD" ? "US$" : "$"}
+          />
         </FormField>
         <p className="text-xs text-carbon/40">
           Las OT ya registradas con el precio anterior no se ven afectadas: el precio queda congelado en cada una.
@@ -70,7 +88,7 @@ export function CambiarPrecioModal({
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={nuevoPrecio <= 0}>
+          <Button type="submit" disabled={!tocado}>
             Guardar nuevo precio
           </Button>
         </div>
