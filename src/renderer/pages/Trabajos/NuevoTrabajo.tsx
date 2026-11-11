@@ -369,7 +369,14 @@ export default function NuevoTrabajo() {
     try {
       const ordenCreada = await crearOrden.mutateAsync(payload);
       if (generarComprobanteTambien) {
-        await generarComprobante.mutateAsync(ordenCreada.id);
+        // Sin await a propósito: generar el PDF (render + subida) tarda
+        // varios segundos y no hay ningún motivo para tener al usuario
+        // esperando esa parte — ya puede seguir a la OT (que muestra
+        // "Pendiente de facturar" mientras tanto) o directo a cargar el
+        // próximo trabajo. useGenerarComprobante ya avisa con un toast y
+        // refresca la pantalla sola cuando el comprobante queda listo (o
+        // si falla), pase lo que pase con la navegación mientras tanto.
+        generarComprobante.mutate(ordenCreada.id);
       }
       navigate(`/trabajos/${ordenCreada.id}`);
     } catch (err) {
