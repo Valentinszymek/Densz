@@ -338,6 +338,12 @@ export interface MovimientoCuenta {
  * Incluye las anuladas (para que no "desaparezcan" del historial) — el
  * consumidor decide si las suma o no según `anulado`. */
 export interface TrabajoFacturadoMes {
+  /** Id del movimiento de cuenta (`movimientos_cuenta.id`) — único por
+   * fila, a diferencia de `ordenId`: una OT editada después de facturada
+   * aparece dos veces (el movimiento viejo anulado + el nuevo activo),
+   * ambas con el mismo `ordenId`. Usar siempre esto como key de lista en
+   * React, nunca `ordenId` solo. */
+  movimientoId: number;
   ordenId: number;
   ordenNumero: string;
   comprobanteNumero: string | null;

@@ -329,6 +329,7 @@ export async function listarMovimientosClinica(db: Queryable, clinicaId: number,
 // ============================================================
 
 interface FilaTrabajoFacturado {
+  movimiento_id: number;
   orden_id: number;
   orden_numero: string;
   comprobante_numero: string | null;
@@ -355,6 +356,7 @@ function mapearTrabajoFacturado(f: FilaTrabajoFacturado): TrabajoFacturadoMes {
       ? JSON.parse(f.prestaciones_detalle_json)
       : ((f.prestaciones_detalle_json as unknown as Array<{ nombre: string; cantidad: number; cantidadPiezas: number }>) ?? []);
   return {
+    movimientoId: f.movimiento_id,
     ordenId: f.orden_id,
     ordenNumero: f.orden_numero,
     comprobanteNumero: f.comprobante_numero,
@@ -400,7 +402,7 @@ async function listarTrabajosFacturadosPorMes(
   const columnaTitular = titular.clinicaId != null ? "m.clinica_id" : "m.odontologo_id";
   const idTitular = titular.clinicaId ?? titular.odontologoId;
   const { rows } = await db.query<FilaTrabajoFacturado>(
-    `SELECT o.id AS orden_id, o.numero AS orden_numero, o.estado,
+    `SELECT m.id AS movimiento_id, o.id AS orden_id, o.numero AS orden_numero, o.estado,
             c.numero AS comprobante_numero, c.fecha_emision AS fecha_facturacion,
             p.nombre AS paciente_nombre, p.apellido AS paciente_apellido,
             prof.nombre AS profesional_nombre,

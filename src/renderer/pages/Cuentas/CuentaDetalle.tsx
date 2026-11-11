@@ -211,7 +211,7 @@ export default function CuentaDetalle() {
                 <Tbody>
                   {ordenarPorFecha(b.trabajos).map((t) => (
                     <Tr
-                      key={t.ordenId}
+                      key={t.movimientoId}
                       className={`cursor-pointer ${t.anulado ? "opacity-40" : ""}`}
                       onClick={() => navigate(`/trabajos/${t.ordenId}`)}
                     >

@@ -203,7 +203,7 @@ export default function ClinicaCuentaDetalle() {
                   <Tbody>
                     {ordenarPorFecha(b.trabajos).map((t) => (
                       <Tr
-                        key={`${t.ordenId}-${t.comprobanteNumero}`}
+                        key={t.movimientoId}
                         className={`cursor-pointer ${t.anulado ? "opacity-40" : ""}`}
                         onClick={() => navigate(`/trabajos/${t.ordenId}`)}
                       >
