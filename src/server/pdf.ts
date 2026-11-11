@@ -57,7 +57,13 @@ export async function generarPdfDesdeHtmlWeb(html: string, outputPath: string, p
   const browser = await getNavegador();
   const page = await browser.newPage();
   try {
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    // El HTML del comprobante/resumen es autocontenido (el logo va embebido
+    // como data URI, sin fuentes ni imágenes externas — ver
+    // comprobanteHtmlTemplate.ts) — "networkidle0" fuerza medio segundo de
+    // espera de red de por sí (su propia definición: 500ms sin conexiones
+    // activas) aunque acá nunca haya ninguna conexión que esperar. "load"
+    // alcanza y sobra, y ahorra esos ~500ms en cada PDF generado.
+    await page.setContent(html, { waitUntil: "load" });
 
     // Sin márgenes propios: igual que pdfService.ts (`margins: {marginType:
     // "none"}`), el margen visual lo define el propio HTML/CSS, nunca
