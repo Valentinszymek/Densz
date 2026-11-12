@@ -161,40 +161,54 @@ function SeccionTamanoImpresion() {
   );
   const tamanoEfectivo = local ?? tamano;
 
+  const etiquetaTamano: Record<TamanoImpresionComprobante, string> = { ticket: "Ticket (chico)", a4: "A4 completa" };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Tamaño de impresión del comprobante</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-carbon/50">
-          Por defecto, Densz genera el comprobante directo al tamaño del ticket (10,5 × 14,8 cm) — ideal si imprimís
-          en papel ya precortado a ese tamaño. Activá esto si en cambio imprimís en hoja A4 entera y recortás el
-          ticket vos mismo después, siguiendo la guía punteada.
-        </p>
-
-        {!esEscritorio && !esA4 && (
-          <p className="text-xs text-amber-800/80 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
-            Estás usando Densz desde el navegador: el tamaño de papel que imprime lo decide la ventana de impresión
-            de Windows/Chrome, no Densz. Si tu impresora no tiene cargado un papel realmente precortado a 10,5 ×
-            14,8 cm, elegí <strong>"Imprimir en hoja A4 completa"</strong> acá abajo para un resultado confiable.
+        {/* Resumen directo, antes que nada: qué va a pasar en ESTA compu
+            ahora mismo, sin que haga falta entender cómo se combinan los
+            dos controles de abajo (el del laboratorio y el de acá) para
+            saberlo. */}
+        {!esEscritorio && tamanoEfectivo && (
+          <p className="text-sm rounded-lg border border-carbon/10 bg-cream px-3 py-2">
+            Ahora mismo, <strong>esta computadora</strong> imprime en:{" "}
+            <strong>{etiquetaTamano[tamanoEfectivo]}</strong>
+            {local
+              ? " (fijado acá abajo para esta compu, sin importar lo que use el resto del laboratorio)."
+              : " (la del laboratorio, sin ningún cambio propio en esta compu)."}
           </p>
         )}
 
-        <div className="flex items-center justify-between rounded-lg border border-carbon/10 bg-cream px-4 py-3">
-          <div>
-            <p className="font-medium text-sm">Imprimir en hoja A4 completa</p>
-            <p className="text-xs text-carbon/50 mt-0.5">
-              {esA4 ? "Hoja A4 con el ticket en la esquina y guía de corte." : "Directo al tamaño del ticket, sin hoja A4 de por medio."}
-            </p>
-            <p className="text-xs text-carbon/40 mt-0.5">Esto aplica para todo el laboratorio, en todas las computadoras.</p>
+        {!esEscritorio && !esA4 && (
+          <p className="text-xs text-amber-800/80 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
+            Estás en el navegador: el tamaño de papel que realmente sale lo decide la ventana de impresión de
+            Windows/Chrome, no Densz. Si tu impresora no tiene cargado un papel ya precortado a 10,5 × 14,8 cm,
+            elegí <strong>A4 completa</strong> (abajo) para un resultado confiable, sin configurar nada.
+          </p>
+        )}
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2">Para todo el laboratorio</p>
+          <div className="flex items-center justify-between rounded-lg border border-carbon/10 bg-cream px-4 py-3">
+            <div>
+              <p className="font-medium text-sm">Imprimir en hoja A4 completa</p>
+              <p className="text-xs text-carbon/50 mt-0.5">
+                {esA4
+                  ? "Hoja A4 con el ticket en una esquina y guía de corte — para recortar vos mismo después."
+                  : "Directo al tamaño del ticket (10,5 × 14,8 cm) — para papel ya precortado a ese tamaño."}
+              </p>
+            </div>
+            <Toggle
+              activo={esA4}
+              disabled={isLoading || guardar.isPending}
+              onChange={(activo) => guardar.mutate(activo ? "a4" : "ticket")}
+              label="Imprimir en hoja A4 completa"
+            />
           </div>
-          <Toggle
-            activo={esA4}
-            disabled={isLoading || guardar.isPending}
-            onChange={(activo) => guardar.mutate(activo ? "a4" : "ticket")}
-            label="Imprimir en hoja A4 completa"
-          />
         </div>
 
         {!esEscritorio && <SeccionTamanoImpresionLocal local={local} onCambiar={setLocal} />}
@@ -232,10 +246,10 @@ function SeccionTamanoImpresionLocal({
 
   return (
     <div className="rounded-lg border border-carbon/10 bg-cream px-4 py-3 space-y-2">
-      <p className="font-medium text-sm">Tamaño de impresión en esta computadora</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40">Solo para esta computadora (opcional)</p>
       <p className="text-xs text-carbon/50">
-        Si esta impresora ya está configurada en Windows para el tamaño del ticket, podés elegirlo acá sin cambiar
-        lo que ven las demás computadoras del laboratorio.
+        Pisa la opción de arriba únicamente acá — útil si justo esta impresora ya está configurada en Windows para
+        el tamaño del ticket, aunque el resto del laboratorio imprima en A4 (o al revés).
       </p>
       <div className="flex gap-2 flex-wrap">
         {opciones.map((o) => (
