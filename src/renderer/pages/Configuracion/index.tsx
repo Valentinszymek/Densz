@@ -18,6 +18,12 @@ import {
   useGuardarTamanoImpresionComprobante
 } from "../../features/configuracion/hooks";
 import { leerTamanoImpresionLocal, guardarTamanoImpresionLocal } from "../../lib/tamanoImpresionLocal";
+import {
+  leerPosicionImpresionLocal,
+  guardarPosicionImpresionLocal,
+  ETIQUETA_POSICION
+} from "../../lib/posicionImpresionLocal";
+import type { TamanoImpresionComprobante, PosicionTicketA4 } from "@shared/types/entities";
 
 // No se importa de webApi.ts a propósito: ese archivo es exclusivo del
 // entry point web (ver su comentario) y esta página también se bundlea
@@ -146,6 +152,14 @@ function SeccionTamanoImpresion() {
   // esquina. "A4 completa" evita ese riesgo por completo: A4 es un
   // tamaño que cualquier impresora soporta sin configuración extra.
   const esEscritorio = window.densz.plataforma === "escritorio";
+  // Se lee acá (no adentro de SeccionTamanoImpresionLocal) para poder
+  // calcular el tamaño EFECTIVO de esta compu (local si hay, si no el del
+  // laboratorio) y decidir si tiene sentido mostrar la rotación de
+  // esquina — que solo aplica en modo "a4".
+  const [local, setLocal] = useState<TamanoImpresionComprobante | null>(() =>
+    !esEscritorio ? leerTamanoImpresionLocal() : null
+  );
+  const tamanoEfectivo = local ?? tamano;
 
   return (
     <Card>
@@ -183,7 +197,8 @@ function SeccionTamanoImpresion() {
           />
         </div>
 
-        {!esEscritorio && <SeccionTamanoImpresionLocal />}
+        {!esEscritorio && <SeccionTamanoImpresionLocal local={local} onCambiar={setLocal} />}
+        {!esEscritorio && tamanoEfectivo === "a4" && <SeccionRotacionEsquinaA4 />}
       </CardContent>
     </Card>
   );
@@ -197,15 +212,19 @@ function SeccionTamanoImpresion() {
  * aprovechar el tamaño chico aunque el resto del laboratorio imprima en
  * A4 por seguridad. Solo tiene sentido en la Web — el escritorio ya es
  * 100% confiable con cualquiera de los dos tamaños, sin esto. */
-function SeccionTamanoImpresionLocal() {
-  const [local, setLocal] = useState(() => leerTamanoImpresionLocal());
-
-  function elegir(valor: "ticket" | "a4" | null) {
+function SeccionTamanoImpresionLocal({
+  local,
+  onCambiar
+}: {
+  local: TamanoImpresionComprobante | null;
+  onCambiar: (valor: TamanoImpresionComprobante | null) => void;
+}) {
+  function elegir(valor: TamanoImpresionComprobante | null) {
     guardarTamanoImpresionLocal(valor);
-    setLocal(valor);
+    onCambiar(valor);
   }
 
-  const opciones: Array<{ valor: "ticket" | "a4" | null; etiqueta: string }> = [
+  const opciones: Array<{ valor: TamanoImpresionComprobante | null; etiqueta: string }> = [
     { valor: null, etiqueta: "Usar la del laboratorio" },
     { valor: "ticket", etiqueta: "Ticket (chico)" },
     { valor: "a4", etiqueta: "A4 completa" }
@@ -231,6 +250,50 @@ function SeccionTamanoImpresionLocal() {
             }`}
           >
             {o.etiqueta}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Solo tiene sentido en modo "a4" efectivo (ver tamanoEfectivo más
+ * arriba): como el ticket es exactamente un cuarto de la hoja, una misma
+ * hoja A4 puede rendir hasta 4 comprobantes en vez de 1 — se corta cada
+ * esquina ya impresa y se reinserta el resto de la hoja. Densz rota sola
+ * a la esquina siguiente en cada "Imprimir" real (nunca en "Ver PDF",
+ * que no gasta papel — ver posicionImpresionLocal.ts); esto es el ajuste
+ * manual para cuando se desincroniza con el papel real (ej. una
+ * impresión que se canceló a mitad de camino). */
+function SeccionRotacionEsquinaA4() {
+  const [posicion, setPosicionState] = useState<PosicionTicketA4>(() => leerPosicionImpresionLocal());
+
+  function elegir(valor: PosicionTicketA4) {
+    guardarPosicionImpresionLocal(valor);
+    setPosicionState(valor);
+  }
+
+  const opciones: PosicionTicketA4[] = ["arriba-izquierda", "arriba-derecha", "abajo-izquierda", "abajo-derecha"];
+
+  return (
+    <div className="rounded-lg border border-carbon/10 bg-cream px-4 py-3 space-y-2">
+      <p className="font-medium text-sm">Esquina de la hoja para el próximo comprobante</p>
+      <p className="text-xs text-carbon/50">
+        Densz pasa sola a la esquina siguiente cada vez que imprimís — así una misma hoja A4 rinde hasta 4
+        comprobantes en vez de 1. Si se desincroniza con el papel real (ej. una impresión cancelada a mitad),
+        corregí acá a mano.
+      </p>
+      <div className="flex gap-2 flex-wrap">
+        {opciones.map((o) => (
+          <button
+            key={o}
+            type="button"
+            onClick={() => elegir(o)}
+            className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+              posicion === o ? "bg-carbon text-cream border-carbon" : "border-carbon/15 text-carbon/60 hover:bg-carbon/5"
+            }`}
+          >
+            {ETIQUETA_POSICION[o]}
           </button>
         ))}
       </div>

@@ -18,6 +18,15 @@ export type Moneda = "ARS" | "USD";
  * valor por defecto cuando no se configuró nada todavía. */
 export type TamanoImpresionComprobante = "ticket" | "a4";
 
+/** En modo "a4" (ticket dibujado en una esquina de la hoja + guía de
+ * corte): qué esquina. Pensado para que, imprimiendo siempre en A4 (lo
+ * único que cualquier impresora soporta sin configurar nada), una misma
+ * hoja rinda hasta 4 comprobantes en vez de 1 — se corta cada esquina ya
+ * impresa y se vuelve a cargar el resto de la hoja para la próxima. Sin
+ * efecto en modo "ticket" (el papel ya viene cortado a ese tamaño, no hay
+ * esquinas). */
+export type PosicionTicketA4 = "arriba-izquierda" | "arriba-derecha" | "abajo-izquierda" | "abajo-derecha";
+
 export interface SesionActualDto {
   usuarioId: number;
   nombreUsuario: string;

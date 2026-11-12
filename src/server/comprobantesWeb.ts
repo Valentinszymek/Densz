@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import type { Pool, PoolClient } from "pg";
-import { generarComprobante, regenerarPdfComprobante, paginaPdfSegunPreferencia } from "../main/services/comprobanteService";
+import { generarComprobante, regenerarPdfComprobante } from "../main/services/comprobanteService";
 import { setPdfPath, obtenerComprobante } from "../main/db/repositories/comprobantesRepo";
-import type { Comprobante, TamanoImpresionComprobante } from "../shared/types/entities";
+import type { Comprobante, TamanoImpresionComprobante, PosicionTicketA4 } from "../shared/types/entities";
 import { generarPdfDesdeHtmlWeb } from "./pdf";
 import { subirDocumento, descargarDocumento, eliminarDocumento } from "./storage";
 
@@ -131,23 +131,28 @@ export async function descargarPdfComprobanteWeb(db: Pool | PoolClient, comproba
 }
 
 /**
- * Variante de `descargarPdfComprobanteWeb` con un tamaño de página elegido
- * puntualmente DESDE ESTA COMPUTADORA (preferencia guardada local, nunca
- * en la base — ver `tamanoImpresionLocal.ts` en el renderer), que puede
- * no coincidir con la preferencia del laboratorio (Configuración →
- * Tamaño de impresión). A propósito, esta variante NUNCA toca Storage ni
+ * Variante de `descargarPdfComprobanteWeb` con un tamaño de página y/o una
+ * esquina (en modo "a4", ver PosicionTicketA4) elegidos puntualmente DESDE
+ * ESTA COMPUTADORA (preferencia guardada local, nunca en la base — ver
+ * `tamanoImpresionLocal.ts`/`posicionImpresionLocal.ts` en el renderer),
+ * que puede no coincidir con la preferencia del laboratorio (Configuración
+ * → Tamaño de impresión). A propósito, esta variante NUNCA toca Storage ni
  * `pdf_path`: ese archivo compartido sigue reflejando siempre la
  * preferencia real del laboratorio, para cualquier otra persona/compu que
- * lo abra — generar acá un PDF con un tamaño distinto no debe "filtrarse"
- * a nadie más. Se genera a un archivo local descartable y se borra apenas
- * se lee, sin dejar rastro en pdf_path. */
+ * lo abra — generar acá un PDF con un tamaño/esquina distinto no debe
+ * "filtrarse" a nadie más. Se genera a un archivo local descartable y se
+ * borra apenas se lee, sin dejar rastro en pdf_path. `tamano` es opcional
+ * a propósito: pedir solo una esquina distinta, sin cambiar el tamaño, es
+ * un caso real (rotar las 4 esquinas de una hoja A4 sin tocar la
+ * preferencia de tamaño del laboratorio, que ya es "a4"). */
 export async function descargarPdfComprobanteWebConTamano(
   db: Pool | PoolClient,
   comprobanteId: number,
-  tamano: TamanoImpresionComprobante
+  tamano?: TamanoImpresionComprobante,
+  posicion?: PosicionTicketA4
 ): Promise<Buffer> {
   await limpiarPdfPathSiEsDeStorage(db, comprobanteId);
-  await regenerarPdfComprobante(db, comprobanteId, generarPdfDesdeHtmlWeb, paginaPdfSegunPreferencia(tamano));
+  await regenerarPdfComprobante(db, comprobanteId, generarPdfDesdeHtmlWeb, undefined, { tamanoPagina: tamano, posicion });
   const comprobante = (await obtenerComprobante(db, comprobanteId))!;
   const rutaLocal = comprobante.pdfPath;
   if (!rutaLocal) throw new Error("No se pudo generar el PDF del comprobante.");

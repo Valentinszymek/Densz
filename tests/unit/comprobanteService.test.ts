@@ -4,7 +4,7 @@ import { crearOdontologo } from "../../src/main/db/repositories/odontologosRepo"
 import { crearCategoria, crearPrestacion } from "../../src/main/db/repositories/preciosRepo";
 import { cambiarPrecioEnLista } from "../../src/main/db/repositories/listasPrecioRepo";
 import { crearOrdenConPrestaciones, anularOrden } from "../../src/main/services/ordenService";
-import { generarComprobante, guardarTamanoImpresionComprobante } from "../../src/main/services/comprobanteService";
+import { generarComprobante, guardarTamanoImpresionComprobante, construirHtmlComprobante } from "../../src/main/services/comprobanteService";
 import { obtenerOrden } from "../../src/main/db/repositories/ordenesRepo";
 import { obtenerSaldos } from "../../src/main/db/repositories/movimientosRepo";
 
@@ -211,5 +211,49 @@ describe("comprobanteService", () => {
     const [html] = pdfFalso.mock.calls[0];
     expect(html).toContain("@page { size: 210mm 297mm; margin: 0; }");
     expect(html).toContain("border-right: 1px dashed");
+  });
+
+  // Rotación de esquina en modo "a4" (una misma hoja rinde hasta 4
+  // comprobantes — ver posicionImpresionLocal.ts en el renderer):
+  // construirHtmlComprobante acepta un override de tamaño/posición que
+  // SÍ afecta el HTML real (a diferencia del `pageSize` crudo de más
+  // arriba, que es solo para inyectar en tests — ver OverrideImpresionComprobante).
+  it("el override de posición ubica el ticket en la esquina pedida, con la guía de corte en sus dos bordes internos", async () => {
+    const { db, usuarioId } = ctx;
+    await guardarTamanoImpresionComprobante(db, "a4");
+    const orden = await crearOrdenDePrueba([{ prestacionId: coronaId, cantidad: 1, piezasFdi: [11] }]);
+    const comprobante = await generarComprobante(db, orden.id, usuarioId, pdfFalso);
+
+    const { html } = await construirHtmlComprobante(db, comprobante.id, { posicion: "abajo-derecha" });
+    expect(html).toContain("margin-left: 105mm;");
+    expect(html).toContain("margin-top: 148.5mm;");
+    expect(html).toContain("border-left: 1px dashed");
+    expect(html).toContain("border-top: 1px dashed");
+    expect(html).not.toContain("border-right: 1px dashed");
+    expect(html).not.toContain("border-bottom: 1px dashed");
+  });
+
+  it("el override de tamaño también cambia el HTML real (guía de corte incluida), no solo el tamaño de página", async () => {
+    const { db, usuarioId } = ctx;
+    // Laboratorio en "ticket" (default) — se pide "a4" puntualmente, como
+    // hace el override local de una computadora (ver comprobantesWeb.ts).
+    const orden = await crearOrdenDePrueba([{ prestacionId: coronaId, cantidad: 1, piezasFdi: [11] }]);
+    const comprobante = await generarComprobante(db, orden.id, usuarioId, pdfFalso);
+
+    const { html, tamanoPagina } = await construirHtmlComprobante(db, comprobante.id, { tamanoPagina: "a4" });
+    expect(tamanoPagina).toBe("a4");
+    expect(html).toContain("@page { size: 210mm 297mm; margin: 0; }");
+    expect(html).toContain("border-right: 1px dashed");
+  });
+
+  it("la posición no tiene ningún efecto en modo ticket (el papel ya viene cortado a ese tamaño, no hay esquinas)", async () => {
+    const { db, usuarioId } = ctx;
+    const orden = await crearOrdenDePrueba([{ prestacionId: coronaId, cantidad: 1, piezasFdi: [11] }]);
+    const comprobante = await generarComprobante(db, orden.id, usuarioId, pdfFalso);
+
+    const { html } = await construirHtmlComprobante(db, comprobante.id, { posicion: "abajo-derecha" });
+    expect(html).toContain("@page { size: 105mm 148.5mm; margin: 0; }");
+    expect(html).not.toContain("border-left: 1px dashed");
+    expect(html).not.toContain("border-top: 1px dashed");
   });
 });

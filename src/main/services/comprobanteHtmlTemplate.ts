@@ -1,6 +1,6 @@
 import { formatearMoneda, formatearFecha } from "../utils/formatShared";
 import { LOGO_COMPLETO_PDF_DATA_URI } from "./brandAssets";
-import type { Moneda, TamanoImpresionComprobante } from "../../shared/types/entities";
+import type { Moneda, TamanoImpresionComprobante, PosicionTicketA4 } from "../../shared/types/entities";
 
 export interface LineaComprobanteHtml {
   nombre: string;
@@ -37,6 +37,10 @@ export interface DatosComprobanteHtml {
    * que coincidir con el tamaño real del papel, no solo con el que se le
    * pide a `print()`/`printToPDF()` desde el proceso main. */
   tamanoPagina: TamanoImpresionComprobante;
+  /** Solo tiene efecto con `tamanoPagina: "a4"` — qué esquina de la hoja
+   * usa el ticket (ver PosicionTicketA4). Por defecto arriba-izquierda,
+   * igual que siempre. */
+  posicion?: PosicionTicketA4;
 }
 
 /** Historial (2026-10-27/28): antes se imprimía en una hoja chica a
@@ -110,6 +114,22 @@ export function generarHtmlComprobante(d: DatosComprobanteHtml): string {
   const anchoHojaMm = paginaEsA4 ? ANCHO_HOJA_MM : ANCHO_PAGINA_COMPROBANTE_MM;
   const altoHojaMm = paginaEsA4 ? ALTO_HOJA_MM : ALTO_PAGINA_COMPROBANTE_MM;
 
+  // Las 4 esquinas de la hoja A4 — para que una misma hoja rinda hasta 4
+  // comprobantes (se corta cada esquina ya impresa y se reinserta el
+  // resto). El ticket mide exactamente la mitad del ancho/alto de la
+  // hoja (105 = 210/2, 148.5 = 297/2), así que "la otra mitad" siempre
+  // alcanza justo para el margen de la esquina opuesta. La guía de corte
+  // (punteada) va siempre en los dos bordes que separan al ticket del
+  // resto de la hoja — nunca en los que ya coinciden con el borde físico.
+  const posicion = d.posicion ?? "arriba-izquierda";
+  const esDerecha = posicion === "arriba-derecha" || posicion === "abajo-derecha";
+  const esAbajo = posicion === "abajo-izquierda" || posicion === "abajo-derecha";
+  const margenIzquierdoMm = paginaEsA4 && esDerecha ? ANCHO_PAGINA_COMPROBANTE_MM : 0;
+  const margenArribaMm = paginaEsA4 && esAbajo ? ALTO_PAGINA_COMPROBANTE_MM : 0;
+  const bordeCorteCss = paginaEsA4
+    ? `border-${esDerecha ? "left" : "right"}: 1px dashed #C9C6BC; border-${esAbajo ? "top" : "bottom"}: 1px dashed #C9C6BC;`
+    : "";
+
   const items = d.orden.prestaciones
     .map(
       (linea) => `
@@ -154,22 +174,23 @@ export function generarHtmlComprobante(d: DatosComprobanteHtml): string {
     color: #111113;
     width: ${ANCHO_PAGINA_COMPROBANTE_MM}mm;
     min-height: ${ALTO_PAGINA_COMPROBANTE_MM}mm;
+    /* Ubica el ticket en la esquina elegida de la hoja A4 (ver
+       "posicion" más arriba) — en arriba-izquierda, la de siempre,
+       estos márgenes son 0 y no cambian nada. Sin efecto en modo
+       "ticket": ahí el ticket YA es toda la hoja. */
+    margin-left: ${margenIzquierdoMm}mm;
+    margin-top: ${margenArribaMm}mm;
     padding: 5.5mm 5.5mm 4mm;
     font-size: 11px;
     line-height: 1.25;
     display: flex;
     flex-direction: column;
-    ${
-      paginaEsA4
-        ? `/* Guía de corte: el ticket es un cuarto de la hoja A4, pensado
-       para recortarse — estos dos bordes marcan dónde (los otros dos ya
-       coinciden con el borde físico de la hoja). Solo tiene sentido en
-       modo "a4" — en "ticket" el papel ya viene cortado a este tamaño,
-       no hay nada que recortar. */
-    border-right: 1px dashed #C9C6BC;
-    border-bottom: 1px dashed #C9C6BC;`
-        : ""
-    }
+    /* Guía de corte: el ticket es un cuarto de la hoja A4, pensado para
+       recortarse — estos bordes marcan dónde (los otros dos ya coinciden
+       con el borde físico de la hoja). Solo tiene sentido en modo "a4"
+       — en "ticket" el papel ya viene cortado a este tamaño, no hay
+       nada que recortar. */
+    ${bordeCorteCss}
   }
   /* Un ".relleno" flexible entre cada bloque reparte el espacio sobrante
      cuando el comprobante es corto (para que ocupe toda la hoja) y se

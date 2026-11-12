@@ -25,7 +25,18 @@ import {
 import { generarPdfDesdeHtml } from "./pdfService";
 import { getComprobantesDir } from "../utils/appPaths";
 import { DenszError } from "../utils/errors";
-import type { Comprobante, TamanoImpresionComprobante } from "../../shared/types/entities";
+import type { Comprobante, TamanoImpresionComprobante, PosicionTicketA4 } from "../../shared/types/entities";
+
+/** Pisa, puntualmente para un pedido, la preferencia guardada del
+ * laboratorio — usado por el override local de una computadora puntual
+ * (ver descargarPdfComprobanteWebConTamano en comprobantesWeb.ts), nunca
+ * persistido. A diferencia del `pageSize` crudo de GenerarPdf (ver más
+ * abajo, solo para tests), esto sigue afectando también el HTML interno
+ * (guía de corte, esquina) — es la fuente de verdad real, no un atajo. */
+export interface OverrideImpresionComprobante {
+  tamanoPagina?: TamanoImpresionComprobante;
+  posicion?: PosicionTicketA4;
+}
 
 const MM_POR_PULGADA = 25.4;
 /** Hoja A4 completa, en pulgadas (unidad que espera `printToPDF` para un
@@ -93,21 +104,23 @@ async function obtenerDatosContacto(db: Queryable, odontologoId: number, clinica
  * para que ambos muestren siempre exactamente el mismo documento (§13). */
 export async function construirHtmlComprobante(
   db: Queryable,
-  comprobanteId: number
-): Promise<{ html: string; comprobante: Comprobante }> {
+  comprobanteId: number,
+  override?: OverrideImpresionComprobante
+): Promise<{ html: string; comprobante: Comprobante; tamanoPagina: TamanoImpresionComprobante }> {
   const comprobante = await obtenerComprobante(db, comprobanteId);
   if (!comprobante) throw new DenszError("El comprobante no existe.");
   const orden = await obtenerOrden(db, comprobante.ordenId);
   if (!orden) throw new DenszError("La orden asociada a este comprobante ya no existe.");
 
   const { direccion, telefono } = await obtenerDatosContacto(db, orden.odontologoId, orden.clinicaId);
-  const tamanoPagina = await obtenerTamanoImpresionComprobante(db);
+  const tamanoPagina = override?.tamanoPagina ?? (await obtenerTamanoImpresionComprobante(db));
 
   const html = generarHtmlComprobante({
     laboratorioNombre: comprobante.laboratorioNombre,
     direccion,
     telefono,
     tamanoPagina,
+    posicion: override?.posicion,
     comprobante: { numero: comprobante.numero, fechaEmision: comprobante.fechaEmision },
     orden: {
       numero: orden.numero,
@@ -127,7 +140,7 @@ export async function construirHtmlComprobante(
     pacienteNombreCompleto: orden.pacienteNombreCompleto ?? ""
   });
 
-  return { html, comprobante };
+  return { html, comprobante, tamanoPagina };
 }
 
 /** Regenera el archivo PDF del comprobante en el mismo `pdfPath` — usado
@@ -139,14 +152,18 @@ export async function regenerarPdfComprobante(
   db: Queryable,
   comprobanteId: number,
   generarPdf: GenerarPdf = generarPdfDesdeHtml,
-  // Si no se pasa, se resuelve según la preferencia guardada del
-  // laboratorio (obtenerTamanoImpresionComprobante) — mismo criterio para
-  // escritorio y Web, ninguno de los dos necesita pasar esto a mano.
-  pageSize?: Electron.PrintToPDFOptions["pageSize"]
+  // Crudo, SOLO para tests (ver comprobanteService.test.ts): pisa
+  // directo lo que recibe generarPdf, sin pasar por el HTML — a
+  // diferencia de `override`, nunca mueve la guía de corte ni la
+  // esquina, porque ni se entera de qué tamaño se pidió. Para cualquier
+  // uso real (el override local de una computadora puntual), usar
+  // `override`, no esto.
+  pageSize?: Electron.PrintToPDFOptions["pageSize"],
+  override?: OverrideImpresionComprobante
 ): Promise<string> {
-  const { html, comprobante } = await construirHtmlComprobante(db, comprobanteId);
+  const { html, comprobante, tamanoPagina } = await construirHtmlComprobante(db, comprobanteId, override);
   const pdfPath = comprobante.pdfPath ?? path.join(getComprobantesDir(), `${comprobante.numero}.pdf`);
-  const tamano = pageSize ?? paginaPdfSegunPreferencia(await obtenerTamanoImpresionComprobante(db));
+  const tamano = pageSize ?? paginaPdfSegunPreferencia(tamanoPagina);
   await generarPdf(html, pdfPath, tamano);
   await setPdfPath(db, comprobanteId, pdfPath);
   return pdfPath;

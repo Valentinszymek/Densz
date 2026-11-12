@@ -4,14 +4,18 @@ import { buildQuery, crearMetodosHttpComunes } from "@shared/http/denszApiFactor
 import { useAuthStore } from "./store/authStore";
 import { toast } from "./store/toastStore";
 import { leerTamanoImpresionLocal } from "./lib/tamanoImpresionLocal";
+import { leerPosicionImpresionLocal, avanzarPosicionImpresionLocal } from "./lib/posicionImpresionLocal";
+import type { PosicionTicketA4 } from "@shared/types/entities";
 
 /** Arma la ruta del PDF del comprobante, con `?tamano=` solo si esta
  * computadora tiene una preferencia local guardada (ver
  * tamanoImpresionLocal.ts) — sin eso, el servidor usa la del laboratorio,
- * como siempre. */
-function rutaPdfComprobante(comprobanteId: number): string {
+ * como siempre. `posicion` (rotación de esquina en modo "a4" — ver
+ * posicionImpresionLocal.ts) se manda siempre: el servidor la ignora
+ * sola si el tamaño efectivo no es "a4". */
+function rutaPdfComprobante(comprobanteId: number, posicion: PosicionTicketA4): string {
   const local = leerTamanoImpresionLocal();
-  return `/comprobantes/${comprobanteId}/pdf${local ? buildQuery({ tamano: local }) : ""}`;
+  return `/comprobantes/${comprobanteId}/pdf${buildQuery({ tamano: local ?? undefined, posicion })}`;
 }
 
 /**
@@ -313,14 +317,20 @@ export const webApi: DenszApi = {
 
   // Igual patrón que cuentasVerPdfResumen: descarga autenticada vía GET
   // /comprobantes/:id/pdf (nunca un path elegido por el cliente), abierta
-  // en una pestaña nueva a partir de un blob local.
-  comprobantesVerPdf: (comprobanteId) => abrirPdfEnNuevaPestana(() => getBlob(rutaPdfComprobante(comprobanteId))),
+  // en una pestaña nueva a partir de un blob local. Usa la esquina ACTUAL
+  // sin avanzarla (ver posicionImpresionLocal.ts) — mirar el PDF no gasta
+  // ningún papel, solo "Imprimir" hace avanzar la rotación.
+  comprobantesVerPdf: (comprobanteId) =>
+    abrirPdfEnNuevaPestana(() => getBlob(rutaPdfComprobante(comprobanteId, leerPosicionImpresionLocal()))),
   // Impresión física SILENCIOSA (sin diálogo, a una impresora elegida de
   // antemano) solo existe en Desktop — ninguna API de navegador lo
   // permite. En Web, "Imprimir" dispara el diálogo de impresión nativo
   // del navegador directo sobre el PDF, sin abrir ninguna pestaña visible
-  // (ver imprimirPdf).
-  comprobantesImprimir: (comprobanteId) => imprimirPdf(() => getBlob(rutaPdfComprobante(comprobanteId))),
+  // (ver imprimirPdf). Acá sí se avanza la rotación de esquina (modo
+  // "a4"): cada intento real de imprimir consume la esquina actual y deja
+  // lista la siguiente para la próxima vez.
+  comprobantesImprimir: (comprobanteId) =>
+    imprimirPdf(() => getBlob(rutaPdfComprobante(comprobanteId, avanzarPosicionImpresionLocal()))),
 
   // Descarga autenticada vía GET /cuentas/resumenes/:id/pdf (nunca un path
   // elegido por el cliente) y lo abre en una pestaña nueva a partir de un
