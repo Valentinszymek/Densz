@@ -35,11 +35,26 @@ export async function withTransaction<T>(db: Queryable, fn: (client: PoolClient)
     await client.query("BEGIN");
     const resultado = await fn(client);
     await client.query("COMMIT");
+    client.release();
     return resultado;
   } catch (err) {
-    await client.query("ROLLBACK");
+    // La conexión puede estar realmente rota (ej. un corte de red a
+    // mitad de una query) — en ese caso el propio ROLLBACK también va a
+    // fallar, pero igual hay que intentarlo antes de soltarla. Pasarle el
+    // error a release() (en vez de release() sin nada) le dice al pool
+    // que DESCARTE esta conexión en vez de devolverla "sana" para el
+    // próximo pedido — sin esto, una conexión rota quedaba reciclada
+    // igual, y el próximo que la agarrara fallaba también, hasta agotar
+    // de a poco las conexiones del pool (hallazgo real, 2026-11-16: el
+    // backend de Railway quedó "vivo" pero sin poder hablarle más a
+    // Postgres, y solo un reinicio del proceso -pool nuevo- lo recuperó).
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // Ignorado a propósito: si la conexión ya está rota, no hay
+      // ROLLBACK que mandar — se descarta igual más abajo.
+    }
+    client.release(err instanceof Error ? err : new Error(String(err)));
     throw err;
-  } finally {
-    client.release();
   }
 }

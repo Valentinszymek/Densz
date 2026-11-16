@@ -95,7 +95,9 @@ export function attachTenantDb(pool: Pool | PoolClient) {
       await client.query("BEGIN");
       await fijarLaboratorioActual(client, sesion.laboratorioId);
     } catch (err) {
-      client.release();
+      // Ver el comentario largo en finalizar() más abajo: se descarta la
+      // conexión (nunca se recicla "como sana") cuando algo salió mal.
+      client.release(err instanceof Error ? err : new Error(String(err)));
       next(err);
       return;
     }
@@ -106,14 +108,29 @@ export function attachTenantDb(pool: Pool | PoolClient) {
     async function finalizar(exito: boolean): Promise<void> {
       if (terminado) return;
       terminado = true;
+      let errorDeCierre: unknown = null;
       try {
         await client.query(exito ? "COMMIT" : "ROLLBACK");
-      } catch {
-        // Si el propio COMMIT/ROLLBACK falla (ej. conexión ya cortada),
-        // no hay nada más para hacer acá — se libera igual abajo.
-      } finally {
-        client.release();
+      } catch (err) {
+        // Si el propio COMMIT/ROLLBACK falla (ej. conexión ya cortada a
+        // mitad del pedido), no hay nada más para hacer con la
+        // transacción — pero sí importa qué conexión vuelve al pool.
+        errorDeCierre = err;
       }
+      // Un ROLLBACK normal (ej. la ruta devolvió 400/404) es una
+      // conexión perfectamente sana — nunca se descarta por eso solo.
+      // Pasarle el error a release() (en vez de release() sin nada) le
+      // dice al pool que DESCARTE esta conexión únicamente cuando el
+      // COMMIT/ROLLBACK EN SÍ falló (ahí sí la conexión está rota de
+      // verdad) en vez de devolverla "sana" para el próximo pedido — sin
+      // esto, una conexión rota por un corte de red quedaba reciclada
+      // igual, y el próximo pedido que la agarrara fallaba también,
+      // hasta agotar de a poco las 10 conexiones del pool. Hallazgo real
+      // (2026-11-16): el backend de Railway quedó "vivo" (respondía)
+      // pero sin poder hablarle más a Postgres, y solo un reinicio del
+      // proceso (pool nuevo de cero) lo recuperó — este es justamente el
+      // mecanismo que debería evitar que vuelva a pasar solo.
+      client.release(errorDeCierre instanceof Error ? errorDeCierre : errorDeCierre ? new Error(String(errorDeCierre)) : undefined);
     }
     res.on("finish", () => void finalizar(res.statusCode < 400));
     res.on("close", () => void finalizar(false));
