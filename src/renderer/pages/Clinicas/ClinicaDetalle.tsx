@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Phone,
@@ -22,6 +22,7 @@ import { EliminarConUso } from "../Precios/EliminarConUso";
 import { useEstadisticasClinica, useSetActivaClinica, useUsoClinica, useEliminarClinica } from "../../features/clinicas/hooks";
 import { useOdontologos } from "../../features/odontologos/hooks";
 import { formatearMoneda } from "../../lib/format";
+import { useVolver } from "../../lib/useVolver";
 import { ClinicaForm } from "./ClinicaForm";
 import { OdontologoForm } from "../Odontologos/OdontologoForm";
 
@@ -29,6 +30,7 @@ export default function ClinicaDetalle() {
   const { id } = useParams();
   const idNum = Number(id);
   const navigate = useNavigate();
+  const volver = useVolver("/clinicas");
   const { data: est, isLoading } = useEstadisticasClinica(idNum);
   const { data: profesionales } = useOdontologos({ clinicaId: idNum });
   const setActiva = useSetActivaClinica();
@@ -53,9 +55,9 @@ export default function ClinicaDetalle() {
 
   return (
     <div>
-      <Link to="/clinicas" className="inline-flex items-center gap-1.5 text-sm text-carbon/50 hover:text-carbon mb-4">
+      <button type="button" onClick={volver} className="inline-flex items-center gap-1.5 text-sm text-carbon/50 hover:text-carbon mb-4">
         <ArrowLeft size={15} /> Clínicas
-      </Link>
+      </button>
 
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>

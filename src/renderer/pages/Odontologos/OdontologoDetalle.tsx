@@ -8,12 +8,14 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { useEstadisticasOdontologo, useSetActivoOdontologo, useAsignarListaOdontologo } from "../../features/odontologos/hooks";
 import { useListasPrecio } from "../../features/listasPrecio/hooks";
 import { formatearMoneda, formatearFecha } from "../../lib/format";
+import { useVolver } from "../../lib/useVolver";
 import { OdontologoForm } from "./OdontologoForm";
 
 export default function OdontologoDetalle() {
   const { id } = useParams();
   const idNum = Number(id);
   const navigate = useNavigate();
+  const volver = useVolver("/odontologos");
   const { data: est, isLoading } = useEstadisticasOdontologo(idNum);
   const { data: listas } = useListasPrecio(true);
   const setActivo = useSetActivoOdontologo();
@@ -26,9 +28,9 @@ export default function OdontologoDetalle() {
 
   return (
     <div>
-      <Link to="/odontologos" className="inline-flex items-center gap-1.5 text-sm text-carbon/50 hover:text-carbon mb-4">
+      <button type="button" onClick={volver} className="inline-flex items-center gap-1.5 text-sm text-carbon/50 hover:text-carbon mb-4">
         <ArrowLeft size={15} /> Odontólogos
-      </Link>
+      </button>
 
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>

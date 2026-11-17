@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Ban, Stethoscope, User, Calendar, Receipt, FileText, Printer, Trash2, Building2, Pencil } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -12,6 +12,7 @@ import {
   useImprimirComprobante
 } from "../../features/comprobantes/hooks";
 import { formatearMoneda, formatearFecha } from "../../lib/format";
+import { useVolver } from "../../lib/useVolver";
 import { esAdministrador } from "../../store/authStore";
 import { AnularOrdenModal } from "./AnularOrdenModal";
 import { EliminarOrdenModal } from "./EliminarOrdenModal";
@@ -31,6 +32,7 @@ const ESTADO_TONO: Record<EstadoOrden, "neutral" | "exito" | "error"> = {
 
 export default function OrdenDetalle() {
   const navigate = useNavigate();
+  const volver = useVolver("/trabajos");
   const { id } = useParams();
   const idNum = Number(id);
   const { data: orden, isLoading } = useOrden(idNum);
@@ -46,9 +48,9 @@ export default function OrdenDetalle() {
 
   return (
     <div className="max-w-3xl">
-      <Link to="/trabajos" className="inline-flex items-center gap-1.5 text-sm text-carbon/50 hover:text-carbon mb-4">
+      <button type="button" onClick={volver} className="inline-flex items-center gap-1.5 text-sm text-carbon/50 hover:text-carbon mb-4">
         <ArrowLeft size={15} /> Trabajos
-      </Link>
+      </button>
 
       <div className="flex items-start justify-between mb-6 gap-4">
         <div>

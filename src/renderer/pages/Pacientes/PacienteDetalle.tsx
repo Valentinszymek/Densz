@@ -4,10 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Ca
 import { Badge } from "../../components/ui/Badge";
 import { usePaciente, useCantidadTrabajosPaciente } from "../../features/pacientes/hooks";
 import { formatearFecha } from "../../lib/format";
+import { useVolver } from "../../lib/useVolver";
 
 // Ficha de SOLO CONSULTA (Bloque 1-B) — ver comentario en Pacientes/index.tsx.
 export default function PacienteDetalle() {
   const { id } = useParams();
+  const volver = useVolver("/pacientes");
   const idNum = Number(id);
   const { data: paciente, isLoading } = usePaciente(idNum);
   const { data: cantidadTrabajos } = useCantidadTrabajosPaciente(idNum);
@@ -17,9 +19,9 @@ export default function PacienteDetalle() {
 
   return (
     <div>
-      <Link to="/pacientes" className="inline-flex items-center gap-1.5 text-sm text-carbon/50 hover:text-carbon mb-4">
+      <button type="button" onClick={volver} className="inline-flex items-center gap-1.5 text-sm text-carbon/50 hover:text-carbon mb-4">
         <ArrowLeft size={15} /> Pacientes
-      </Link>
+      </button>
 
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>

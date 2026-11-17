@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Wallet, FileBarChart, Ban, FileText, CircleDollarSign, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
@@ -17,6 +17,7 @@ import {
   useVerPdfResumen
 } from "../../features/cuentas/hooks";
 import { formatearMoneda, formatearFecha, formatearFechaHora } from "../../lib/format";
+import { useVolver } from "../../lib/useVolver";
 import { RegistrarPagoModal } from "./RegistrarPagoModal";
 import { AnularPagoModal } from "./AnularPagoModal";
 import { AgregarDeudaModal } from "./AgregarDeudaModal";
@@ -55,6 +56,7 @@ function ocultarMovimientosReemplazados(trabajos: TrabajoFacturadoMes[]): Trabaj
 export default function ClinicaCuentaDetalle() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const volver = useVolver("/cuentas");
   const clinicaId = Number(id);
   const { data: clinica } = useClinica(clinicaId);
   const { data: saldos } = useSaldosClinica(clinicaId);
@@ -93,9 +95,9 @@ export default function ClinicaCuentaDetalle() {
 
   return (
     <div className="max-w-4xl">
-      <Link to="/cuentas" className="inline-flex items-center gap-1.5 text-sm text-carbon/50 hover:text-carbon mb-4">
+      <button type="button" onClick={volver} className="inline-flex items-center gap-1.5 text-sm text-carbon/50 hover:text-carbon mb-4">
         <ArrowLeft size={15} /> Cuentas
-      </Link>
+      </button>
 
       <div className="flex items-start justify-between mb-6">
         <h1 className="text-2xl font-display text-carbon">{clinica?.nombre ?? "—"}</h1>
