@@ -107,14 +107,12 @@ describe("editarOrdenConPrestaciones", () => {
     expect(saldos).toHaveLength(1);
     expect(saldos[0].saldoCentavos).toBe(1000000);
 
-    // El movimiento viejo queda anulado (nunca borrado: historial auditable).
+    // El movimiento se actualiza EN EL LUGAR (nunca se anula uno y se crea
+    // otro — evita la fila fantasma tachada en Cuentas, ver ordenService.ts).
     const movimientos = await listarMovimientos(db, odontologoId);
-    const activos = movimientos.filter((m) => !m.anulado);
-    const anulados = movimientos.filter((m) => m.anulado);
-    expect(activos).toHaveLength(1);
-    expect(activos[0].importeCentavos).toBe(1000000);
-    expect(anulados).toHaveLength(1);
-    expect(anulados[0].importeCentavos).toBe(1800000);
+    expect(movimientos).toHaveLength(1);
+    expect(movimientos[0].anulado).toBe(false);
+    expect(movimientos[0].importeCentavos).toBe(1000000);
   });
 
   it("CASO 2 — OT facturada sin pagos: el importe sube ($180.000 → $250.000) y la cuenta refleja SOLO el nuevo importe", async () => {

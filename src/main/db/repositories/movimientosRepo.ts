@@ -50,6 +50,28 @@ export async function anularMovimientoDeOrden(db: Queryable, ordenId: number): P
 }
 
 /**
+ * Actualiza EN EL LUGAR el movimiento "debe" activo de una OT ya
+ * facturada, cuando su importe/moneda/titular cambiaron al editarla — a
+ * propósito, nunca anula uno y crea otro (eso dejaba una fila fantasma
+ * tachada en Cuentas que confundía y llevó a un borrado real por error,
+ * 2026-11-17). El valor anterior sigue disponible en Auditoría (la
+ * edición de la orden ya lo registra ahí), así que no hace falta
+ * duplicar ese historial en la propia fila de la cuenta corriente.
+ */
+export async function actualizarMovimientoDebeDeOrden(
+  db: Queryable,
+  id: number,
+  data: TitularCuenta & { importeCentavos: number; moneda: Moneda; descripcion: string }
+): Promise<void> {
+  await db.query(
+    `UPDATE movimientos_cuenta
+     SET odontologo_id = $1, clinica_id = $2, importe_centavos = $3, moneda = $4, descripcion = $5
+     WHERE id = $6 AND tipo = 'debe' AND orden_id IS NOT NULL AND anulado = 0`,
+    [data.odontologoId, data.clinicaId, data.importeCentavos, data.moneda, data.descripcion, id]
+  );
+}
+
+/**
  * El movimiento "debe" ACTIVO (no anulado) de una OT ya facturada, si
  * existe — usado al editar una OT facturada para saber si el importe,
  * la moneda o el titular (odontólogo/clínica) realmente cambiaron antes

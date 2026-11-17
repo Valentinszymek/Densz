@@ -43,6 +43,15 @@ function ordenarPorFecha(trabajos: TrabajoFacturadoMes[]): TrabajoFacturadoMes[]
   return [...trabajos].sort((a, b) => (b.fechaFacturacion ?? "").localeCompare(a.fechaFacturacion ?? ""));
 }
 
+/** Ver el comentario largo en CuentaDetalle.tsx (misma función, mismo
+ * motivo): oculta el movimiento viejo que quedó anulado por una edición de
+ * una OT que sigue facturada — esa fila ya no aporta nada en pantalla y
+ * llevó a un borrado real por error. Una OT realmente anulada sigue
+ * mostrándose igual que siempre. */
+function ocultarMovimientosReemplazados(trabajos: TrabajoFacturadoMes[]): TrabajoFacturadoMes[] {
+  return trabajos.filter((t) => !(t.anulado && t.estado === "facturado"));
+}
+
 export default function ClinicaCuentaDetalle() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -184,7 +193,7 @@ export default function ClinicaCuentaDetalle() {
               </div>
             </div>
 
-            {b.trabajos.length === 0 ? (
+            {ocultarMovimientosReemplazados(b.trabajos).length === 0 ? (
               <p className="text-sm text-carbon/40">Sin trabajos facturados en este período.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -201,7 +210,7 @@ export default function ClinicaCuentaDetalle() {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {ordenarPorFecha(b.trabajos).map((t) => (
+                    {ordenarPorFecha(ocultarMovimientosReemplazados(b.trabajos)).map((t) => (
                       <Tr
                         key={t.movimientoId}
                         className={`cursor-pointer ${t.anulado ? "opacity-40" : ""}`}

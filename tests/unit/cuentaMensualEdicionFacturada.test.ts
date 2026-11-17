@@ -26,6 +26,15 @@ import { calcularBloquesMes } from "../../src/main/services/cuentaService";
  * solo no se estaba leyendo. Este archivo prueba específicamente ese
  * escenario (edición dentro del mismo mes de facturación), en todas las
  * variantes pedidas en el bloque de corrección post-auditoría.
+ *
+ * Actualización (2026-11-17): `editarOrdenConPrestaciones` dejó de
+ * anular+crear — ahora actualiza EN EL LUGAR el mismo movimiento DEBE
+ * (ver el comentario largo en `ordenService.ts`), porque la fila vieja
+ * tachada que quedaba dando vueltas en Cuentas confundía y llevó a un
+ * borrado real por error. Así que ya no hay ninguna fila histórica que
+ * comprobar acá — solo que el único movimiento activo refleje siempre el
+ * valor final. El caso de una OT REALMENTE anulada (no editada) sigue
+ * dejando su movimiento anulado, sin ningún reemplazo — eso no cambió.
  */
 
 const pdfFalso = vi.fn(async () => {});
@@ -98,29 +107,28 @@ describe("cuentaService — edición de OT facturada en el mismo mes (bug de dob
     const bloques = await calcularBloquesMes(db, { odontologoId, clinicaId: null }, ahora.getFullYear(), ahora.getMonth() + 1);
     const bloque = bloques.find((b) => b.moneda === "ARS")!;
 
-    // Antes de la corrección: 2 filas "activas" (la vieja y la nueva) y
-    // totalTrabajosCentavos = 1.800.000 + 1.000.000 = 2.800.000 (INCORRECTO).
-    // Con la corrección: la OT aparece en el detalle UNA vez activa y otra
-    // histórica/tachada (nunca desaparece), y el total es solo el vigente.
+    // Antes de la corrección original: 2 filas "activas" (la vieja y la
+    // nueva) y totalTrabajosCentavos = 1.800.000 + 1.000.000 = 2.800.000
+    // (INCORRECTO). Con el movimiento actualizado EN EL LUGAR (2026-11-17),
+    // la OT aparece en el detalle UNA SOLA vez, con el valor vigente — sin
+    // ninguna fila histórica dando vueltas.
     const filasDeEstaOt = bloque.trabajos.filter((t) => t.ordenId === orden.id);
-    expect(filasDeEstaOt).toHaveLength(2); // vieja (anulada) + nueva (activa) — ambas visibles, nunca se borran
-    const activas = filasDeEstaOt.filter((t) => !t.anulado);
-    const historicas = filasDeEstaOt.filter((t) => t.anulado);
-    expect(activas).toHaveLength(1);
-    expect(activas[0].importeCentavos).toBe(1000000);
-    expect(historicas).toHaveLength(1);
-    expect(historicas[0].importeCentavos).toBe(1800000);
+    expect(filasDeEstaOt).toHaveLength(1);
+    expect(filasDeEstaOt[0].anulado).toBe(false);
+    expect(filasDeEstaOt[0].importeCentavos).toBe(1000000);
 
     expect(bloque.totalTrabajosCentavos).toBe(1000000); // NUNCA 2.800.000
     expect(bloque.saldoPendienteCentavos).toBe(1000000);
   });
 
-  it("el movimiento DEBE viejo queda anulado/histórico y el nuevo es el único activo (obtenerSaldos general también correcto)", async () => {
+  it("el movimiento DEBE se actualiza en el lugar, sin dejar ninguna fila histórica (obtenerSaldos general también correcto)", async () => {
     ctx = await createTestDbConUsuario();
     const { db, usuarioId } = ctx;
     const { odontologoId, coronaId, pmmaId } = await prepararOdontologoIndependiente();
 
     const orden = await facturarHoy(odontologoId, coronaId);
+    const movimientoOriginalId = (await listarMovimientos(db, odontologoId))[0].id;
+
     await editarOrdenConPrestaciones(db, orden.id, {
       odontologoId,
       pacienteId: orden.pacienteId,
@@ -130,12 +138,10 @@ describe("cuentaService — edición de OT facturada en el mismo mes (bug de dob
     });
 
     const movimientos = await listarMovimientos(db, odontologoId);
-    const activos = movimientos.filter((m) => !m.anulado);
-    const anulados = movimientos.filter((m) => m.anulado);
-    expect(activos).toHaveLength(1);
-    expect(activos[0].importeCentavos).toBe(1000000);
-    expect(anulados).toHaveLength(1);
-    expect(anulados[0].importeCentavos).toBe(1800000);
+    expect(movimientos).toHaveLength(1);
+    expect(movimientos[0].id).toBe(movimientoOriginalId); // mismo movimiento, actualizado — nunca uno nuevo
+    expect(movimientos[0].anulado).toBe(false);
+    expect(movimientos[0].importeCentavos).toBe(1000000);
 
     // El saldo general (fuera de cualquier ventana mensual) también da el valor final único.
     const saldos = await obtenerSaldos(db, odontologoId);
@@ -196,8 +202,8 @@ describe("cuentaService — edición de OT facturada en el mismo mes (bug de dob
     expect(saldosClinica[0].saldoCentavos).toBe(1000000);
 
     const movimientosClinica = await listarMovimientosClinica(db, clinicaId);
-    expect(movimientosClinica.filter((m) => !m.anulado)).toHaveLength(1);
-    expect(movimientosClinica.filter((m) => m.anulado)).toHaveLength(1);
+    expect(movimientosClinica).toHaveLength(1); // actualizado en el lugar, sin ninguna fila histórica
+    expect(movimientosClinica[0].anulado).toBe(false);
   });
 
   it("una edición que CAMBIA el importe (sube) no duplica el trabajo del mes", async () => {

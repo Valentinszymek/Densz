@@ -17,6 +17,7 @@ import {
   eliminarMovimientosDeOrden,
   anularMovimientoDeOrden,
   registrarMovimientoDebe,
+  actualizarMovimientoDebeDeOrden,
   obtenerMovimientoDebeActivoDeOrden,
   type TitularCuenta
 } from "../db/repositories/movimientosRepo";
@@ -304,10 +305,12 @@ function detectarCambiosOrden(
  *   (lista vigente del odontólogo, o manual) — nunca queda "flotando"
  *   contra el catálogo actual.
  * - Si la OT ya estaba facturada, la cuenta corriente refleja SIEMPRE el
- *   estado final de la OT con un único movimiento "debe": el anterior se
- *   anula (nunca se borra, para no perder el historial contable) y se
- *   emite uno nuevo ÚNICAMENTE si el importe, la moneda o el titular
- *   (odontólogo/clínica) realmente cambiaron — nunca se duplica el DEBE.
+ *   estado final de la OT con un único movimiento "debe", actualizado EN
+ *   EL LUGAR (nunca se anula uno y se crea otro — eso dejaba una fila
+ *   fantasma tachada en Cuentas, confusa y riesgosa: llevó a un borrado
+ *   real por error, 2026-11-17) únicamente si el importe, la moneda o el
+ *   titular (odontólogo/clínica) realmente cambiaron. El valor anterior
+ *   queda igual disponible en Auditoría.
  * - Los pagos (`pagos`/movimientos "haber") nunca se tocan: si el nuevo
  *   total queda por debajo de lo ya pagado, el saldo pasa a favor del
  *   odontólogo/clínica solo, naturalmente, por aritmética del ledger.
@@ -375,26 +378,33 @@ export async function editarOrdenConPrestaciones(pool: Queryable, ordenId: numbe
         movimientoActual.clinicaId !== nuevoTitular.clinicaId;
 
       if (cambioImporte || cambioMoneda || cambioTitular) {
-        // Se conserva la fecha del movimiento original para que el
-        // resumen mensual no "salte" de mes solo por haber sido editada
-        // hoy (el mes se define por la fecha del comprobante, que esta
-        // edición no toca — pero el orden dentro del ledger crudo de
-        // Cuentas sí depende de esta fecha).
-        const fechaMovimiento = movimientoActual?.fecha ?? anterior.fechaTrabajo;
-        await anularMovimientoDeOrden(db, ordenId);
-        // Un total en $0 (ej. una repetición sin cargo) no genera deuda:
-        // la tabla prohíbe movimientos de $0 a propósito (nunca ensuciar
-        // la cuenta corriente con una "deuda" inexistente), así que acá
-        // alcanza con haber anulado la deuda anterior arriba — no hay
-        // nada nuevo que registrar.
-        if (totalCentavos > 0) {
+        const descripcion = `Orden ${anterior.numero}${odontologo.clinicaId ? ` — ${odontologo.nombre}` : ""}`;
+        if (movimientoActual && totalCentavos > 0) {
+          // Caso normal: se actualiza EN EL LUGAR el mismo movimiento, sin
+          // crear ninguna fila nueva ni tocar su fecha — así Cuentas nunca
+          // muestra una fila vieja tachada junto a la vigente.
+          await actualizarMovimientoDebeDeOrden(db, movimientoActual.id, {
+            ...nuevoTitular,
+            importeCentavos: totalCentavos,
+            moneda: lista.moneda,
+            descripcion
+          });
+        } else if (totalCentavos === 0) {
+          // Un total en $0 (ej. una repetición sin cargo) no genera deuda:
+          // la tabla prohíbe movimientos de $0 a propósito (nunca ensuciar
+          // la cuenta corriente con una "deuda" inexistente) — acá no
+          // queda ningún reemplazo posible, solo anular el que había.
+          await anularMovimientoDeOrden(db, ordenId);
+        } else {
+          // Defensivo: una OT facturada sin movimiento "debe" activo no
+          // debería darse nunca en uso normal, pero si pasara, se crea uno.
           await registrarMovimientoDebe(db, {
             ...nuevoTitular,
             ordenId,
             importeCentavos: totalCentavos,
             moneda: lista.moneda,
-            fecha: fechaMovimiento,
-            descripcion: `Orden ${anterior.numero}${odontologo.clinicaId ? ` — ${odontologo.nombre}` : ""} (editada)`
+            fecha: anterior.fechaTrabajo,
+            descripcion
           });
         }
       }

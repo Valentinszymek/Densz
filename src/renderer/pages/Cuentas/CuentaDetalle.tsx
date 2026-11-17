@@ -44,6 +44,21 @@ function ordenarPorFecha(trabajos: TrabajoFacturadoMes[]): TrabajoFacturadoMes[]
   return [...trabajos].sort((a, b) => (b.fechaFacturacion ?? "").localeCompare(a.fechaFacturacion ?? ""));
 }
 
+/**
+ * Al editar una OT ya facturada, el movimiento DEBE viejo queda anulado (no
+ * se borra, por historial contable) y se crea uno nuevo con el importe
+ * corregido — así que esta lista puede traer dos filas para la misma OT: la
+ * vieja tachada y la vigente, ambas apuntando al mismo `ordenId`. En
+ * pantalla eso no se entendía (parecía una fila "de más" para borrar) y
+ * llevó a un borrado real por error (2026-11-17) — acá se oculta esa fila
+ * vieja, que de cualquier forma sigue completa en Auditoría. Una OT
+ * REALMENTE anulada (estado "anulado") no tiene ninguna fila gemela viva —
+ * esa sí se sigue mostrando, tachada, como siempre.
+ */
+function ocultarMovimientosReemplazados(trabajos: TrabajoFacturadoMes[]): TrabajoFacturadoMes[] {
+  return trabajos.filter((t) => !(t.anulado && t.estado === "facturado"));
+}
+
 export default function CuentaDetalle() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -194,7 +209,7 @@ export default function CuentaDetalle() {
               </div>
             </div>
 
-            {b.trabajos.length === 0 ? (
+            {ocultarMovimientosReemplazados(b.trabajos).length === 0 ? (
               <p className="text-sm text-carbon/40">Sin trabajos facturados en este período.</p>
             ) : (
               <Table>
@@ -209,7 +224,7 @@ export default function CuentaDetalle() {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {ordenarPorFecha(b.trabajos).map((t) => (
+                  {ordenarPorFecha(ocultarMovimientosReemplazados(b.trabajos)).map((t) => (
                     <Tr
                       key={t.movimientoId}
                       className={`cursor-pointer ${t.anulado ? "opacity-40" : ""}`}
