@@ -216,7 +216,7 @@ export default function ClinicaCuentaDetalle() {
                       <Tr
                         key={t.movimientoId}
                         className={`cursor-pointer ${t.anulado ? "opacity-40" : ""}`}
-                        onClick={() => navigate(`/trabajos/${t.ordenId}`)}
+                        onClick={() => navigate(`/cuentas/clinica/${clinicaId}/trabajos/${t.ordenId}`)}
                       >
                         <Td className="font-mono text-xs text-carbon/60">{t.ordenNumero}</Td>
                         <Td className="text-carbon/60">{t.fechaFacturacion ? formatearFecha(t.fechaFacturacion) : "—"}</Td>

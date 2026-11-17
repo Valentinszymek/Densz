@@ -86,6 +86,12 @@ export function AppRouter() {
                   <Route path="/cuentas" element={<Cuentas />} />
                   <Route path="/cuentas/clinica/:id" element={<ClinicaCuentaDetalle />} />
                   <Route path="/cuentas/:id" element={<CuentaDetalle />} />
+                  {/* Mismo componente que "/trabajos/:id", pero anidado acá
+                      para que ver un trabajo desde Cuentas y volver no
+                      desmonte el ProteccionGuard (lo que re-pediría la
+                      contraseña — ver comentario en ProteccionGuard.tsx). */}
+                  <Route path="/cuentas/:odontologoId/trabajos/:id" element={<OrdenDetalle />} />
+                  <Route path="/cuentas/clinica/:clinicaId/trabajos/:id" element={<OrdenDetalle />} />
                   <Route path="/estadisticas" element={<Estadisticas />} />
                 </Route>
               </Route>
