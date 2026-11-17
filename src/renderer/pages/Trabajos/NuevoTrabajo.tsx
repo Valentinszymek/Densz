@@ -13,7 +13,7 @@ import { useOdontologos, useOdontologo } from "../../features/odontologos/hooks"
 import { usePrestaciones } from "../../features/precios/hooks";
 import { useItemsListaPrecio } from "../../features/listasPrecio/hooks";
 import { useOrden, useCrearOrden, useEditarOrden } from "../../features/ordenes/hooks";
-import { useGenerarComprobante } from "../../features/comprobantes/hooks";
+import { useGenerarComprobante, useImprimirComprobante } from "../../features/comprobantes/hooks";
 import { useTienePagos } from "../../features/cuentas/hooks";
 import { formatearMoneda } from "../../lib/format";
 import { cn } from "../../lib/cn";
@@ -183,6 +183,7 @@ export default function NuevoTrabajo() {
   const crearOrden = useCrearOrden();
   const editarOrden = useEditarOrden();
   const generarComprobante = useGenerarComprobante();
+  const imprimirComprobante = useImprimirComprobante();
 
   // Para la advertencia de "esta cuenta tiene pagos registrados" (§5) —
   // los pagos en Densz no están atados a una OT puntual, sino al titular
@@ -313,7 +314,7 @@ export default function NuevoTrabajo() {
   const totalActual = actual?.prestacionId ? precioDeRegistro(actual) * cantidadNum(actual) : 0;
   const total = totalRegistros + totalActual;
 
-  async function onGuardar(generarComprobanteTambien: boolean) {
+  async function onGuardar(modo: "guardar" | "comprobante" | "comprobante-imprimir") {
     setError(null);
     // El registro que se está completando en pantalla cuenta como parte
     // de la OT si ya tiene una prestación elegida — no hace falta que el
@@ -368,7 +369,11 @@ export default function NuevoTrabajo() {
 
     try {
       const ordenCreada = await crearOrden.mutateAsync(payload);
-      if (generarComprobanteTambien) {
+      if (modo === "guardar") {
+        navigate(`/trabajos/${ordenCreada.id}`);
+        return;
+      }
+      if (modo === "comprobante") {
         // Sin await a propósito: generar el PDF (render + subida) tarda
         // varios segundos y no hay ningún motivo para tener al usuario
         // esperando esa parte — ya puede seguir a la OT (que muestra
@@ -377,6 +382,17 @@ export default function NuevoTrabajo() {
         // refresca la pantalla sola cuando el comprobante queda listo (o
         // si falla), pase lo que pase con la navegación mientras tanto.
         generarComprobante.mutate(ordenCreada.id);
+        navigate(`/trabajos/${ordenCreada.id}`);
+        return;
+      }
+      // "comprobante-imprimir": acá sí hay que esperar el PDF (a diferencia
+      // de arriba) porque no hay nada que mandar a imprimir hasta que
+      // termine de generarse. Si falló (pdfPath null — ver
+      // useGenerarComprobante), no se intenta imprimir nada inexistente;
+      // el mismo toast de "PDF no se pudo generar todavía" ya avisa.
+      const comprobante = await generarComprobante.mutateAsync(ordenCreada.id);
+      if (comprobante.pdfPath) {
+        await imprimirComprobante.mutateAsync(comprobante.id);
       }
       navigate(`/trabajos/${ordenCreada.id}`);
     } catch (err) {
@@ -384,7 +400,8 @@ export default function NuevoTrabajo() {
     }
   }
 
-  const guardando = crearOrden.isPending || generarComprobante.isPending || editarOrden.isPending;
+  const guardando =
+    crearOrden.isPending || generarComprobante.isPending || editarOrden.isPending || imprimirComprobante.isPending;
 
   if (esEdicion && cargandoOrden) {
     return <p className="text-carbon/40 text-sm">Cargando…</p>;
@@ -703,32 +720,35 @@ export default function NuevoTrabajo() {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button variant="secondary" onClick={() => navigate(esEdicion ? `/trabajos/${idEditar}` : "/trabajos")}>
               Cancelar
             </Button>
             {esEdicion ? (
               ordenOriginal!.estado === "pendiente_facturar" ? (
                 <>
-                  <Button variant="secondary" onClick={() => onGuardar(false)} disabled={guardando}>
+                  <Button variant="secondary" onClick={() => onGuardar("guardar")} disabled={guardando}>
                     Guardar cambios
                   </Button>
-                  <Button onClick={() => onGuardar(true)} disabled={guardando}>
+                  <Button onClick={() => onGuardar("comprobante")} disabled={guardando}>
                     {guardando ? "Guardando…" : "Guardar y generar comprobante"}
                   </Button>
                 </>
               ) : (
-                <Button onClick={() => onGuardar(false)} disabled={guardando}>
+                <Button onClick={() => onGuardar("guardar")} disabled={guardando}>
                   {guardando ? "Guardando…" : "Guardar cambios"}
                 </Button>
               )
             ) : (
               <>
-                <Button variant="secondary" onClick={() => onGuardar(false)} disabled={guardando}>
+                <Button variant="secondary" onClick={() => onGuardar("guardar")} disabled={guardando}>
                   Guardar
                 </Button>
-                <Button onClick={() => onGuardar(true)} disabled={guardando}>
+                <Button variant="secondary" onClick={() => onGuardar("comprobante")} disabled={guardando}>
                   {guardando ? "Guardando…" : "Guardar y generar comprobante"}
+                </Button>
+                <Button onClick={() => onGuardar("comprobante-imprimir")} disabled={guardando}>
+                  {guardando ? "Guardando…" : "Guardar, generar comprobante e imprimir"}
                 </Button>
               </>
             )}
@@ -752,7 +772,7 @@ export default function NuevoTrabajo() {
             moneda={moneda}
             tienePagosRegistrados={tienePagosRegistrados ?? false}
             guardando={editarOrden.isPending}
-            onConfirmar={() => onGuardar(false)}
+            onConfirmar={() => onGuardar("guardar")}
           />
         )}
       </div>
