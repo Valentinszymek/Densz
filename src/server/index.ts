@@ -10,7 +10,7 @@ import express from "express";
 import "express-async-errors";
 import cookieParser from "cookie-parser";
 import { loadEnvFile, getDatabaseUrl } from "../main/utils/appPaths";
-import { openDatabase, checkConnection } from "../main/db/connection";
+import { openDatabase, checkConnection, closeDatabase } from "../main/db/connection";
 import { errorHandler } from "./middleware/errorHandler";
 import { crearRouterAuth } from "./routes/auth.route";
 import { crearRouterOdontologos } from "./routes/odontologos.route";
@@ -47,6 +47,29 @@ import { logger } from "../main/utils/logger";
  * de escritorio sigue funcionando exactamente igual, sin cambios.
  */
 loadEnvFile();
+
+// Red de seguridad de último recurso (investigación de estabilidad,
+// 2026-11-19) — nunca debería activarse en el camino normal, porque
+// express-async-errors (arriba) ya atrapa cualquier rechazo que escape de
+// un handler/middleware de Express. Esto cubre lo que quedaría AFUERA de
+// eso (una promesa suelta en el arranque, un callback de una librería de
+// terceros que no la haga pasar por un handler de Express): antes, nada
+// la registraba en ningún lado antes de que Node tirara abajo el proceso
+// entero — Railway lo reiniciaba igual, pero sin ningún rastro de POR QUÉ,
+// así que una caída real se veía indistinguible de un simple reinicio de
+// rutina. Una promesa rechazada sola no implica que el proceso haya
+// quedado en un estado roto, así que solo se loguea; una excepción
+// sincrónica sin capturar sí puede dejarlo en un estado indefinido —ver
+// la documentación de Node— así que ahí se loguea Y se cierra, para que
+// Railway levante un proceso nuevo y limpio en vez de seguir en un estado
+// desconocido.
+process.on("unhandledRejection", (motivo) => {
+  logger.error("Promesa rechazada sin manejar (no debería pasar — revisar de dónde vino):", motivo);
+});
+process.on("uncaughtException", (err) => {
+  logger.error("Excepción no capturada — cerrando el proceso para que Railway lo reinicie limpio:", err);
+  process.exit(1);
+});
 
 // La mayoría de los hosts (Railway incluido) asignan el puerto por la
 // variable PORT, no por SERVER_PORT — se prioriza PORT si existe, y
@@ -100,6 +123,23 @@ async function main(): Promise<void> {
     res.json({ ok });
   });
 
+  // Visibilidad de pedidos lentos (§4 del reporte de estabilidad) — nunca
+  // loguea cada pedido (sería puro ruido), solo los que de verdad tardan,
+  // que es la señal real para distinguir "una query quedó bloqueada" de
+  // "el usuario tiene mala conexión". Nunca incluye body/params, solo
+  // método, ruta y duración.
+  const UMBRAL_LENTO_MS = 3000;
+  app.use((req, res, next) => {
+    const inicio = Date.now();
+    res.on("finish", () => {
+      const duracionMs = Date.now() - inicio;
+      if (duracionMs > UMBRAL_LENTO_MS) {
+        logger.warn(`Pedido lento: ${req.method} ${req.path} — ${duracionMs}ms (status ${res.statusCode})`);
+      }
+    });
+    next();
+  });
+
   app.use("/auth", crearRouterAuth(pool));
   app.use("/odontologos", crearRouterOdontologos(pool));
   app.use("/clinicas", crearRouterClinicas(pool));
@@ -128,10 +168,26 @@ async function main(): Promise<void> {
   // error-handler solo por tener 4 parámetros). Ver src/server/middleware/errorHandler.ts.
   app.use(errorHandler);
 
-  app.listen(PUERTO, () => {
+  const servidor = app.listen(PUERTO, () => {
     // eslint-disable-next-line no-console
     console.log(`Servidor Densz escuchando en http://localhost:${PUERTO}`);
   });
+
+  // Cada deploy a Railway manda SIGTERM al proceso viejo antes de arrancar
+  // el nuevo — sin esto, el proceso moría de golpe sin avisarle nunca a
+  // Postgres/al pooler de Supabase que esas 10 conexiones quedaban libres,
+  // dejándolas como conexiones "zombies" del lado del servidor hasta que
+  // el propio TCP keepalive las cortara solo, minutos después. Cerrar el
+  // pool a mano en el apagado hace que cada deploy quede prolijo de
+  // entrada, en vez de depender de que el otro lado lo note con demora.
+  async function apagarProlijo(señal: string): Promise<void> {
+    logger.info(`Señal ${señal} recibida — cerrando el pool de Postgres antes de salir.`);
+    servidor.close();
+    await closeDatabase();
+    process.exit(0);
+  }
+  process.on("SIGTERM", () => void apagarProlijo("SIGTERM"));
+  process.on("SIGINT", () => void apagarProlijo("SIGINT"));
 }
 
 main().catch((err) => {

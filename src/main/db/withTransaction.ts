@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import type { Queryable } from "./types";
+import { logger } from "../utils/logger";
 
 /**
  * `PoolClient` también expone un método `.connect()` (lo hereda de la
@@ -38,23 +39,34 @@ export async function withTransaction<T>(db: Queryable, fn: (client: PoolClient)
     client.release();
     return resultado;
   } catch (err) {
-    // La conexión puede estar realmente rota (ej. un corte de red a
-    // mitad de una query) — en ese caso el propio ROLLBACK también va a
-    // fallar, pero igual hay que intentarlo antes de soltarla. Pasarle el
-    // error a release() (en vez de release() sin nada) le dice al pool
-    // que DESCARTE esta conexión en vez de devolverla "sana" para el
-    // próximo pedido — sin esto, una conexión rota quedaba reciclada
-    // igual, y el próximo que la agarrara fallaba también, hasta agotar
-    // de a poco las conexiones del pool (hallazgo real, 2026-11-16: el
-    // backend de Railway quedó "vivo" pero sin poder hablarle más a
-    // Postgres, y solo un reinicio del proceso -pool nuevo- lo recuperó).
+    // Corrección (investigación de estabilidad, 2026-11-19): la versión
+    // anterior de este catch pasaba SIEMPRE el error de `fn()` a
+    // release() — incluido un error de NEGOCIO común y corriente (ej.
+    // "Hay una prestación sin precio", cualquier 400 de validación), que
+    // no tiene absolutamente nada que ver con el estado de la conexión.
+    // Eso hacía que `pg` descartara y volviera a abrir una conexión nueva
+    // contra el pooler de Supabase en CADA error de validación de toda la
+    // app — no solo las raras veces que la red se corta de verdad — un
+    // churn de conexiones innecesario y frecuente que nunca era la
+    // intención (ver el comentario original, que solo hablaba de "un
+    // corte de red a mitad de una query"). El único indicador real y
+    // confiable de que la conexión está rota es que el propio
+    // COMMIT/ROLLBACK falle — ahí sí hay que descartarla (hallazgo real,
+    // 2026-11-16: el backend de Railway quedó "vivo" pero sin poder
+    // hablarle más a Postgres, y solo un reinicio del proceso -pool
+    // nuevo- lo recuperó). Mismo criterio que usa attachTenantDb.ts.
+    let errorDeRollback: unknown = null;
     try {
       await client.query("ROLLBACK");
-    } catch {
-      // Ignorado a propósito: si la conexión ya está rota, no hay
-      // ROLLBACK que mandar — se descarta igual más abajo.
+    } catch (rollbackErr) {
+      errorDeRollback = rollbackErr;
     }
-    client.release(err instanceof Error ? err : new Error(String(err)));
+    // Visibilidad para diagnóstico (§4 del reporte de estabilidad): sin
+    // esto, una conexión descartada por estar rota quedaba invisible en
+    // los logs — nunca un número para saber si esto pasa una vez al mes o
+    // diez veces por hora. Nunca incluye datos de la query ni parámetros.
+    if (errorDeRollback) logger.warn("Conexión a Postgres descartada del pool (rota) en withTransaction.");
+    client.release(errorDeRollback instanceof Error ? errorDeRollback : errorDeRollback ? new Error(String(errorDeRollback)) : undefined);
     throw err;
   }
 }

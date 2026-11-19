@@ -90,7 +90,23 @@ export function attachTenantDb(pool: Pool | PoolClient) {
       return;
     }
 
-    const client = await pool.connect();
+    // Hallazgo real (2026-11-19, misma familia que el de la nota larga más
+    // abajo): si pool.connect() en sí falla — pool agotado, timeout real
+    // contra el pooler de Supabase, lo que sea — esto corre dentro de un
+    // middleware async registrado con router.use(...), que Express 4
+    // NUNCA espera ni atrapa. Sin este try/catch, ese rechazo quedaba sin
+    // manejar y Node (desde la v15, sin ninguna flag especial acá) tira
+    // abajo el proceso entero por una promesa rechazada sin capturar —
+    // convirtiendo "no hay conexión libre ahora mismo" (recuperable, un
+    // 503 normal) en un reinicio completo de Railway. Con el try/catch,
+    // en cambio, es un error HTTP más, manejado por errorHandler.ts.
+    let client: PoolClient;
+    try {
+      client = await pool.connect();
+    } catch (err) {
+      next(err);
+      return;
+    }
     try {
       await client.query("BEGIN");
       await fijarLaboratorioActual(client, sesion.laboratorioId);

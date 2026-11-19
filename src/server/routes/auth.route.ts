@@ -4,6 +4,7 @@ import type { Pool } from "pg";
 import { login, logout } from "../../main/services/authService";
 import { loginConGoogle, registrarseConGoogle } from "../../main/services/googleAuthService";
 import { listarUsuariosActivosParaSeleccion, buscarUsuarioParaLoginGoogle } from "../../main/db/repositories/usuariosRepo";
+import { withTransaction } from "../../main/db/withTransaction";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { crearSesionHttp, obtenerSesionHttp, destruirSesionHttp, obtenerIdSesionDeRequest, COOKIE_SESION } from "../session";
 import { verificarTokenGoogle } from "../googleAuth";
@@ -198,30 +199,19 @@ export function crearRouterAuth(db: Pool): Router {
         res.json([]);
         return;
       }
-      // Mismo chequeo dual que attachTenantDb.ts: en los tests HTTP, `db`
-      // es en realidad un PoolClient ya abierto disfrazado de Pool (toda
-      // la request de un test corre a propósito dentro de esa misma
-      // transacción, que el test revierte al final) — ahí no hay que
-      // abrir ("connect") ninguna conexión nueva, alcanza con fijar el
-      // GUC sobre esa misma.
-      if (typeof (db as unknown as { release?: unknown }).release === "function") {
-        await db.query("SELECT set_config('app.current_laboratorio_id', $1, true)", [String(usuario.laboratorioId)]);
-        res.json(await listarUsuariosActivosParaSeleccion(db));
-        return;
-      }
-      const client = await db.connect();
-      try {
-        await client.query("BEGIN");
+      // withTransaction ya resuelve el chequeo dual (en los tests HTTP,
+      // `db` es en realidad un PoolClient disfrazado de Pool — ver su
+      // propio comentario) y, clave acá, descarta la conexión del pool en
+      // vez de reciclarla como "sana" si el COMMIT/ROLLBACK en sí falla
+      // (ver withTransaction.ts — mismo hallazgo que el de 2026-11-16, que
+      // esta ruta había quedado afuera: abría su propia conexión a mano,
+      // sin ese resguardo, y la devolvía siempre con release() sin
+      // argumento aunque estuviera realmente rota).
+      const usuarios = await withTransaction(db, async (client) => {
         await client.query("SELECT set_config('app.current_laboratorio_id', $1, true)", [String(usuario.laboratorioId)]);
-        const usuarios = await listarUsuariosActivosParaSeleccion(client);
-        await client.query("COMMIT");
-        res.json(usuarios);
-      } catch (err) {
-        await client.query("ROLLBACK");
-        throw err;
-      } finally {
-        client.release();
-      }
+        return listarUsuariosActivosParaSeleccion(client);
+      });
+      res.json(usuarios);
     } catch (err) {
       logger.error("Error en POST /auth/usuarios-del-laboratorio:", err);
       const error = traducirErrorPostgres(err);
