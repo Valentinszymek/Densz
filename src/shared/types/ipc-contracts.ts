@@ -166,6 +166,7 @@ export const IPC_CHANNELS = {
   PAGOS_LISTAR: "pagos:listar",
   PAGOS_LISTAR_CLINICA: "pagos:listarClinica",
   PAGOS_REGISTRAR: "pagos:registrar",
+  PAGOS_EDITAR: "pagos:editar",
   PAGOS_ANULAR: "pagos:anular",
   MEDIOS_PAGO_LISTAR: "mediosPago:listar",
   MEDIOS_PAGO_CREAR: "mediosPago:crear",
@@ -462,6 +463,10 @@ export interface DenszApi {
   pagosListar: (odontologoId: number) => Promise<Pago[]>;
   pagosListarClinica: (clinicaId: number) => Promise<Pago[]>;
   pagosRegistrar: (data: DatosNuevoPagoDto, confirmarDuplicado?: boolean) => Promise<ResultadoRegistrarPagoDto>;
+  /** Edita un pago EN EL LUGAR (nunca anula uno y crea otro) — pensado
+   * sobre todo para corregir a mano el mes de un pago viejo. No incluye
+   * odontologoId/clinicaId: el titular de un pago no se puede cambiar. */
+  pagosEditar: (id: number, data: DatosEditarPagoDto) => Promise<Pago>;
   pagosAnular: (id: number, motivo: string) => Promise<void>;
   mediosPagoListar: () => Promise<MedioPago[]>;
   mediosPagoCrear: (nombre: string) => Promise<number>;
@@ -625,6 +630,18 @@ export interface DatosNuevoPagoDto {
 }
 
 export type ResultadoRegistrarPagoDto = { creado: true; pago: Pago } | { creado: false; posibleDuplicado: true };
+
+/** Igual que DatosNuevoPagoDto, sin odontologoId/clinicaId — el titular
+ * de un pago no se puede cambiar desde el formulario de edición. */
+export interface DatosEditarPagoDto {
+  fecha: string;
+  importeCentavos: number;
+  moneda: Moneda;
+  medioPagoId: number;
+  referencia?: string | null;
+  periodoAnio?: number | null;
+  periodoMes?: number | null;
+}
 
 export interface DatosNuevaDeudaDto {
   /** Exactamente uno de los dos. */

@@ -117,6 +117,22 @@ export async function anularMovimientoDePago(db: Queryable, pagoId: number): Pro
   await db.query("UPDATE movimientos_cuenta SET anulado = 1 WHERE pago_id = $1 AND anulado = 0", [pagoId]);
 }
 
+/** Actualiza EN EL LUGAR el movimiento "haber" de un pago ya registrado
+ * (al editarlo) — nunca lo anula y crea uno nuevo, mismo criterio que
+ * `actualizarMovimientoDebeDeOrden` (evita una fila fantasma en Cuentas). */
+export async function actualizarMovimientoDePago(
+  db: Queryable,
+  pagoId: number,
+  data: { importeCentavos: number; moneda: Moneda; fecha: string; periodoAnio: number | null; periodoMes: number | null }
+): Promise<void> {
+  await db.query(
+    `UPDATE movimientos_cuenta
+     SET importe_centavos = $1, moneda = $2, fecha = $3, periodo_anio = $4, periodo_mes = $5
+     WHERE pago_id = $6 AND tipo = 'haber' AND anulado = 0`,
+    [data.importeCentavos, data.moneda, data.fecha, data.periodoAnio, data.periodoMes, pagoId]
+  );
+}
+
 /** Anula (no borra) una deuda agregada a mano — nunca toca un movimiento
  * que venga de una orden o de un pago real (el filtro por orden_id/pago_id
  * IS NULL es a propósito, así este endpoint no puede anular nada más). */
@@ -304,6 +320,7 @@ interface FilaMovimiento {
   referencia: string | null;
   periodo_anio: number | null;
   periodo_mes: number | null;
+  pago_medio_pago_id: number | null;
 }
 
 /** JOIN compartido por todas las lecturas de movimientos: además de la OT
@@ -317,7 +334,7 @@ const JOIN_DETALLE_MOVIMIENTO = `
      LEFT JOIN ordenes o ON o.id = m.orden_id
      LEFT JOIN pagos p ON p.id = m.pago_id
      LEFT JOIN medios_pago mp ON mp.id = p.medio_pago_id`;
-const SELECT_DETALLE_MOVIMIENTO = `m.*, o.numero AS orden_numero, mp.nombre AS medio_pago_nombre, p.referencia`;
+const SELECT_DETALLE_MOVIMIENTO = `m.*, o.numero AS orden_numero, mp.nombre AS medio_pago_nombre, p.referencia, p.medio_pago_id AS pago_medio_pago_id`;
 
 function mapearMovimiento(f: FilaMovimiento): MovimientoCuenta {
   return {
@@ -336,7 +353,8 @@ function mapearMovimiento(f: FilaMovimiento): MovimientoCuenta {
     medioPagoNombre: f.medio_pago_nombre,
     referencia: f.referencia,
     periodoAnio: f.periodo_anio,
-    periodoMes: f.periodo_mes
+    periodoMes: f.periodo_mes,
+    medioPagoId: f.pago_medio_pago_id
   };
 }
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DatosNuevoPagoDto } from "@shared/types/ipc-contracts";
+import type { DatosNuevoPagoDto, DatosEditarPagoDto } from "@shared/types/ipc-contracts";
 import { toast } from "../../store/toastStore";
 
 const CLAVE = "pagos";
@@ -49,6 +49,18 @@ export function useRegistrarPago() {
       }
     },
     onError: (e: unknown) => toast({ titulo: "No se pudo registrar el pago", descripcion: String(e), tono: "error" })
+  });
+}
+
+export function useEditarPago() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: DatosEditarPagoDto }) => window.densz.pagosEditar(id, data),
+    onSuccess: () => {
+      invalidarCuenta(qc);
+      toast({ titulo: "Pago actualizado", tono: "exito" });
+    },
+    onError: (e: unknown) => toast({ titulo: "No se pudo editar el pago", descripcion: String(e), tono: "error" })
   });
 }
 

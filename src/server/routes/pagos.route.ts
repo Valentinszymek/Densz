@@ -8,7 +8,7 @@ import {
   listarMediosPago,
   crearMedioPago
 } from "../../main/db/repositories/pagosRepo";
-import { registrarPago, anularPago } from "../../main/services/pagoService";
+import { registrarPago, editarPago, anularPago } from "../../main/services/pagoService";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { requireAuth, type RequestConSesion } from "../middleware/requireAuth";
@@ -39,6 +39,20 @@ const esquemaPago = z
     periodoAnio: d.periodoAnio ?? null,
     periodoMes: d.periodoMes ?? null
   }));
+
+// Igual que esquemaPago, pero sin odontologoId/clinicaId — el titular de
+// un pago no es editable desde este formulario.
+const esquemaEditarPago = z
+  .object({
+    fecha: z.string().min(1),
+    importeCentavos: z.number().int().positive("El importe debe ser mayor a cero."),
+    moneda: z.enum(["ARS", "USD"]),
+    medioPagoId: z.number().int().positive(),
+    referencia: z.string().trim().max(200).nullable().optional(),
+    periodoAnio: z.number().int().positive().nullable().optional(),
+    periodoMes: z.number().int().min(1).max(12).nullable().optional()
+  })
+  .transform((d) => ({ ...d, periodoAnio: d.periodoAnio ?? null, periodoMes: d.periodoMes ?? null }));
 
 const esquemaMotivo = z.string().trim().min(3, "Ingresá un motivo de al menos 3 caracteres.");
 
@@ -125,6 +139,22 @@ export function crearRouterPagos(db: Pool): Router {
     } catch (err) {
       const error = traducirErrorPostgres(err);
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  router.put("/:id", requierePagosCrear, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
+    try {
+      const id = esquemaId.parse(req.params.id);
+      const validado = esquemaEditarPago.parse(req.body);
+      const usuarioId = (req as unknown as RequestConSesion).sesion.usuarioId;
+      // editarPago ya audita "editar" adentro de su propia transacción.
+      const pago = await editarPago(db, id, validado, usuarioId);
+      res.json(pago);
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      const status = error.message === "El pago no existe." ? 404 : 400;
+      res.status(status).json({ error: error.message });
     }
   });
 

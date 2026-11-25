@@ -9,6 +9,7 @@ export function registrarHandlersPagos(): void {
   ipcMain.handle(IPC_CHANNELS.PAGOS_REGISTRAR, (_e, data, confirmarDuplicado?: boolean) =>
     apiClient.pagosRegistrar(data, confirmarDuplicado)
   );
+  ipcMain.handle(IPC_CHANNELS.PAGOS_EDITAR, (_e, id: number, data) => apiClient.pagosEditar(id, data));
   ipcMain.handle(IPC_CHANNELS.PAGOS_ANULAR, (_e, id: number, motivo: string) => apiClient.pagosAnular(id, motivo));
   ipcMain.handle(IPC_CHANNELS.MEDIOS_PAGO_LISTAR, () => apiClient.mediosPagoListar());
   ipcMain.handle(IPC_CHANNELS.MEDIOS_PAGO_CREAR, (_e, nombre: string) => apiClient.mediosPagoCrear(nombre));

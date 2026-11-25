@@ -358,6 +358,10 @@ export interface MovimientoCuenta {
    * movimiento que no sea un pago. */
   periodoAnio?: number | null;
   periodoMes?: number | null;
+  /** Solo en un "haber" (pago) — el id del medio de pago (no solo su
+   * nombre), para poder preseleccionarlo al editar. `null` en cualquier
+   * otro movimiento. */
+  medioPagoId?: number | null;
 }
 
 /** Una OT facturada en un mes concreto, para el detalle de la cuenta y el

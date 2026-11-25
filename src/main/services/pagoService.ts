@@ -5,9 +5,11 @@ import {
   existePagoSimilarReciente,
   obtenerPago,
   anularPagoDb,
-  type DatosNuevoPago
+  actualizarPagoDb,
+  type DatosNuevoPago,
+  type DatosEditarPago
 } from "../db/repositories/pagosRepo";
-import { registrarMovimientoHaber, anularMovimientoDePago } from "../db/repositories/movimientosRepo";
+import { registrarMovimientoHaber, anularMovimientoDePago, actualizarMovimientoDePago } from "../db/repositories/movimientosRepo";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
 import { DenszError } from "../utils/errors";
 import type { Pago } from "../../shared/types/entities";
@@ -41,12 +43,7 @@ export async function registrarPago(
   if (data.odontologoId && data.clinicaId) {
     throw new DenszError("Un pago es de un odontólogo o de una clínica, no de ambos.");
   }
-  if ((data.periodoAnio == null) !== (data.periodoMes == null)) {
-    throw new DenszError("El mes del pago quedó incompleto — indicá año y mes, o ninguno de los dos.");
-  }
-  if (data.periodoMes != null && (data.periodoMes < 1 || data.periodoMes > 12)) {
-    throw new DenszError("El mes del pago tiene que ser un número entre 1 y 12.");
-  }
+  validarPeriodo(data.periodoAnio, data.periodoMes);
   if (!confirmarDuplicado && (await existePagoSimilarReciente(pool, data))) {
     return { creado: false, posibleDuplicado: true };
   }
@@ -82,6 +79,66 @@ export async function registrarPago(
   });
 
   return { creado: true, pago: (await obtenerPago(pool, pagoId))! };
+}
+
+function validarPeriodo(periodoAnio: number | null | undefined, periodoMes: number | null | undefined): void {
+  if ((periodoAnio == null) !== (periodoMes == null)) {
+    throw new DenszError("El mes del pago quedó incompleto — indicá año y mes, o ninguno de los dos.");
+  }
+  if (periodoMes != null && (periodoMes < 1 || periodoMes > 12)) {
+    throw new DenszError("El mes del pago tiene que ser un número entre 1 y 12.");
+  }
+}
+
+/**
+ * Edita un pago ya registrado — EN EL LUGAR (nunca anula uno y crea otro,
+ * mismo criterio que editar una OT facturada: evita una fila fantasma en
+ * Cuentas). Pensado sobre todo para corregir a mano el mes de un pago
+ * viejo que quedó mal clasificado — no toca el titular (odontólogo/
+ * clínica), que no es editable desde este formulario.
+ */
+export async function editarPago(pool: Queryable, id: number, data: DatosEditarPago, usuarioId: number): Promise<Pago> {
+  const anterior = await obtenerPago(pool, id);
+  if (!anterior) throw new DenszError("El pago no existe.");
+  if (anterior.anulado) throw new DenszError("Este pago está anulado — no se puede editar.");
+  validarPeriodo(data.periodoAnio, data.periodoMes);
+
+  await withTransaction(pool, async (db) => {
+    await actualizarPagoDb(db, id, data);
+    await actualizarMovimientoDePago(db, id, {
+      importeCentavos: data.importeCentavos,
+      moneda: data.moneda,
+      fecha: data.fecha,
+      periodoAnio: data.periodoAnio ?? null,
+      periodoMes: data.periodoMes ?? null
+    });
+    await registrarAuditoria(db, {
+      usuarioId,
+      accion: "editar",
+      entidad: "pagos",
+      entidadId: id,
+      detalle: {
+        antes: {
+          fecha: anterior.fecha,
+          importeCentavos: anterior.importeCentavos,
+          moneda: anterior.moneda,
+          medioPagoId: anterior.medioPagoId,
+          periodoAnio: anterior.periodoAnio,
+          periodoMes: anterior.periodoMes
+        },
+        despues: {
+          fecha: data.fecha,
+          importeCentavos: data.importeCentavos,
+          moneda: data.moneda,
+          medioPagoId: data.medioPagoId,
+          periodoAnio: data.periodoAnio ?? null,
+          periodoMes: data.periodoMes ?? null
+        }
+      }
+    });
+  });
+
+  return (await obtenerPago(pool, id))!;
 }
 
 export async function anularPago(pool: Queryable, id: number, motivo: string, usuarioId: number): Promise<void> {

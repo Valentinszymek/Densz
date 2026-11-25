@@ -132,6 +132,29 @@ export async function insertarPago(db: Queryable, data: DatosNuevoPago): Promise
   return rows[0].id;
 }
 
+export interface DatosEditarPago {
+  fecha: string;
+  importeCentavos: number;
+  moneda: Moneda;
+  medioPagoId: number;
+  referencia?: string | null;
+  periodoAnio?: number | null;
+  periodoMes?: number | null;
+}
+
+/** Actualiza EN EL LUGAR un pago ya registrado — nunca el titular
+ * (odontólogo/clínica), que no es editable desde este formulario. Útil
+ * sobre todo para corregir a mano el mes de un pago viejo que quedó mal
+ * clasificado (ver cuentaService.ts). */
+export async function actualizarPagoDb(db: Queryable, id: number, data: DatosEditarPago): Promise<void> {
+  await db.query(
+    `UPDATE pagos
+     SET fecha = $1, importe_centavos = $2, moneda = $3, medio_pago_id = $4, referencia = $5, periodo_anio = $6, periodo_mes = $7
+     WHERE id = $8`,
+    [data.fecha, data.importeCentavos, data.moneda, data.medioPagoId, data.referencia ?? null, data.periodoAnio ?? null, data.periodoMes ?? null, id]
+  );
+}
+
 export async function anularPagoDb(db: Queryable, id: number, motivo: string, usuarioId: number): Promise<void> {
   await db.query(
     `UPDATE pagos SET anulado = 1, motivo_anulacion = $1, anulado_por = $2, anulado_en = densz_now() WHERE id = $3`,

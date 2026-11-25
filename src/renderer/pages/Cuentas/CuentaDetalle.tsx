@@ -20,6 +20,7 @@ import { formatearMoneda, formatearFecha, formatearFechaHora } from "../../lib/f
 import { useVolver } from "../../lib/useVolver";
 import { RegistrarPagoModal } from "./RegistrarPagoModal";
 import { AnularPagoModal } from "./AnularPagoModal";
+import { EditarPagoModal } from "./EditarPagoModal";
 import { AgregarDeudaModal } from "./AgregarDeudaModal";
 import { EditarDeudaModal } from "./EditarDeudaModal";
 import { AnularDeudaModal } from "./AnularDeudaModal";
@@ -99,6 +100,7 @@ export default function CuentaDetalle() {
 
   const [pagoAbierto, setPagoAbierto] = useState(false);
   const [pagoAAnular, setPagoAAnular] = useState<number | null>(null);
+  const [pagoAEditar, setPagoAEditar] = useState<MovimientoCuenta | null>(null);
   const [deudaAbierta, setDeudaAbierta] = useState(false);
   const [deudaAEditar, setDeudaAEditar] = useState<MovimientoCuenta | null>(null);
   const [deudaAAnular, setDeudaAAnular] = useState<number | null>(null);
@@ -288,9 +290,14 @@ export default function CuentaDetalle() {
                 <Td className="text-emerald-700 font-medium">{formatearMoneda(m.importeCentavos, m.moneda)}</Td>
                 <Td>
                   {m.pagoId && !m.anulado && (
-                    <Button variant="ghost" size="sm" onClick={() => setPagoAAnular(m.pagoId!)} title="Anular pago">
-                      <Ban size={13} />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => setPagoAEditar(m)} title="Editar pago">
+                        <Pencil size={13} />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setPagoAAnular(m.pagoId!)} title="Anular pago">
+                        <Ban size={13} />
+                      </Button>
+                    </div>
                   )}
                 </Td>
               </Tr>
@@ -371,6 +378,9 @@ export default function CuentaDetalle() {
       )}
 
       <RegistrarPagoModal open={pagoAbierto} onOpenChange={setPagoAbierto} titular={{ odontologoId }} periodoInicial={periodo} />
+      {pagoAEditar !== null && (
+        <EditarPagoModal open onOpenChange={(o) => !o && setPagoAEditar(null)} pago={pagoAEditar} />
+      )}
       {pagoAAnular !== null && (
         <AnularPagoModal open onOpenChange={(o) => !o && setPagoAAnular(null)} pagoId={pagoAAnular} />
       )}

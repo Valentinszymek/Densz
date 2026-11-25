@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTestDbConUsuario, idListaGeneral, type TestDb } from "../helpers/testDb";
 import { crearOdontologo } from "../../src/main/db/repositories/odontologosRepo";
 import { crearLista } from "../../src/main/db/repositories/listasPrecioRepo";
-import { registrarPago, anularPago } from "../../src/main/services/pagoService";
-import { obtenerSaldos } from "../../src/main/db/repositories/movimientosRepo";
+import { registrarPago, editarPago, anularPago } from "../../src/main/services/pagoService";
+import { obtenerSaldos, listarMovimientos } from "../../src/main/db/repositories/movimientosRepo";
 import { listarMediosPago } from "../../src/main/db/repositories/pagosRepo";
 
 describe("pagoService", () => {
@@ -145,6 +145,64 @@ describe("pagoService", () => {
       registrarPago(
         db,
         { odontologoId, fecha: "2026-01-01", importeCentavos: 500000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 13 },
+        usuarioId
+      )
+    ).rejects.toThrow();
+  });
+
+  it("editar un pago lo actualiza EN EL LUGAR — nunca anula uno y crea otro", async () => {
+    const { db, usuarioId } = ctx;
+    const resultado = await registrarPago(
+      db,
+      { odontologoId, fecha: "2026-11-15", importeCentavos: 500000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 11 },
+      usuarioId
+    );
+    if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
+
+    const editado = await editarPago(
+      db,
+      resultado.pago.id,
+      { fecha: "2026-11-15", importeCentavos: 500000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 10 },
+      usuarioId
+    );
+    expect(editado.periodoMes).toBe(10);
+
+    // Sigue siendo UN solo movimiento — no quedó ninguna fila fantasma.
+    const movimientos = await listarMovimientos(db, odontologoId);
+    const haberes = movimientos.filter((m) => m.tipo === "haber" && !m.anulado);
+    expect(haberes).toHaveLength(1);
+    expect(haberes[0].periodoMes).toBe(10);
+  });
+
+  it("no permite editar un pago ya anulado", async () => {
+    const { db, usuarioId } = ctx;
+    const resultado = await registrarPago(
+      db,
+      { odontologoId, fecha: "2026-01-01", importeCentavos: 500000, moneda: "ARS", medioPagoId },
+      usuarioId
+    );
+    if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
+    await anularPago(db, resultado.pago.id, "Motivo", usuarioId);
+
+    await expect(
+      editarPago(db, resultado.pago.id, { fecha: "2026-01-01", importeCentavos: 500000, moneda: "ARS", medioPagoId }, usuarioId)
+    ).rejects.toThrow();
+  });
+
+  it("editar rechaza un periodoMes fuera de 1-12", async () => {
+    const { db, usuarioId } = ctx;
+    const resultado = await registrarPago(
+      db,
+      { odontologoId, fecha: "2026-01-01", importeCentavos: 500000, moneda: "ARS", medioPagoId },
+      usuarioId
+    );
+    if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
+
+    await expect(
+      editarPago(
+        db,
+        resultado.pago.id,
+        { fecha: "2026-01-01", importeCentavos: 500000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 15 },
         usuarioId
       )
     ).rejects.toThrow();

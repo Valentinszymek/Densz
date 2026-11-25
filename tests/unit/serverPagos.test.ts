@@ -203,6 +203,34 @@ describe("HTTP /pagos", () => {
     expect(despues.body.length).toBe(antes.body.length);
   });
 
+  it("PUT /pagos/:id edita un pago en el lugar — el mes queda actualizado", async () => {
+    const creado = await request(app)
+      .post("/pagos")
+      .set("Cookie", cookieAdmin)
+      .send(datosPagoValido({ fecha: "2026-04-01", periodoAnio: 2026, periodoMes: 4 }));
+    expect(creado.status).toBe(201);
+
+    const editado = await request(app)
+      .put(`/pagos/${creado.body.pago.id}`)
+      .set("Cookie", cookieAdmin)
+      .send({ fecha: "2026-04-01", importeCentavos: 500000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 3 });
+    expect(editado.status).toBe(200);
+    expect(editado.body.periodoMes).toBe(3);
+
+    const listado = await request(app).get(`/pagos?odontologoId=${odontologoId}`).set("Cookie", cookieAdmin);
+    // Sigue siendo el MISMO pago (mismo id), no uno nuevo al lado.
+    const encontrado = listado.body.find((p: { id: number }) => p.id === creado.body.pago.id);
+    expect(encontrado.periodoMes).toBe(3);
+  });
+
+  it("PUT /pagos/:id de un pago inexistente responde 404", async () => {
+    const res = await request(app)
+      .put("/pagos/999999999")
+      .set("Cookie", cookieAdmin)
+      .send({ fecha: "2026-04-01", importeCentavos: 500000, moneda: "ARS", medioPagoId });
+    expect(res.status).toBe(404);
+  });
+
   // --- 6. POST con payload inválido → 400 ---
   it("rechaza un payload inválido (400) sin registrar nada", async () => {
     const antes = await request(app).get(`/pagos?odontologoId=${odontologoId}`).set("Cookie", cookieAdmin);

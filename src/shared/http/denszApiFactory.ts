@@ -228,6 +228,7 @@ export function crearMetodosHttpComunes(http: HttpPrimitives): Omit<DenszApi, Me
         throw err;
       }
     },
+    pagosEditar: (id, data) => put<Pago>(`/pagos/${id}`, data),
     pagosAnular: (id, motivo) => patch<{ ok: true }>(`/pagos/${id}/anular`, { motivo }).then(() => undefined),
     mediosPagoListar: () => get("/pagos/medios"),
     mediosPagoCrear: (nombre) => post<number>("/pagos/medios", { nombre }),

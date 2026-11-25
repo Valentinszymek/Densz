@@ -128,6 +128,7 @@ const api: DenszApi = {
   pagosListarClinica: (clinicaId) => ipcRenderer.invoke(IPC_CHANNELS.PAGOS_LISTAR_CLINICA, clinicaId),
   pagosRegistrar: (data, confirmarDuplicado) =>
     ipcRenderer.invoke(IPC_CHANNELS.PAGOS_REGISTRAR, data, confirmarDuplicado),
+  pagosEditar: (id, data) => ipcRenderer.invoke(IPC_CHANNELS.PAGOS_EDITAR, id, data),
   pagosAnular: (id, motivo) => ipcRenderer.invoke(IPC_CHANNELS.PAGOS_ANULAR, id, motivo),
   mediosPagoListar: () => ipcRenderer.invoke(IPC_CHANNELS.MEDIOS_PAGO_LISTAR),
   mediosPagoCrear: (nombre) => ipcRenderer.invoke(IPC_CHANNELS.MEDIOS_PAGO_CREAR, nombre),
