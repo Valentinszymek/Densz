@@ -197,6 +197,10 @@ export function crearMetodosHttpComunes(http: HttpPrimitives): Omit<DenszApi, Me
     cuentasResumenMes: (odontologoId, periodo) => get(`/cuentas/${odontologoId}/resumen-mes${buildQuery(periodo)}`),
     cuentasResumenMesClinica: (clinicaId, periodo) =>
       get(`/cuentas/clinica/${clinicaId}/resumen-mes${buildQuery(periodo)}`),
+    cuentasDesglosePorMes: (odontologoId, periodo) =>
+      get(`/cuentas/${odontologoId}/desglose-por-mes${buildQuery(periodo)}`),
+    cuentasDesglosePorMesClinica: (clinicaId, periodo) =>
+      get(`/cuentas/clinica/${clinicaId}/desglose-por-mes${buildQuery(periodo)}`),
     // Genera el registro real (resumenes_mensuales) y sube el PDF a Storage
     // — el visor (platform-specific) es quien lo descarga y muestra.
     cuentasImprimirEstadoDeCuenta: (odontologoId, periodo) =>

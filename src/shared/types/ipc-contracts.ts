@@ -25,6 +25,7 @@ import type {
   MedioPago,
   MovimientoCuenta,
   BloqueCuentaMoneda,
+  PendienteMes,
   ImpresoraInfo,
   UsoCategoria,
   UsoPrestacion,
@@ -149,6 +150,8 @@ export const IPC_CHANNELS = {
   CUENTAS_MOVIMIENTOS_CLINICA: "cuentas:movimientosClinica",
   CUENTAS_RESUMEN_MES: "cuentas:resumenMes",
   CUENTAS_RESUMEN_MES_CLINICA: "cuentas:resumenMesClinica",
+  CUENTAS_DESGLOSE_POR_MES: "cuentas:desglosePorMes",
+  CUENTAS_DESGLOSE_POR_MES_CLINICA: "cuentas:desglosePorMesClinica",
   CUENTAS_IMPRIMIR_ESTADO: "cuentas:imprimirEstadoDeCuenta",
   CUENTAS_IMPRIMIR_ESTADO_CLINICA: "cuentas:imprimirEstadoDeCuentaClinica",
   CUENTAS_LISTAR_RESUMENES: "cuentas:listarResumenes",
@@ -445,6 +448,10 @@ export interface DenszApi {
   cuentasMovimientosClinica: (clinicaId: number) => Promise<MovimientoCuenta[]>;
   cuentasResumenMes: (odontologoId: number, periodo: PeriodoMesDto) => Promise<BloqueCuentaMoneda[]>;
   cuentasResumenMesClinica: (clinicaId: number, periodo: PeriodoMesDto) => Promise<BloqueCuentaMoneda[]>;
+  /** Cuánto queda pendiente, mes por mes, hasta (incluido) `periodo` —
+   * el desglose nuevo, distinto del saldo total acumulado de siempre. */
+  cuentasDesglosePorMes: (odontologoId: number, periodo: PeriodoMesDto) => Promise<PendienteMes[]>;
+  cuentasDesglosePorMesClinica: (clinicaId: number, periodo: PeriodoMesDto) => Promise<PendienteMes[]>;
   cuentasImprimirEstadoDeCuenta: (odontologoId: number, periodo: PeriodoMesDto) => Promise<ResumenMensual[]>;
   cuentasImprimirEstadoDeCuentaClinica: (clinicaId: number, periodo: PeriodoMesDto) => Promise<ResumenMensual[]>;
   cuentasListarResumenes: (odontologoId: number) => Promise<ResumenMensual[]>;
@@ -611,6 +618,10 @@ export interface DatosNuevoPagoDto {
   moneda: Moneda;
   medioPagoId: number;
   referencia?: string | null;
+  /** A qué mes corresponde este pago — ambos o ninguno. Elegido por quien
+   * lo registra, no necesariamente el mes de `fecha`. */
+  periodoAnio?: number | null;
+  periodoMes?: number | null;
 }
 
 export type ResultadoRegistrarPagoDto = { creado: true; pago: Pago } | { creado: false; posibleDuplicado: true };

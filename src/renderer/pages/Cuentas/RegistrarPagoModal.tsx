@@ -4,6 +4,7 @@ import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { FormField, Input } from "../../components/ui/Input";
 import { CurrencyInput } from "../../components/ui/CurrencyInput";
+import { SelectorMes } from "../../components/ui/SelectorMes";
 import { useMediosPago, useRegistrarPago } from "../../features/pagos/hooks";
 import { useOdontologo } from "../../features/odontologos/hooks";
 import type { Moneda } from "@shared/types/entities";
@@ -18,7 +19,8 @@ export function RegistrarPagoModal({
   open,
   onOpenChange,
   titular,
-  monedaSugerida
+  monedaSugerida,
+  periodoInicial
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -27,12 +29,19 @@ export function RegistrarPagoModal({
    * odontólogo): la pantalla que abre el modal ya sabe en qué moneda tiene
    * saldo esa clínica — sin esto, siempre caía en ARS por defecto. */
   monedaSugerida?: Moneda;
+  /** Mes al que se le precarga el pago — el mismo que ya estás mirando
+   * en Cuentas al tocar "Registrar pago" (pedido explícito: un pago no
+   * se reparte solo entre meses, lo elegís vos — ver SelectorMes abajo,
+   * que deja cambiarlo antes de guardar si corresponde a otro mes). */
+  periodoInicial: { anio: number; mes: number };
 }) {
   const [fecha, setFecha] = useState(hoyISO());
   const [importe, setImporte] = useState(0);
   const [moneda, setMoneda] = useState<Moneda>("ARS");
   const [medioPagoId, setMedioPagoId] = useState<number | null>(null);
   const [referencia, setReferencia] = useState("");
+  const [periodoAnio, setPeriodoAnio] = useState(periodoInicial.anio);
+  const [periodoMes, setPeriodoMes] = useState(periodoInicial.mes);
   const [advertenciaDuplicado, setAdvertenciaDuplicado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,11 +57,13 @@ export function RegistrarPagoModal({
       setMoneda(odontologo?.listaPrecioMoneda ?? monedaSugerida ?? "ARS");
       setMedioPagoId(medios?.[0]?.id ?? null);
       setReferencia("");
+      setPeriodoAnio(periodoInicial.anio);
+      setPeriodoMes(periodoInicial.mes);
       setAdvertenciaDuplicado(false);
       setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, odontologo, monedaSugerida]);
+  }, [open, odontologo, monedaSugerida, periodoInicial.anio, periodoInicial.mes]);
 
   async function enviar(confirmarDuplicado: boolean) {
     setError(null);
@@ -67,7 +78,9 @@ export function RegistrarPagoModal({
         importeCentavos: importe,
         moneda,
         medioPagoId,
-        referencia: referencia || null
+        referencia: referencia || null,
+        periodoAnio,
+        periodoMes
       },
       confirmarDuplicado
     });
@@ -119,6 +132,12 @@ export function RegistrarPagoModal({
             </div>
             <FormField label="Fecha">
               <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            </FormField>
+            <FormField label="¿A qué mes corresponde?">
+              <SelectorMes anio={periodoAnio} mes={periodoMes} onChange={(a, m) => { setPeriodoAnio(a); setPeriodoMes(m); }} />
+              <p className="mt-1 text-xs text-carbon/40">
+                No tiene que ser el mes de la fecha de arriba — si cobra hoy algo de un mes anterior, elegí ese mes.
+              </p>
             </FormField>
             <FormField label="Medio de pago">
               <select

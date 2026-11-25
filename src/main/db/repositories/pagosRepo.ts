@@ -14,6 +14,13 @@ interface FilaPago {
   anulado: number;
   motivo_anulacion: string | null;
   creado_por_nombre: string | null;
+  /** A qué mes corresponde este pago — elegido por la persona al
+   * registrarlo (no necesariamente el mes de `fecha`: alguien puede
+   * cobrar en noviembre algo que es de octubre). `NULL` en pagos
+   * registrados antes de que existiera este campo — ver cuentaService.ts
+   * para el criterio de respaldo (usar el mes de `fecha`) en ese caso. */
+  periodo_anio: number | null;
+  periodo_mes: number | null;
 }
 
 const SELECT_BASE = `
@@ -36,7 +43,9 @@ function mapear(f: FilaPago): Pago {
     referencia: f.referencia,
     anulado: f.anulado === 1,
     motivoAnulacion: f.motivo_anulacion,
-    creadoPorNombre: f.creado_por_nombre ?? undefined
+    creadoPorNombre: f.creado_por_nombre ?? undefined,
+    periodoAnio: f.periodo_anio,
+    periodoMes: f.periodo_mes
   };
 }
 
@@ -87,6 +96,10 @@ export interface DatosNuevoPago {
   medioPagoId: number;
   referencia?: string | null;
   creadoPor: number;
+  /** A qué mes corresponde este pago — ambos o ninguno. Opcional: un
+   * pago sin esto queda "sin mes asignado" (ver FilaPago.periodo_anio). */
+  periodoAnio?: number | null;
+  periodoMes?: number | null;
 }
 
 export async function existePagoSimilarReciente(db: Queryable, data: Omit<DatosNuevoPago, "creadoPor">): Promise<boolean> {
@@ -101,8 +114,8 @@ export async function existePagoSimilarReciente(db: Queryable, data: Omit<DatosN
 
 export async function insertarPago(db: Queryable, data: DatosNuevoPago): Promise<number> {
   const { rows } = await db.query<{ id: number }>(
-    `INSERT INTO pagos (odontologo_id, clinica_id, fecha, importe_centavos, moneda, medio_pago_id, referencia, creado_por)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    `INSERT INTO pagos (odontologo_id, clinica_id, fecha, importe_centavos, moneda, medio_pago_id, referencia, creado_por, periodo_anio, periodo_mes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
     [
       data.odontologoId,
       data.clinicaId,
@@ -111,7 +124,9 @@ export async function insertarPago(db: Queryable, data: DatosNuevoPago): Promise
       data.moneda,
       data.medioPagoId,
       data.referencia ?? null,
-      data.creadoPor
+      data.creadoPor,
+      data.periodoAnio ?? null,
+      data.periodoMes ?? null
     ]
   );
   return rows[0].id;

@@ -12,6 +12,7 @@ import {
   useSaldos,
   useMovimientos,
   useResumenMes,
+  useDesglosePorMes,
   useResumenesMensuales,
   useImprimirEstadoDeCuenta,
   useVerPdfResumen
@@ -32,6 +33,14 @@ const NOMBRES_MES = [
 
 const ESTADO_TRABAJO_TONO = { pendiente_facturar: "neutral", facturado: "exito", anulado: "error" } as const;
 const ESTADO_TRABAJO_LABEL = { pendiente_facturar: "Pendiente", facturado: "Facturado", anulado: "Anulado" } as const;
+
+/** Para no repetir el mes al lado de un pago cuando coincide con el mes de
+ * su propia fecha (ej. pagado el 5/11 y asignado a noviembre) — el cartel
+ * "→ Mes" solo aporta cuando de verdad son distintos (pagado en noviembre,
+ * asignado a octubre), que es justo el caso que esto existe para mostrar. */
+function esDelMismoMes(fechaIso: string, anio: number, mes: number): boolean {
+  return fechaIso.slice(0, 7) === `${anio}-${String(mes).padStart(2, "0")}`;
+}
 
 /**
  * El backend sigue devolviendo los trabajos ordenados por fecha ascendente
@@ -74,6 +83,7 @@ export default function CuentaDetalle() {
   const periodo = useMemo(() => ({ anio, mes }), [anio, mes]);
 
   const { data: bloques, isLoading: cargandoResumen } = useResumenMes(odontologoId, periodo);
+  const { data: desglosePorMes } = useDesglosePorMes(odontologoId, periodo);
   const { data: resumenesGenerados } = useResumenesMensuales(odontologoId);
   const resumenesDelMes = useMemo(
     () => (resumenesGenerados ?? []).filter((r) => r.anio === anio && r.mes === mes),
@@ -280,6 +290,37 @@ export default function CuentaDetalle() {
           </div>
         ))}
 
+      {desglosePorMes && desglosePorMes.length > 0 && (
+        <div className="mb-8">
+          <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-0.5">Desglose por mes</p>
+          <p className="text-xs text-carbon/40 mb-3">
+            Cuánto queda pendiente de cada mes, según el mes que le asignaste a cada pago — no necesariamente el mes en que se cobró.
+          </p>
+          <div className="rounded-lg border border-carbon/10 divide-y divide-carbon/10 overflow-hidden">
+            {desglosePorMes.map((d) => (
+              <div key={`${d.anio}-${d.mes}`} className="flex items-center justify-between px-4 py-2.5 bg-cream-card">
+                <p className="text-sm font-medium">
+                  {NOMBRES_MES[d.mes - 1]} {d.anio}
+                </p>
+                <div className="flex items-center gap-2">
+                  {d.porMoneda.map((p) =>
+                    p.saldoPendienteCentavos > 0 ? (
+                      <Badge key={p.moneda} tono="advertencia">
+                        Pendiente {formatearMoneda(p.saldoPendienteCentavos, p.moneda)}
+                      </Badge>
+                    ) : (
+                      <Badge key={p.moneda} tono="exito">
+                        Al día {p.moneda}
+                      </Badge>
+                    )
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2 mt-8">Pagos registrados</p>
       {pagos.length === 0 && <p className="text-sm text-carbon/40">Sin pagos todavía.</p>}
       {pagos.length > 0 && (
@@ -300,6 +341,11 @@ export default function CuentaDetalle() {
                 <Td>
                   {m.medioPagoNombre ?? m.descripcion}
                   <Badge tono="neutral" className="ml-2">{m.moneda}</Badge>
+                  {m.periodoMes != null && !esDelMismoMes(m.fecha, m.periodoAnio!, m.periodoMes) && (
+                    <Badge tono="gold" className="ml-2">
+                      → {NOMBRES_MES[m.periodoMes - 1]} {m.periodoAnio}
+                    </Badge>
+                  )}
                   {m.anulado && <Badge tono="error" className="ml-2">Anulado</Badge>}
                 </Td>
                 <Td className="text-carbon/60">{m.referencia || "—"}</Td>
@@ -357,7 +403,7 @@ export default function CuentaDetalle() {
         </Table>
       )}
 
-      <RegistrarPagoModal open={pagoAbierto} onOpenChange={setPagoAbierto} titular={{ odontologoId }} />
+      <RegistrarPagoModal open={pagoAbierto} onOpenChange={setPagoAbierto} titular={{ odontologoId }} periodoInicial={periodo} />
       {pagoAAnular !== null && (
         <AnularPagoModal open onOpenChange={(o) => !o && setPagoAAnular(null)} pagoId={pagoAAnular} />
       )}

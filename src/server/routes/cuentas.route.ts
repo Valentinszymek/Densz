@@ -11,7 +11,7 @@ import {
   tienePagosRegistrados
 } from "../../main/db/repositories/movimientosRepo";
 import { listarResumenesMensuales } from "../../main/db/repositories/resumenesMensualesRepo";
-import { calcularBloquesMes } from "../../main/services/cuentaService";
+import { calcularBloquesMes, listarDesglosePorMes } from "../../main/services/cuentaService";
 import { registrarAuditoria } from "../../main/db/repositories/auditoriaRepo";
 import { traducirErrorPostgres } from "../../main/utils/errors";
 import { PERMISOS } from "../../shared/constants/permisos";
@@ -112,6 +112,18 @@ export function crearRouterCuentas(db: Pool): Router {
     }
   });
 
+  router.get("/clinica/:clinicaId/desglose-por-mes", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
+    try {
+      const clinicaId = esquemaId.parse(req.params.clinicaId);
+      const periodo = esquemaPeriodo.parse(req.query);
+      res.json(await listarDesglosePorMes(db, { odontologoId: null, clinicaId }, periodo.anio, periodo.mes));
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   router.get("/clinica/:clinicaId/resumenes", ...requiereCuentas, async (req, res) => {
     const db = (req as unknown as RequestConTenantDb).db;
     try {
@@ -176,6 +188,18 @@ export function crearRouterCuentas(db: Pool): Router {
       const odontologoId = esquemaId.parse(req.params.odontologoId);
       const periodo = esquemaPeriodo.parse(req.query);
       res.json(await calcularBloquesMes(db, { odontologoId, clinicaId: null }, periodo.anio, periodo.mes));
+    } catch (err) {
+      const error = traducirErrorPostgres(err);
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  router.get("/:odontologoId/desglose-por-mes", ...requiereCuentas, async (req, res) => {
+    const db = (req as unknown as RequestConTenantDb).db;
+    try {
+      const odontologoId = esquemaId.parse(req.params.odontologoId);
+      const periodo = esquemaPeriodo.parse(req.query);
+      res.json(await listarDesglosePorMes(db, { odontologoId, clinicaId: null }, periodo.anio, periodo.mes));
     } catch (err) {
       const error = traducirErrorPostgres(err);
       res.status(400).json({ error: error.message });

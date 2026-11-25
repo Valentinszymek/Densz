@@ -21,6 +21,12 @@ export function registrarHandlersCuentas(): void {
   ipcMain.handle(IPC_CHANNELS.CUENTAS_RESUMEN_MES_CLINICA, (_e, clinicaId: number, periodo: PeriodoMesDto) =>
     apiClient.cuentasResumenMesClinica(clinicaId, periodo)
   );
+  ipcMain.handle(IPC_CHANNELS.CUENTAS_DESGLOSE_POR_MES, (_e, odontologoId: number, periodo: PeriodoMesDto) =>
+    apiClient.cuentasDesglosePorMes(odontologoId, periodo)
+  );
+  ipcMain.handle(IPC_CHANNELS.CUENTAS_DESGLOSE_POR_MES_CLINICA, (_e, clinicaId: number, periodo: PeriodoMesDto) =>
+    apiClient.cuentasDesglosePorMesClinica(clinicaId, periodo)
+  );
 
   // Antes abría el PDF en una ventana nativa de inmediato, apenas
   // generado; la UI compartida (useImprimirEstadoDeCuenta, igual en las

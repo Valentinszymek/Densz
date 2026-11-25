@@ -105,6 +105,51 @@ describe("pagoService", () => {
     expect(segundo.creado).toBe(true);
   });
 
+  it("guarda el mes elegido (periodoAnio/periodoMes) cuando se manda", async () => {
+    const { db, usuarioId } = ctx;
+    const resultado = await registrarPago(
+      db,
+      { odontologoId, fecha: "2026-11-15", importeCentavos: 500000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 10 },
+      usuarioId
+    );
+    if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
+    // Pagado en noviembre (fecha), pero asignado a octubre — justo el
+    // caso real que motivó esto: cobrar tarde algo de un mes anterior.
+    expect(resultado.pago.periodoAnio).toBe(2026);
+    expect(resultado.pago.periodoMes).toBe(10);
+    expect(resultado.pago.fecha).toBe("2026-11-15");
+  });
+
+  it("un pago sin mes elegido queda con periodoAnio/periodoMes en null (compatibilidad con lo ya cargado)", async () => {
+    const { db, usuarioId } = ctx;
+    const resultado = await registrarPago(
+      db,
+      { odontologoId, fecha: "2026-01-01", importeCentavos: 500000, moneda: "ARS", medioPagoId },
+      usuarioId
+    );
+    if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
+    expect(resultado.pago.periodoAnio).toBeNull();
+    expect(resultado.pago.periodoMes).toBeNull();
+  });
+
+  it("rechaza mandar el año sin el mes (o viceversa)", async () => {
+    const { db, usuarioId } = ctx;
+    await expect(
+      registrarPago(db, { odontologoId, fecha: "2026-01-01", importeCentavos: 500000, moneda: "ARS", medioPagoId, periodoAnio: 2026 }, usuarioId)
+    ).rejects.toThrow();
+  });
+
+  it("rechaza un mes fuera de 1-12", async () => {
+    const { db, usuarioId } = ctx;
+    await expect(
+      registrarPago(
+        db,
+        { odontologoId, fecha: "2026-01-01", importeCentavos: 500000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 13 },
+        usuarioId
+      )
+    ).rejects.toThrow();
+  });
+
   it("un pago en USD no se mezcla con el saldo en ARS: cada moneda tiene su propio saldo", async () => {
     const { db, usuarioId } = ctx;
     const listaDolares = await crearLista(db, { nombre: "Dólares", moneda: "USD" });

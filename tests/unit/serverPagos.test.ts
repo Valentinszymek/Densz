@@ -175,6 +175,34 @@ describe("HTTP /pagos", () => {
     expect(listado.body.some((p: { id: number }) => p.id === res.body.pago.id)).toBe(true);
   });
 
+  it("acepta periodoAnio/periodoMes y los devuelve en el pago creado", async () => {
+    const res = await request(app)
+      .post("/pagos")
+      .set("Cookie", cookieAdmin)
+      .send(datosPagoValido({ fecha: "2026-11-15", periodoAnio: 2026, periodoMes: 10 }));
+    expect(res.status).toBe(201);
+    expect(res.body.pago.periodoAnio).toBe(2026);
+    expect(res.body.pago.periodoMes).toBe(10);
+  });
+
+  it("sin periodoAnio/periodoMes, el pago queda con ambos en null (compatibilidad)", async () => {
+    const res = await request(app).post("/pagos").set("Cookie", cookieAdmin).send(datosPagoValido({ fecha: "2026-03-01" }));
+    expect(res.status).toBe(201);
+    expect(res.body.pago.periodoAnio).toBeNull();
+    expect(res.body.pago.periodoMes).toBeNull();
+  });
+
+  it("rechaza (400) un periodoMes fuera de 1-12, sin registrar nada", async () => {
+    const antes = await request(app).get(`/pagos?odontologoId=${odontologoId}`).set("Cookie", cookieAdmin);
+    const res = await request(app)
+      .post("/pagos")
+      .set("Cookie", cookieAdmin)
+      .send(datosPagoValido({ fecha: "2026-03-02", periodoAnio: 2026, periodoMes: 0 }));
+    expect(res.status).toBe(400);
+    const despues = await request(app).get(`/pagos?odontologoId=${odontologoId}`).set("Cookie", cookieAdmin);
+    expect(despues.body.length).toBe(antes.body.length);
+  });
+
   // --- 6. POST con payload inválido → 400 ---
   it("rechaza un payload inválido (400) sin registrar nada", async () => {
     const antes = await request(app).get(`/pagos?odontologoId=${odontologoId}`).set("Cookie", cookieAdmin);

@@ -312,6 +312,20 @@ export interface Pago {
   anulado: boolean;
   motivoAnulacion?: string | null;
   creadoPorNombre?: string;
+  /** Mes al que corresponde este pago, elegido por quien lo registró —
+   * no necesariamente el mes de `fecha` (se puede cobrar en noviembre
+   * algo de octubre). `null` en pagos de antes de que existiera esto. */
+  periodoAnio: number | null;
+  periodoMes: number | null;
+}
+
+/** Cuánto queda pendiente de UN mes puntual, por moneda — el "desglose
+ * por mes" de Cuentas (distinto del saldo total acumulado de siempre). */
+export interface PendienteMes {
+  anio: number;
+  /** 1-12 */
+  mes: number;
+  porMoneda: Array<{ moneda: Moneda; saldoPendienteCentavos: number }>;
 }
 
 export interface PagoConOdontologo extends Pago {
@@ -339,6 +353,11 @@ export interface MovimientoCuenta {
    * movimiento (OT facturada, deuda agregada a mano). */
   medioPagoNombre?: string | null;
   referencia?: string | null;
+  /** Solo en un "haber" (pago) — a qué mes lo asignó quien lo registró.
+   * `null` en un pago de antes de que existiera esto, o en cualquier
+   * movimiento que no sea un pago. */
+  periodoAnio?: number | null;
+  periodoMes?: number | null;
 }
 
 /** Una OT facturada en un mes concreto, para el detalle de la cuenta y el

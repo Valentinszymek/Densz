@@ -41,6 +41,12 @@ export async function registrarPago(
   if (data.odontologoId && data.clinicaId) {
     throw new DenszError("Un pago es de un odontólogo o de una clínica, no de ambos.");
   }
+  if ((data.periodoAnio == null) !== (data.periodoMes == null)) {
+    throw new DenszError("El mes del pago quedó incompleto — indicá año y mes, o ninguno de los dos.");
+  }
+  if (data.periodoMes != null && (data.periodoMes < 1 || data.periodoMes > 12)) {
+    throw new DenszError("El mes del pago tiene que ser un número entre 1 y 12.");
+  }
   if (!confirmarDuplicado && (await existePagoSimilarReciente(pool, data))) {
     return { creado: false, posibleDuplicado: true };
   }
@@ -54,7 +60,9 @@ export async function registrarPago(
       importeCentavos: data.importeCentavos,
       moneda: data.moneda,
       fecha: data.fecha,
-      descripcion: "Pago recibido"
+      descripcion: "Pago recibido",
+      periodoAnio: data.periodoAnio,
+      periodoMes: data.periodoMes
     });
     await registrarAuditoria(db, {
       usuarioId,

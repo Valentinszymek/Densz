@@ -9,7 +9,12 @@ import { generarComprobante } from "../../src/main/services/comprobanteService";
 import { registrarPago } from "../../src/main/services/pagoService";
 import { registrarDeuda } from "../../src/main/services/deudaService";
 import { listarMediosPago } from "../../src/main/db/repositories/pagosRepo";
-import { generarPdfEstadoCuenta, generarPdfEstadoCuentaClinica, calcularBloquesMes } from "../../src/main/services/cuentaService";
+import {
+  generarPdfEstadoCuenta,
+  generarPdfEstadoCuentaClinica,
+  calcularBloquesMes,
+  listarDesglosePorMes
+} from "../../src/main/services/cuentaService";
 import { listarResumenesMensuales } from "../../src/main/db/repositories/resumenesMensualesRepo";
 
 const pdfFalso = async () => {};
@@ -465,5 +470,66 @@ describe("cuentaService", () => {
     });
     expect(htmlCapturado).toContain("9.000,00");
     expect(htmlCapturado).not.toContain("15.000,00");
+  });
+
+  // Caso real que motivó el desglose por mes: el odontólogo debe $958.000
+  // de octubre y paga $950.000 recién en noviembre — pero ese pago se
+  // asigna (a mano, por quien lo registra) a octubre, no a noviembre.
+  it("un pago hecho en noviembre pero asignado a octubre reduce el pendiente de OCTUBRE, no el de noviembre", async () => {
+    ctx = await createTestDbConUsuario();
+    const { db, usuarioId } = ctx as TestDb & { usuarioId: number };
+    const listaId = await idListaGeneral(db);
+    const odontologoId = await crearOdontologo(db, { nombre: "Dr. Octubre", listaPrecioId: listaId });
+    const titular = { odontologoId, clinicaId: null };
+    const medioPagoId = (await listarMediosPago(db))[0].id;
+
+    await registrarDeuda(db, { odontologoId, importeCentavos: 9580000, moneda: "ARS", fecha: "2026-10-05", descripcion: "Trabajo de octubre" }, usuarioId);
+    await registrarDeuda(db, { odontologoId, importeCentavos: 4390000, moneda: "ARS", fecha: "2026-11-10", descripcion: "Trabajo de noviembre" }, usuarioId);
+    await registrarPago(
+      db,
+      { odontologoId, fecha: "2026-11-15", importeCentavos: 9500000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 10 },
+      usuarioId
+    );
+
+    const bloquesOctubre = await calcularBloquesMes(db, titular, 2026, 10);
+    const octubreArs = bloquesOctubre.find((b) => b.moneda === "ARS")!;
+    expect(octubreArs.totalPagosCentavos).toBe(9500000);
+    expect(octubreArs.saldoPendienteCentavos).toBe(80000); // 9.580.000 - 9.500.000
+
+    const bloquesNoviembre = await calcularBloquesMes(db, titular, 2026, 11);
+    const noviembreArs = bloquesNoviembre.find((b) => b.moneda === "ARS")!;
+    // Clave: el pago NO cuenta como "de noviembre" (periodoMes=10), así
+    // que pagosDelMes de noviembre queda en 0 — pero el saldo anterior
+    // SÍ tiene que reflejar que ese pago ya bajó la deuda de octubre
+    // (si no, estos $950.000 "desaparecerían" del cálculo acumulado).
+    expect(noviembreArs.totalPagosCentavos).toBe(0);
+    expect(noviembreArs.saldoAnteriorCentavos).toBe(80000); // lo que quedó pendiente de octubre
+    expect(noviembreArs.saldoPendienteCentavos).toBe(80000 + 4390000);
+  });
+
+  it("listarDesglosePorMes devuelve el pendiente real de cada mes, no el total mezclado", async () => {
+    ctx = await createTestDbConUsuario();
+    const { db, usuarioId } = ctx as TestDb & { usuarioId: number };
+    const listaId = await idListaGeneral(db);
+    const odontologoId = await crearOdontologo(db, { nombre: "Dr. Desglose", listaPrecioId: listaId });
+    const titular = { odontologoId, clinicaId: null };
+    const medioPagoId = (await listarMediosPago(db))[0].id;
+
+    await registrarDeuda(db, { odontologoId, importeCentavos: 9580000, moneda: "ARS", fecha: "2026-10-05", descripcion: "Trabajo de octubre" }, usuarioId);
+    await registrarDeuda(db, { odontologoId, importeCentavos: 4390000, moneda: "ARS", fecha: "2026-11-10", descripcion: "Trabajo de noviembre" }, usuarioId);
+    await registrarPago(
+      db,
+      { odontologoId, fecha: "2026-11-15", importeCentavos: 9500000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 10 },
+      usuarioId
+    );
+
+    const desglose = await listarDesglosePorMes(db, titular, 2026, 11, 3);
+    expect(desglose.map((d) => `${d.anio}-${d.mes}`)).toEqual(["2026-9", "2026-10", "2026-11"]);
+
+    const octubre = desglose.find((d) => d.anio === 2026 && d.mes === 10)!;
+    expect(octubre.porMoneda.find((p) => p.moneda === "ARS")?.saldoPendienteCentavos).toBe(80000);
+
+    const noviembre = desglose.find((d) => d.anio === 2026 && d.mes === 11)!;
+    expect(noviembre.porMoneda.find((p) => p.moneda === "ARS")?.saldoPendienteCentavos).toBe(80000 + 4390000);
   });
 });

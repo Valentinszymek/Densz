@@ -28,9 +28,17 @@ const esquemaPago = z
     importeCentavos: z.number().int().positive("El importe debe ser mayor a cero."),
     moneda: z.enum(["ARS", "USD"]),
     medioPagoId: z.number().int().positive(),
-    referencia: z.string().trim().max(200).nullable().optional()
+    referencia: z.string().trim().max(200).nullable().optional(),
+    periodoAnio: z.number().int().positive().nullable().optional(),
+    periodoMes: z.number().int().min(1).max(12).nullable().optional()
   })
-  .transform((d) => ({ ...d, odontologoId: d.odontologoId ?? null, clinicaId: d.clinicaId ?? null }));
+  .transform((d) => ({
+    ...d,
+    odontologoId: d.odontologoId ?? null,
+    clinicaId: d.clinicaId ?? null,
+    periodoAnio: d.periodoAnio ?? null,
+    periodoMes: d.periodoMes ?? null
+  }));
 
 const esquemaMotivo = z.string().trim().min(3, "Ingresá un motivo de al menos 3 caracteres.");
 

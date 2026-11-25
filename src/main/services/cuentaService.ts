@@ -23,7 +23,8 @@ import type {
   Moneda,
   BloqueCuentaMoneda,
   ResumenMensual,
-  MovimientoCuenta
+  MovimientoCuenta,
+  PendienteMes
 } from "../../shared/types/entities";
 
 type GenerarPdf = (html: string, outputPath: string) => Promise<void>;
@@ -35,6 +36,19 @@ function validarMes(mes: number): void {
 function esDelPeriodo(fechaIso: string, anio: number, mes: number): boolean {
   const prefijo = `${anio}-${String(mes).padStart(2, "0")}`;
   return fechaIso.slice(0, 7) === prefijo;
+}
+
+/** A qué mes corresponde un pago para el desglose de Cuentas: el mes que
+ * la persona eligió al registrarlo (`periodoAnio`/`periodoMes`), nunca el
+ * de `fecha` — cobrar en noviembre algo de octubre tiene que seguir
+ * contando para octubre. Los pagos de antes de que existiera este campo
+ * (sin período asignado) usan el mes de su `fecha` como respaldo, igual
+ * que se comportaba todo el sistema hasta ahora. */
+function esPagoDelPeriodo(pago: Pago, anio: number, mes: number): boolean {
+  if (pago.periodoAnio != null && pago.periodoMes != null) {
+    return pago.periodoAnio === anio && pago.periodoMes === mes;
+  }
+  return esDelPeriodo(pago.fecha, anio, mes);
 }
 
 /**
@@ -62,7 +76,7 @@ export async function calcularBloquesMes(db: Queryable, titular: TitularCuenta, 
     listarDeudasManualesDelPeriodo(db, titular, anio, mes)
   ]);
 
-  const pagosDelMes = todosLosPagos.filter((p) => esDelPeriodo(p.fecha, anio, mes));
+  const pagosDelMes = todosLosPagos.filter((p) => esPagoDelPeriodo(p, anio, mes));
 
   const monedas = new Set<Moneda>([
     ...saldoAnteriorPorMoneda.keys(),
@@ -92,6 +106,47 @@ export async function calcularBloquesMes(db: Queryable, titular: TitularCuenta, 
       saldoPendienteCentavos: saldoAnterior + totalTrabajos + totalDeudasManuales - totalPagos
     };
   });
+}
+
+/**
+ * Desglose de "cuánto queda pendiente" mes por mes, para los últimos
+ * `cantidadMeses` (incluido `anio`/`mes`) — reutiliza `calcularBloquesMes`
+ * (la MISMA función que ya alimenta la pantalla de Cuentas y el PDF) para
+ * cada mes, así nunca hay una cuenta distinta para lo mismo. Devuelve del
+ * mes más viejo al más nuevo.
+ */
+export async function listarDesglosePorMes(
+  db: Queryable,
+  titular: TitularCuenta,
+  anio: number,
+  mes: number,
+  cantidadMeses = 6
+): Promise<PendienteMes[]> {
+  validarMes(mes);
+
+  const periodos: Array<{ anio: number; mes: number }> = [];
+  let a = anio;
+  let m = mes;
+  for (let i = 0; i < cantidadMeses; i++) {
+    periodos.push({ anio: a, mes: m });
+    m -= 1;
+    if (m === 0) {
+      m = 12;
+      a -= 1;
+    }
+  }
+
+  const resultados = await Promise.all(
+    periodos.map(async (p): Promise<PendienteMes> => {
+      const bloques = await calcularBloquesMes(db, titular, p.anio, p.mes);
+      return {
+        anio: p.anio,
+        mes: p.mes,
+        porMoneda: bloques.map((b) => ({ moneda: b.moneda, saldoPendienteCentavos: b.saldoPendienteCentavos }))
+      };
+    })
+  );
+  return resultados.reverse();
 }
 
 async function generarResumen(

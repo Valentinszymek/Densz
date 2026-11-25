@@ -112,6 +112,9 @@ const api: DenszApi = {
   cuentasMovimientosClinica: (clinicaId) => ipcRenderer.invoke(IPC_CHANNELS.CUENTAS_MOVIMIENTOS_CLINICA, clinicaId),
   cuentasResumenMes: (odontologoId, periodo) => ipcRenderer.invoke(IPC_CHANNELS.CUENTAS_RESUMEN_MES, odontologoId, periodo),
   cuentasResumenMesClinica: (clinicaId, periodo) => ipcRenderer.invoke(IPC_CHANNELS.CUENTAS_RESUMEN_MES_CLINICA, clinicaId, periodo),
+  cuentasDesglosePorMes: (odontologoId, periodo) => ipcRenderer.invoke(IPC_CHANNELS.CUENTAS_DESGLOSE_POR_MES, odontologoId, periodo),
+  cuentasDesglosePorMesClinica: (clinicaId, periodo) =>
+    ipcRenderer.invoke(IPC_CHANNELS.CUENTAS_DESGLOSE_POR_MES_CLINICA, clinicaId, periodo),
   cuentasImprimirEstadoDeCuenta: (odontologoId, periodo) =>
     ipcRenderer.invoke(IPC_CHANNELS.CUENTAS_IMPRIMIR_ESTADO, odontologoId, periodo),
   cuentasImprimirEstadoDeCuentaClinica: (clinicaId, periodo) =>

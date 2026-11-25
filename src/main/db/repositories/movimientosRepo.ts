@@ -35,12 +35,34 @@ export async function registrarMovimientoDebe(
 
 export async function registrarMovimientoHaber(
   db: Queryable,
-  data: TitularCuenta & { pagoId: number; importeCentavos: number; moneda: Moneda; fecha: string; descripcion: string }
+  data: TitularCuenta & {
+    pagoId: number;
+    importeCentavos: number;
+    moneda: Moneda;
+    fecha: string;
+    descripcion: string;
+    /** Mismo criterio que pagos.periodo_anio/periodo_mes — se graba acá
+     * también (redundante a propósito, mismo patrón que `moneda`) para
+     * que calcularSaldoAnteriorAlPeriodo pueda usarlo sin tener que salir
+     * a buscarlo a la tabla `pagos`. */
+    periodoAnio?: number | null;
+    periodoMes?: number | null;
+  }
 ): Promise<void> {
   await db.query(
-    `INSERT INTO movimientos_cuenta (odontologo_id, clinica_id, tipo, pago_id, importe_centavos, moneda, fecha, descripcion)
-     VALUES ($1, $2, 'haber', $3, $4, $5, $6, $7)`,
-    [data.odontologoId, data.clinicaId, data.pagoId, data.importeCentavos, data.moneda, data.fecha, data.descripcion]
+    `INSERT INTO movimientos_cuenta (odontologo_id, clinica_id, tipo, pago_id, importe_centavos, moneda, fecha, descripcion, periodo_anio, periodo_mes)
+     VALUES ($1, $2, 'haber', $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      data.odontologoId,
+      data.clinicaId,
+      data.pagoId,
+      data.importeCentavos,
+      data.moneda,
+      data.fecha,
+      data.descripcion,
+      data.periodoAnio ?? null,
+      data.periodoMes ?? null
+    ]
   );
 }
 
@@ -280,6 +302,8 @@ interface FilaMovimiento {
   anulado: number;
   medio_pago_nombre: string | null;
   referencia: string | null;
+  periodo_anio: number | null;
+  periodo_mes: number | null;
 }
 
 /** JOIN compartido por todas las lecturas de movimientos: además de la OT
@@ -310,7 +334,9 @@ function mapearMovimiento(f: FilaMovimiento): MovimientoCuenta {
     descripcion: f.descripcion,
     anulado: f.anulado === 1,
     medioPagoNombre: f.medio_pago_nombre,
-    referencia: f.referencia
+    referencia: f.referencia,
+    periodoAnio: f.periodo_anio,
+    periodoMes: f.periodo_mes
   };
 }
 
@@ -477,10 +503,13 @@ function primerDiaDelMes(anio: number, mes: number): string {
 
 /** Saldo (DEBE no anulado − HABER no anulado, agrupado por moneda) de
  * TODO lo anterior al primer día de `anio`/`mes` — el "saldo anterior" que
- * arrastra el resumen mensual. Usa el mismo criterio de fecha que el
- * detalle del mes (fecha de facturación del comprobante para el DEBE de
- * una OT real, fecha del pago para el HABER), para que ningún movimiento
- * quede contado dos veces ni se pierda entre un período y el siguiente.
+ * arrastra el resumen mensual. El DEBE usa la fecha de facturación del
+ * comprobante; el HABER usa el MES ELEGIDO al cobrar (periodo_anio/
+ * periodo_mes — ver registrarMovimientoHaber), no la fecha real del
+ * cobro, para que un pago hecho en noviembre pero asignado a octubre siga
+ * contando como deuda de octubre y no se "cuele" a noviembre. Un pago
+ * sin período asignado (de antes de que existiera este campo) usa su
+ * `fecha` como respaldo, igual que antes.
  *
  * El DEBE incluye, además de las OTs facturadas, las "deudas" agregadas a
  * mano sin ninguna orden detrás (ver deudaService.ts — típicamente el
@@ -515,12 +544,22 @@ export async function calcularSaldoAnteriorAlPeriodo(
        GROUP BY moneda`,
       [idTitular, limite]
     ),
+    // "Antes del período" para un HABER usa el mes ELEGIDO al cobrar
+    // (periodo_anio/periodo_mes), no la fecha real del cobro — a
+    // propósito: cobrar en noviembre algo de octubre tiene que seguir
+    // contando como deuda de octubre, nunca "colarse" al mes en que se
+    // cobró. Los pagos de antes de que existiera este campo (NULL) usan
+    // la fecha como respaldo, igual que siempre.
     db.query<{ moneda: Moneda; total: number }>(
       `SELECT moneda, SUM(importe_centavos) AS total
        FROM movimientos_cuenta
-       WHERE tipo = 'haber' AND anulado = 0 AND ${columnaTitular} = $1 AND fecha < $2
+       WHERE tipo = 'haber' AND anulado = 0 AND ${columnaTitular} = $1
+         AND (
+           (periodo_anio IS NOT NULL AND (periodo_anio, periodo_mes) < ($3, $4))
+           OR (periodo_anio IS NULL AND fecha < $2)
+         )
        GROUP BY moneda`,
-      [idTitular, limite]
+      [idTitular, limite, anio, mes]
     )
   ]);
 

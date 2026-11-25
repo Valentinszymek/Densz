@@ -71,6 +71,24 @@ export function useResumenMesClinica(clinicaId: number | undefined, periodo: Per
   });
 }
 
+/** Cuánto queda pendiente, mes por mes — el desglose nuevo, pensado para
+ * contestar "¿qué me debe de octubre?" sin mezclarlo con otros meses. */
+export function useDesglosePorMes(odontologoId: number | undefined, periodo: PeriodoMesDto) {
+  return useQuery({
+    queryKey: [CLAVE, "desglose-por-mes", odontologoId, periodo.anio, periodo.mes],
+    queryFn: () => window.densz.cuentasDesglosePorMes(odontologoId!, periodo),
+    enabled: odontologoId !== undefined
+  });
+}
+
+export function useDesglosePorMesClinica(clinicaId: number | undefined, periodo: PeriodoMesDto) {
+  return useQuery({
+    queryKey: [CLAVE, "desglose-por-mes-clinica", clinicaId, periodo.anio, periodo.mes],
+    queryFn: () => window.densz.cuentasDesglosePorMesClinica(clinicaId!, periodo),
+    enabled: clinicaId !== undefined
+  });
+}
+
 export function useResumenesMensuales(odontologoId: number | undefined) {
   return useQuery({
     queryKey: [CLAVE, "resumenes", odontologoId],
