@@ -257,37 +257,6 @@ export default function CuentaDetalle() {
           </div>
         ))}
 
-      {desglosePorMes && desglosePorMes.length > 0 && (
-        <div className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-0.5">Desglose por mes</p>
-          <p className="text-xs text-carbon/40 mb-3">
-            Cuánto queda pendiente de cada mes, según el mes que le asignaste a cada pago — no necesariamente el mes en que se cobró.
-          </p>
-          <div className="rounded-lg border border-carbon/10 divide-y divide-carbon/10 overflow-hidden">
-            {desglosePorMes.map((d) => (
-              <div key={`${d.anio}-${d.mes}`} className="flex items-center justify-between px-4 py-2.5 bg-cream-card">
-                <p className="text-sm font-medium">
-                  {NOMBRES_MES[d.mes - 1]} {d.anio}
-                </p>
-                <div className="flex items-center gap-2">
-                  {d.porMoneda.map((p) =>
-                    p.saldoPendienteCentavos > 0 ? (
-                      <Badge key={p.moneda} tono="advertencia">
-                        Pendiente {formatearMoneda(p.saldoPendienteCentavos, p.moneda)}
-                      </Badge>
-                    ) : (
-                      <Badge key={p.moneda} tono="exito">
-                        Al día {p.moneda}
-                      </Badge>
-                    )
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2 mt-8">Pagos registrados</p>
       {pagos.length === 0 && <p className="text-sm text-carbon/40">Sin pagos todavía.</p>}
       {pagos.length > 0 && (
@@ -328,6 +297,37 @@ export default function CuentaDetalle() {
             ))}
           </Tbody>
         </Table>
+      )}
+
+      {desglosePorMes && desglosePorMes.length > 0 && (
+        <div className="mb-8 mt-8">
+          <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-0.5">Desglose por mes</p>
+          <p className="text-xs text-carbon/40 mb-3">
+            Cuánto queda pendiente de cada mes, según el mes que le asignaste a cada pago — no necesariamente el mes en que se cobró.
+          </p>
+          <div className="rounded-lg border border-carbon/10 divide-y divide-carbon/10 overflow-hidden">
+            {desglosePorMes.map((d) => (
+              <div key={`${d.anio}-${d.mes}`} className="flex items-center justify-between px-4 py-2.5 bg-cream-card">
+                <p className="text-sm font-medium">
+                  {NOMBRES_MES[d.mes - 1]} {d.anio}
+                </p>
+                <div className="flex items-center gap-2">
+                  {d.porMoneda.map((p) =>
+                    p.saldoPendienteCentavos > 0 ? (
+                      <Badge key={p.moneda} tono="advertencia">
+                        Pendiente {formatearMoneda(p.saldoPendienteCentavos, p.moneda)}
+                      </Badge>
+                    ) : (
+                      <Badge key={p.moneda} tono="exito">
+                        Al día {p.moneda}
+                      </Badge>
+                    )
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2 mt-8">Deudas agregadas</p>
