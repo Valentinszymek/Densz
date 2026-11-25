@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Wallet, FileBarChart, Ban, FileText, CircleDollarSign, Pencil } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Table, Thead, Tbody, Tr, Th, Td } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
@@ -147,39 +146,7 @@ export default function CuentaDetalle() {
         <p className="text-sm text-carbon/40 mb-6">Sin movimientos todavía.</p>
       )}
 
-      {(saldos ?? []).map((s) => (
-        <div key={s.moneda} className="mb-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2">{s.moneda}</p>
-          <div className="grid grid-cols-3 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Debe (total facturado)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-display">{formatearMoneda(s.totalDebeCentavos, s.moneda)}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Haber (total pagado)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-display text-emerald-700">{formatearMoneda(s.totalHaberCentavos, s.moneda)}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Saldo pendiente</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-display text-amber-700">{formatearMoneda(s.saldoCentavos, s.moneda)}</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      ))}
-
-      <div className="flex items-center justify-between mt-8 mb-3 flex-wrap gap-2">
+      <div className="flex items-center justify-between mt-2 mb-3 flex-wrap gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40">Trabajos facturados</p>
           <p className="text-xs text-carbon/40 mt-0.5">Todos los trabajos que componen la deuda de este período.</p>
@@ -202,22 +169,22 @@ export default function CuentaDetalle() {
           <div key={b.moneda} className="mb-8">
             {bloques.length > 1 && <Badge tono="neutral" className="mb-2">{b.moneda}</Badge>}
 
-            <div className="grid grid-cols-4 gap-3 mb-4">
-              <div className="rounded-lg border border-carbon/10 px-3 py-2.5">
-                <p className="text-[10px] uppercase tracking-wide text-carbon/40">Saldo anterior</p>
-                <p className="text-base font-semibold mt-0.5">{formatearMoneda(b.saldoAnteriorCentavos, b.moneda)}</p>
-              </div>
+            <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="rounded-lg border border-carbon/10 px-3 py-2.5">
                 <p className="text-[10px] uppercase tracking-wide text-carbon/40">Trabajos del mes</p>
-                <p className="text-base font-semibold mt-0.5">{formatearMoneda(b.totalTrabajosCentavos, b.moneda)}</p>
+                <p className="text-base font-semibold mt-0.5">
+                  {formatearMoneda(b.totalTrabajosCentavos + b.totalDeudasManualesCentavos, b.moneda)}
+                </p>
               </div>
               <div className="rounded-lg border border-carbon/10 px-3 py-2.5">
                 <p className="text-[10px] uppercase tracking-wide text-carbon/40">Pagos del mes</p>
                 <p className="text-base font-semibold mt-0.5 text-emerald-700">{formatearMoneda(b.totalPagosCentavos, b.moneda)}</p>
               </div>
               <div className="rounded-lg border border-gold/30 bg-gold/5 px-3 py-2.5">
-                <p className="text-[10px] uppercase tracking-wide text-gold-dim">Saldo pendiente</p>
-                <p className="text-base font-semibold mt-0.5 text-gold-dim">{formatearMoneda(b.saldoPendienteCentavos, b.moneda)}</p>
+                <p className="text-[10px] uppercase tracking-wide text-gold-dim">Pendiente de este mes</p>
+                <p className="text-base font-semibold mt-0.5 text-gold-dim">
+                  {formatearMoneda(b.totalTrabajosCentavos + b.totalDeudasManualesCentavos - b.totalPagosCentavos, b.moneda)}
+                </p>
               </div>
             </div>
 

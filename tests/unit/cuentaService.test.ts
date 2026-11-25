@@ -529,7 +529,9 @@ describe("cuentaService", () => {
     const octubre = desglose.find((d) => d.anio === 2026 && d.mes === 10)!;
     expect(octubre.porMoneda.find((p) => p.moneda === "ARS")?.saldoPendienteCentavos).toBe(80000);
 
+    // A propósito, NUNCA arrastra lo de octubre: cada mes es autónomo
+    // (pedido explícito — "no hagas más total de nada, hacelo por mes").
     const noviembre = desglose.find((d) => d.anio === 2026 && d.mes === 11)!;
-    expect(noviembre.porMoneda.find((p) => p.moneda === "ARS")?.saldoPendienteCentavos).toBe(80000 + 4390000);
+    expect(noviembre.porMoneda.find((p) => p.moneda === "ARS")?.saldoPendienteCentavos).toBe(4390000);
   });
 });

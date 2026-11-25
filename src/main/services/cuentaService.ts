@@ -142,7 +142,14 @@ export async function listarDesglosePorMes(
       return {
         anio: p.anio,
         mes: p.mes,
-        porMoneda: bloques.map((b) => ({ moneda: b.moneda, saldoPendienteCentavos: b.saldoPendienteCentavos }))
+        // A propósito, NUNCA b.saldoPendienteCentavos (ese arrastra el saldo
+        // de meses anteriores — justo lo que este desglose existe para
+        // evitar). Cada mes muestra solo lo suyo: lo facturado ese mes
+        // (OTs + deudas manuales) menos lo que se le asignó a ese mes.
+        porMoneda: bloques.map((b) => ({
+          moneda: b.moneda,
+          saldoPendienteCentavos: b.totalTrabajosCentavos + b.totalDeudasManualesCentavos - b.totalPagosCentavos
+        }))
       };
     })
   );
