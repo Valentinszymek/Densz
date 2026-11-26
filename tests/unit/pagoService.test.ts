@@ -3,6 +3,7 @@ import { createTestDbConUsuario, idListaGeneral, type TestDb } from "../helpers/
 import { crearOdontologo } from "../../src/main/db/repositories/odontologosRepo";
 import { crearLista } from "../../src/main/db/repositories/listasPrecioRepo";
 import { registrarPago, editarPago, anularPago } from "../../src/main/services/pagoService";
+import { registrarDeuda } from "../../src/main/services/deudaService";
 import { obtenerSaldos, listarMovimientos } from "../../src/main/db/repositories/movimientosRepo";
 import { listarMediosPago } from "../../src/main/db/repositories/pagosRepo";
 
@@ -219,5 +220,132 @@ describe("pagoService", () => {
     expect(saldos).toHaveLength(1);
     expect(saldos[0].moneda).toBe("USD");
     expect(saldos[0].totalHaberCentavos).toBe(10000);
+  });
+
+  describe("sobrante automático (el pago excede lo pendiente del mes elegido)", () => {
+    it("un pago exacto al pendiente del mes no genera ningún pago adicional", async () => {
+      const { db, usuarioId } = ctx;
+      await registrarDeuda(
+        db,
+        { odontologoId, importeCentavos: 900000, moneda: "ARS", fecha: "2026-10-05", descripcion: "Trabajo de octubre" },
+        usuarioId
+      );
+      const resultado = await registrarPago(
+        db,
+        { odontologoId, fecha: "2026-10-20", importeCentavos: 900000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 10 },
+        usuarioId
+      );
+      if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
+      expect(resultado.pago.importeCentavos).toBe(900000);
+      expect(resultado.pagosAdicionales).toHaveLength(0);
+    });
+
+    it("el sobrante del mes elegido pasa solo al próximo mes con saldo pendiente, con referencia clara", async () => {
+      const { db, usuarioId } = ctx;
+      await registrarDeuda(
+        db,
+        { odontologoId, importeCentavos: 900000, moneda: "ARS", fecha: "2026-10-05", descripcion: "Trabajo de octubre" },
+        usuarioId
+      );
+      await registrarDeuda(
+        db,
+        { odontologoId, importeCentavos: 200000, moneda: "ARS", fecha: "2026-11-05", descripcion: "Trabajo de noviembre" },
+        usuarioId
+      );
+
+      // Paga $1.000.000 "para hacer redondo" sobre una deuda de octubre de
+      // $900.000 — exactamente el ejemplo que dio el dueño del producto.
+      const resultado = await registrarPago(
+        db,
+        { odontologoId, fecha: "2026-10-20", importeCentavos: 1000000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 10 },
+        usuarioId
+      );
+      if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
+
+      expect(resultado.pago.importeCentavos).toBe(900000);
+      expect(resultado.pago.periodoAnio).toBe(2026);
+      expect(resultado.pago.periodoMes).toBe(10);
+
+      expect(resultado.pagosAdicionales).toHaveLength(1);
+      const sobrante = resultado.pagosAdicionales[0];
+      expect(sobrante.importeCentavos).toBe(100000);
+      expect(sobrante.periodoAnio).toBe(2026);
+      expect(sobrante.periodoMes).toBe(11);
+      expect(sobrante.referencia).toBe("Sobrante de Octubre 2026");
+
+      // Noviembre queda con $100.000 pendiente ($200.000 - $100.000 ya cubiertos).
+      const movimientos = await listarMovimientos(db, odontologoId);
+      const haberNoviembre = movimientos.find((m) => m.tipo === "haber" && m.periodoMes === 11 && !m.anulado);
+      expect(haberNoviembre?.importeCentavos).toBe(100000);
+    });
+
+    it("si noviembre ya está todo pago, el sobrante salta directo a diciembre", async () => {
+      const { db, usuarioId } = ctx;
+      await registrarDeuda(
+        db,
+        { odontologoId, importeCentavos: 900000, moneda: "ARS", fecha: "2026-10-05", descripcion: "Trabajo de octubre" },
+        usuarioId
+      );
+      // Noviembre: deuda y pago ya se cancelan entre sí — queda en $0.
+      await registrarDeuda(
+        db,
+        { odontologoId, importeCentavos: 200000, moneda: "ARS", fecha: "2026-11-05", descripcion: "Trabajo de noviembre" },
+        usuarioId
+      );
+      await registrarPago(
+        db,
+        { odontologoId, fecha: "2026-11-05", importeCentavos: 200000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 11 },
+        usuarioId
+      );
+      await registrarDeuda(
+        db,
+        { odontologoId, importeCentavos: 300000, moneda: "ARS", fecha: "2026-12-05", descripcion: "Trabajo de diciembre" },
+        usuarioId
+      );
+
+      const resultado = await registrarPago(
+        db,
+        { odontologoId, fecha: "2026-10-20", importeCentavos: 1000000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 10 },
+        usuarioId
+      );
+      if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
+
+      expect(resultado.pago.importeCentavos).toBe(900000);
+      // El tramo de noviembre nunca se crea (estaba en $0) — salta directo
+      // a diciembre, sin dejar ninguna fila de $0 en el medio.
+      expect(resultado.pagosAdicionales).toHaveLength(1);
+      expect(resultado.pagosAdicionales[0].periodoMes).toBe(12);
+      expect(resultado.pagosAdicionales[0].importeCentavos).toBe(100000);
+      expect(resultado.pagosAdicionales[0].referencia).toBe("Sobrante de Octubre 2026");
+    });
+
+    it("si no encuentra ningún mes con pendiente, el sobrante vuelve al mes elegido como adelanto", async () => {
+      const { db, usuarioId } = ctx;
+      // El mes elegido (octubre) ya está totalmente al día (sin deuda
+      // ninguna) y no hay NINGÚN mes futuro con pendiente — el pago entero
+      // tiene que quedar en octubre, como si no existiera el reparto.
+      const resultado = await registrarPago(
+        db,
+        { odontologoId, fecha: "2026-10-20", importeCentavos: 500000, moneda: "ARS", medioPagoId, periodoAnio: 2026, periodoMes: 10 },
+        usuarioId
+      );
+      if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
+
+      expect(resultado.pago.importeCentavos).toBe(500000);
+      expect(resultado.pago.periodoMes).toBe(10);
+      expect(resultado.pagosAdicionales).toHaveLength(0);
+    });
+
+    it("sin mes elegido (periodoAnio/periodoMes ausentes), el pago se registra entero sin ningún reparto", async () => {
+      const { db, usuarioId } = ctx;
+      const resultado = await registrarPago(
+        db,
+        { odontologoId, fecha: "2026-10-20", importeCentavos: 500000, moneda: "ARS", medioPagoId },
+        usuarioId
+      );
+      if (!resultado.creado) throw new Error("no debería marcarse como duplicado");
+      expect(resultado.pago.importeCentavos).toBe(500000);
+      expect(resultado.pagosAdicionales).toHaveLength(0);
+    });
   });
 });

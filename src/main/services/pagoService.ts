@@ -11,10 +11,23 @@ import {
 } from "../db/repositories/pagosRepo";
 import { registrarMovimientoHaber, anularMovimientoDePago, actualizarMovimientoDePago } from "../db/repositories/movimientosRepo";
 import { registrarAuditoria } from "../db/repositories/auditoriaRepo";
+import { calcularPendientePuroDeMes } from "./cuentaService";
 import { DenszError } from "../utils/errors";
 import type { Pago } from "../../shared/types/entities";
 
-export type ResultadoRegistrarPago = { creado: true; pago: Pago } | { creado: false; posibleDuplicado: true };
+export type ResultadoRegistrarPago =
+  | { creado: true; pago: Pago; pagosAdicionales: Pago[] }
+  | { creado: false; posibleDuplicado: true };
+
+const NOMBRES_MES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
+
+/** Tope defensivo de meses a mirar hacia adelante buscando dónde meter el
+ * sobrante — nunca debería hacer falta ni cerca de esto en el uso real;
+ * está para no quedar buscando para siempre si algo raro pasara. */
+const MAX_MESES_SOBRANTE = 36;
 
 /**
  * Registra un pago + su movimiento "haber" en una única transacción. Si ya
@@ -48,37 +61,124 @@ export async function registrarPago(
     return { creado: false, posibleDuplicado: true };
   }
 
-  const pagoId = await withTransaction(pool, async (db) => {
-    const id = await insertarPago(db, { ...data, creadoPor: usuarioId });
-    await registrarMovimientoHaber(db, {
-      odontologoId: data.odontologoId,
-      clinicaId: data.clinicaId,
-      pagoId: id,
-      importeCentavos: data.importeCentavos,
-      moneda: data.moneda,
-      fecha: data.fecha,
-      descripcion: "Pago recibido",
-      periodoAnio: data.periodoAnio,
-      periodoMes: data.periodoMes
-    });
+  const idsCreados = await withTransaction(pool, async (db) => {
+    const ids: number[] = [];
+
+    // Si eligió un mes y el pago es MAYOR a lo que ese mes tiene
+    // pendiente, el sobrante se manda solo al próximo mes con algo
+    // pendiente (y al siguiente, si hiciera falta) — pedido explícito:
+    // "si pago de más redondeando, que el sobrante pase solo al próximo
+    // mes". Sin mes elegido, no hay con qué comparar — se guarda tal
+    // cual, como siempre.
+    const tramos: Array<{ anio: number | null; mes: number | null; importeCentavos: number; esSobrante: boolean }> =
+      data.periodoAnio != null && data.periodoMes != null
+        ? await repartirConSobrante(db, { odontologoId: data.odontologoId, clinicaId: data.clinicaId }, data.moneda, data.importeCentavos, data.periodoAnio, data.periodoMes)
+        : [{ anio: null, mes: null, importeCentavos: data.importeCentavos, esSobrante: false }];
+
+    for (const tramo of tramos) {
+      const id = await insertarPago(db, {
+        ...data,
+        importeCentavos: tramo.importeCentavos,
+        periodoAnio: tramo.anio,
+        periodoMes: tramo.mes,
+        referencia: tramo.esSobrante
+          ? `Sobrante de ${NOMBRES_MES[data.periodoMes! - 1]} ${data.periodoAnio}`
+          : data.referencia,
+        creadoPor: usuarioId
+      });
+      await registrarMovimientoHaber(db, {
+        odontologoId: data.odontologoId,
+        clinicaId: data.clinicaId,
+        pagoId: id,
+        importeCentavos: tramo.importeCentavos,
+        moneda: data.moneda,
+        fecha: data.fecha,
+        descripcion: "Pago recibido",
+        periodoAnio: tramo.anio,
+        periodoMes: tramo.mes
+      });
+      ids.push(id);
+    }
+
     await registrarAuditoria(db, {
       usuarioId,
       accion: "crear",
       entidad: "pagos",
-      entidadId: id,
+      entidadId: ids[0],
       detalle: {
         odontologoId: data.odontologoId,
         clinicaId: data.clinicaId,
         importeCentavos: data.importeCentavos,
         moneda: data.moneda,
         medioPagoId: data.medioPagoId,
-        fecha: data.fecha
+        fecha: data.fecha,
+        // Cuando hubo sobrante, dejar anotado en qué meses quedó repartido
+        // — sin esto, Auditoría solo mostraría el primer tramo.
+        tramos: tramos.length > 1 ? tramos : undefined
       }
     });
-    return id;
+
+    return ids;
   });
 
-  return { creado: true, pago: (await obtenerPago(pool, pagoId))! };
+  const pagosCreados = await Promise.all(idsCreados.map((id) => obtenerPago(pool, id)));
+  const [pago, ...pagosAdicionales] = pagosCreados as Pago[];
+  return { creado: true, pago, pagosAdicionales };
+}
+
+/**
+ * Reparte un importe entre el mes elegido y, si sobra, los siguientes
+ * meses con algo pendiente — nunca crea una fila de $0 (un mes ya al día
+ * se salta sin fila propia). Si el sobrante no encuentra ningún mes con
+ * pendiente dentro de `MAX_MESES_SOBRANTE`, el resto vuelve al mes
+ * elegido (queda como adelanto ahí, igual que si nunca hubiera reparto).
+ */
+async function repartirConSobrante(
+  db: Queryable,
+  titular: { odontologoId: number | null; clinicaId: number | null },
+  moneda: Pago["moneda"],
+  importeCentavos: number,
+  anioElegido: number,
+  mesElegido: number
+): Promise<Array<{ anio: number; mes: number; importeCentavos: number; esSobrante: boolean }>> {
+  const tramos: Array<{ anio: number; mes: number; importeCentavos: number; esSobrante: boolean }> = [];
+  let restante = importeCentavos;
+  let anio = anioElegido;
+  let mes = mesElegido;
+
+  for (let i = 0; i < MAX_MESES_SOBRANTE && restante > 0; i++) {
+    const pendiente = await calcularPendientePuroDeMes(db, titular, moneda, anio, mes);
+    if (pendiente > 0) {
+      const aplicado = Math.min(restante, pendiente);
+      // "Sobrante" es cualquier tramo que NO sea el mes que la persona
+      // eligió — nunca depende de si es el primero en crearse (si el mes
+      // elegido ya estaba al día, el primer tramo real que se crea puede
+      // ser el siguiente, y ese sí es sobrante igual).
+      const esSobrante = !(anio === anioElegido && mes === mesElegido);
+      tramos.push({ anio, mes, importeCentavos: aplicado, esSobrante });
+      restante -= aplicado;
+    }
+    // Siguiente mes (sin Date, para no depender de huso horario).
+    mes += 1;
+    if (mes > 12) {
+      mes = 1;
+      anio += 1;
+    }
+  }
+
+  if (restante > 0) {
+    // No quedó ningún mes con pendiente real en todo el rango buscado —
+    // el resto se queda en el mes que eligió la persona, como adelanto
+    // (mismo comportamiento que si no existiera el reparto automático).
+    const yaTieneTramoDelMesElegido = tramos.some((t) => t.anio === anioElegido && t.mes === mesElegido);
+    if (yaTieneTramoDelMesElegido) {
+      tramos[0].importeCentavos += restante;
+    } else {
+      tramos.unshift({ anio: anioElegido, mes: mesElegido, importeCentavos: restante, esSobrante: false });
+    }
+  }
+
+  return tramos;
 }
 
 function validarPeriodo(periodoAnio: number | null | undefined, periodoMes: number | null | undefined): void {

@@ -156,6 +156,27 @@ export async function listarDesglosePorMes(
   return resultados.reverse();
 }
 
+/**
+ * Cuánto queda pendiente de UN mes puntual, en una moneda puntual — la
+ * versión de un solo número de `calcularBloquesMes` (misma fórmula que ya
+ * usa el "Desglose por mes": trabajos + deudas manuales − pagos de ESE
+ * mes, sin arrastrar nada de otros). La usa el sobrante automático de un
+ * pago (ver pagoService.ts) para saber cuánto le queda a un mes antes de
+ * empezarle a mandar el excedente al siguiente.
+ */
+export async function calcularPendientePuroDeMes(
+  db: Queryable,
+  titular: TitularCuenta,
+  moneda: Moneda,
+  anio: number,
+  mes: number
+): Promise<number> {
+  const bloques = await calcularBloquesMes(db, titular, anio, mes);
+  const bloque = bloques.find((b) => b.moneda === moneda);
+  if (!bloque) return 0;
+  return bloque.totalTrabajosCentavos + bloque.totalDeudasManualesCentavos - bloque.totalPagosCentavos;
+}
+
 async function generarResumen(
   pool: Queryable,
   titular: TitularCuenta,

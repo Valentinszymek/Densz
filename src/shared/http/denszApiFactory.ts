@@ -220,7 +220,7 @@ export function crearMetodosHttpComunes(http: HttpPrimitives): Omit<DenszApi, Me
     // valor resuelto en vez de dejar que se propague como ApiError.
     pagosRegistrar: async (data, confirmarDuplicado) => {
       try {
-        return await post<{ creado: true; pago: Pago }>("/pagos", { ...data, confirmarDuplicado });
+        return await post<{ creado: true; pago: Pago; pagosAdicionales: Pago[] }>("/pagos", { ...data, confirmarDuplicado });
       } catch (err) {
         if (err instanceof ApiError && err.status === 409) {
           return { creado: false, posibleDuplicado: true };

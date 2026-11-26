@@ -13,6 +13,14 @@ function hoyISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Mismos nombres que NOMBRES_MES en pagoService.ts — para que el ejemplo
+// de "Sobrante de Octubre 2026" en pantalla coincida exactamente con lo
+// que va a aparecer después en Pagos registrados.
+const NOMBRES_MES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
+
 type Titular = { odontologoId: number } | { clinicaId: number };
 
 export function RegistrarPagoModal({
@@ -137,6 +145,8 @@ export function RegistrarPagoModal({
               <SelectorMes anio={periodoAnio} mes={periodoMes} onChange={(a, m) => { setPeriodoAnio(a); setPeriodoMes(m); }} />
               <p className="mt-1 text-xs text-carbon/40">
                 No tiene que ser el mes de la fecha de arriba — si cobra hoy algo de un mes anterior, elegí ese mes.
+                Si el importe es mayor a lo pendiente de este mes, el sobrante se asigna solo a los meses siguientes
+                con saldo pendiente (queda registrado como "Sobrante de {NOMBRES_MES[periodoMes - 1]} {periodoAnio}").
               </p>
             </FormField>
             <FormField label="Medio de pago">

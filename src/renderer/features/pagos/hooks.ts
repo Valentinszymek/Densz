@@ -45,7 +45,18 @@ export function useRegistrarPago() {
     onSuccess: (resultado) => {
       if (resultado.creado) {
         invalidarCuenta(qc);
-        toast({ titulo: "Pago registrado", tono: "exito" });
+        if (resultado.pagosAdicionales.length > 0) {
+          toast({
+            titulo: "Pago registrado",
+            descripcion:
+              resultado.pagosAdicionales.length === 1
+                ? "El sobrante se asignó automáticamente al mes siguiente con saldo pendiente."
+                : `El sobrante se repartió automáticamente entre los ${resultado.pagosAdicionales.length} meses siguientes con saldo pendiente.`,
+            tono: "exito"
+          });
+        } else {
+          toast({ titulo: "Pago registrado", tono: "exito" });
+        }
       }
     },
     onError: (e: unknown) => toast({ titulo: "No se pudo registrar el pago", descripcion: String(e), tono: "error" })

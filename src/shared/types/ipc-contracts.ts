@@ -629,7 +629,14 @@ export interface DatosNuevoPagoDto {
   periodoMes?: number | null;
 }
 
-export type ResultadoRegistrarPagoDto = { creado: true; pago: Pago } | { creado: false; posibleDuplicado: true };
+/** `pagosAdicionales` solo tiene elementos cuando el importe pagado
+ * superó lo pendiente del mes elegido y el sobrante se repartió solo en
+ * los meses siguientes (ver repartirConSobrante en pagoService.ts) — cada
+ * uno ya quedó registrado como un pago propio, con su referencia tipo
+ * "Sobrante de Octubre 2026". */
+export type ResultadoRegistrarPagoDto =
+  | { creado: true; pago: Pago; pagosAdicionales: Pago[] }
+  | { creado: false; posibleDuplicado: true };
 
 /** Igual que DatosNuevoPagoDto, sin odontologoId/clinicaId — el titular
  * de un pago no se puede cambiar desde el formulario de edición. */
