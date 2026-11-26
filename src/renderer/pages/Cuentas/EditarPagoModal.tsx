@@ -5,7 +5,7 @@ import { FormField, Input } from "../../components/ui/Input";
 import { CurrencyInput } from "../../components/ui/CurrencyInput";
 import { SelectorMes } from "../../components/ui/SelectorMes";
 import { useMediosPago, useEditarPago } from "../../features/pagos/hooks";
-import type { Moneda, MovimientoCuenta } from "@shared/types/entities";
+import type { Moneda, Pago } from "@shared/types/entities";
 
 /**
  * Mismos campos que "Registrar pago" (RegistrarPagoModal.tsx), pero
@@ -23,7 +23,7 @@ export function EditarPagoModal({
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  pago: MovimientoCuenta;
+  pago: Pago;
 }) {
   const [fecha, setFecha] = useState(pago.fecha.slice(0, 10));
   const [importe, setImporte] = useState(pago.importeCentavos);
@@ -58,10 +58,8 @@ export function EditarPagoModal({
     setError(null);
     if (importe <= 0) return setError("Ingresá un importe mayor a cero.");
     if (!medioPagoId) return setError("Seleccioná un medio de pago.");
-    if (!pago.pagoId) return setError("Este movimiento no corresponde a un pago.");
-
     await editar.mutateAsync({
-      id: pago.pagoId,
+      id: pago.id,
       data: { fecha, importeCentavos: importe, moneda, medioPagoId, referencia: referencia || null, periodoAnio, periodoMes }
     });
     onOpenChange(false);

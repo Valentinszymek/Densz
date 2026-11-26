@@ -9,7 +9,6 @@ import { SelectorMes } from "../../components/ui/SelectorMes";
 import { useClinica } from "../../features/clinicas/hooks";
 import {
   useSaldosClinica,
-  useMovimientosClinica,
   useResumenMesClinica,
   useDesglosePorMesClinica,
   useResumenesMensualesClinica,
@@ -24,7 +23,7 @@ import { EditarPagoModal } from "./EditarPagoModal";
 import { AgregarDeudaModal } from "./AgregarDeudaModal";
 import { EditarDeudaModal } from "./EditarDeudaModal";
 import { AnularDeudaModal } from "./AnularDeudaModal";
-import type { TrabajoFacturadoMes, MovimientoCuenta } from "@shared/types/entities";
+import type { TrabajoFacturadoMes, MovimientoCuenta, Pago } from "@shared/types/entities";
 
 const NOMBRES_MES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -89,16 +88,18 @@ export default function ClinicaCuentaDetalle() {
     () => (resumenesGenerados ?? []).filter((r) => r.anio === anio && r.mes === mes),
     [resumenesGenerados, anio, mes]
   );
-  const { data: movimientos } = useMovimientosClinica(clinicaId);
-  const pagos = useMemo(() => (movimientos ?? []).filter((m) => m.tipo === "haber"), [movimientos]);
-  const deudas = useMemo(() => (movimientos ?? []).filter((m) => m.tipo === "debe" && m.ordenId === null), [movimientos]);
+  // Igual criterio que CuentaDetalle.tsx (odontólogo) — "cada sector con
+  // su sector": solo los pagos/deudas asignados al mes que se está
+  // mirando, nunca la lista sin filtrar de toda la vida.
+  const pagosDelMes = useMemo(() => (bloques ?? []).flatMap((b) => b.pagosDelMes), [bloques]);
+  const deudasDelMes = useMemo(() => (bloques ?? []).flatMap((b) => b.deudasManuales), [bloques]);
 
   const imprimir = useImprimirEstadoDeCuentaClinica();
   const verPdfResumen = useVerPdfResumen();
 
   const [pagoAbierto, setPagoAbierto] = useState(false);
   const [pagoAAnular, setPagoAAnular] = useState<number | null>(null);
-  const [pagoAEditar, setPagoAEditar] = useState<MovimientoCuenta | null>(null);
+  const [pagoAEditar, setPagoAEditar] = useState<Pago | null>(null);
   const [deudaAbierta, setDeudaAbierta] = useState(false);
   const [deudaAEditar, setDeudaAEditar] = useState<MovimientoCuenta | null>(null);
   const [deudaAAnular, setDeudaAAnular] = useState<number | null>(null);
@@ -246,9 +247,10 @@ export default function ClinicaCuentaDetalle() {
           </div>
         ))}
 
-      <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2 mt-8">Pagos registrados</p>
-      {pagos.length === 0 && <p className="text-sm text-carbon/40">Sin pagos todavía.</p>}
-      {pagos.length > 0 && (
+      <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-0.5 mt-8">Pagos registrados</p>
+      <p className="text-xs text-carbon/40 mb-2">Solo los asignados a {NOMBRES_MES[mes - 1]} {anio} — cambiá de mes arriba para ver los demás.</p>
+      {pagosDelMes.length === 0 && <p className="text-sm text-carbon/40">Sin pagos asignados a este mes.</p>}
+      {pagosDelMes.length > 0 && (
         <Table>
           <Thead>
             <Tr>
@@ -260,28 +262,28 @@ export default function ClinicaCuentaDetalle() {
             </Tr>
           </Thead>
           <Tbody>
-            {pagos.map((m) => (
-              <Tr key={m.id} className={m.anulado ? "opacity-40" : ""}>
-                <Td className="text-carbon/60">{formatearFecha(m.fecha)}</Td>
+            {pagosDelMes.map((p) => (
+              <Tr key={p.id} className={p.anulado ? "opacity-40" : ""}>
+                <Td className="text-carbon/60">{formatearFecha(p.fecha)}</Td>
                 <Td>
-                  {m.medioPagoNombre ?? m.descripcion}
-                  <Badge tono="neutral" className="ml-2">{m.moneda}</Badge>
-                  {m.periodoMes != null && !esDelMismoMes(m.fecha, m.periodoAnio!, m.periodoMes) && (
+                  {p.medioPagoNombre ?? "—"}
+                  <Badge tono="neutral" className="ml-2">{p.moneda}</Badge>
+                  {p.periodoMes != null && !esDelMismoMes(p.fecha, p.periodoAnio!, p.periodoMes) && (
                     <Badge tono="gold" className="ml-2">
-                      → {NOMBRES_MES[m.periodoMes - 1]} {m.periodoAnio}
+                      → {NOMBRES_MES[p.periodoMes - 1]} {p.periodoAnio}
                     </Badge>
                   )}
-                  {m.anulado && <Badge tono="error" className="ml-2">Anulado</Badge>}
+                  {p.anulado && <Badge tono="error" className="ml-2">Anulado</Badge>}
                 </Td>
-                <Td className="text-carbon/60">{m.referencia || "—"}</Td>
-                <Td className="text-emerald-700 font-medium">{formatearMoneda(m.importeCentavos, m.moneda)}</Td>
+                <Td className="text-carbon/60">{p.referencia || "—"}</Td>
+                <Td className="text-emerald-700 font-medium">{formatearMoneda(p.importeCentavos, p.moneda)}</Td>
                 <Td>
-                  {m.pagoId && !m.anulado && (
+                  {!p.anulado && (
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => setPagoAEditar(m)} title="Editar pago">
+                      <Button variant="ghost" size="sm" onClick={() => setPagoAEditar(p)} title="Editar pago">
                         <Pencil size={13} />
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setPagoAAnular(m.pagoId!)} title="Anular pago">
+                      <Button variant="ghost" size="sm" onClick={() => setPagoAAnular(p.id)} title="Anular pago">
                         <Ban size={13} />
                       </Button>
                     </div>
@@ -324,9 +326,10 @@ export default function ClinicaCuentaDetalle() {
         </div>
       )}
 
-      <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-2 mt-8">Deudas agregadas</p>
-      {deudas.length === 0 && <p className="text-sm text-carbon/40">Sin deudas agregadas a mano.</p>}
-      {deudas.length > 0 && (
+      <p className="text-xs font-semibold uppercase tracking-wide text-carbon/40 mb-0.5 mt-8">Deudas agregadas</p>
+      <p className="text-xs text-carbon/40 mb-2">Solo las de {NOMBRES_MES[mes - 1]} {anio}.</p>
+      {deudasDelMes.length === 0 && <p className="text-sm text-carbon/40">Sin deudas agregadas a mano este mes.</p>}
+      {deudasDelMes.length > 0 && (
         <Table>
           <Thead>
             <Tr>
@@ -337,7 +340,7 @@ export default function ClinicaCuentaDetalle() {
             </Tr>
           </Thead>
           <Tbody>
-            {deudas.map((m) => (
+            {deudasDelMes.map((m) => (
               <Tr key={m.id} className={m.anulado ? "opacity-40" : ""}>
                 <Td className="text-carbon/60">{formatearFecha(m.fecha)}</Td>
                 <Td>
